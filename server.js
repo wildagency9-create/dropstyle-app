@@ -25,6 +25,118 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// ============================================
+// INITIALISER LA BASE DE DONNÉES
+// ============================================
+async function initDB() {
+    try {
+        const conn = await pool.getConnection();
+        
+        console.log('🔄 Création des tables...');
+        
+        // Créer les tables
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                nom VARCHAR(255) NOT NULL,
+                role ENUM('user', 'admin') DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS vinyles (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                price DECIMAL(10, 2) NOT NULL,
+                type VARCHAR(50),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS materiaux (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                support VARCHAR(255) NOT NULL,
+                price DECIMAL(10, 2) NOT NULL,
+                categorie VARCHAR(50),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS poseurs (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                nom VARCHAR(255) NOT NULL,
+                jour DECIMAL(10, 2) NOT NULL,
+                demijour DECIMAL(10, 2) NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS devis (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                qty INT NOT NULL,
+                ht DECIMAL(10, 2) NOT NULL,
+                ttc DECIMAL(10, 2) NOT NULL,
+                details JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        
+        // Vérifier si admin existe
+        const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
+        
+        if (users[0].count === 0) {
+            console.log('📝 Création admin par défaut...');
+            
+            const bcrypt = require('bcrypt');
+            const hashedPassword = await bcrypt.hash('admin123', 10);
+            
+            await conn.query(
+                'INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)',
+                ['admin@dropstyle.com', hashedPassword, 'Admin DropStyle', 'admin']
+            );
+            
+            const [adminUser] = await conn.query('SELECT id FROM users WHERE email = ?', ['admin@dropstyle.com']);
+            const adminId = adminUser[0].id;
+            
+            // Ajouter données par défaut
+            await conn.query(
+                'INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)',
+                [adminId, '3M Scotchprint Standard', 12.50, 'standard']
+            );
+            
+            await conn.query(
+                'INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)',
+                [adminId, 'PVC 380g blanc', 15.00, 'pvc']
+            );
+            
+            await conn.query(
+                'INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)',
+                [adminId, 'Jean Pose Pro', 150.00, 85.00]
+            );
+            
+            console.log('✅ Base de données initialisée avec admin par défaut');
+        } else {
+            console.log('✅ Base de données déjà prête');
+        }
+        
+        await conn.release();
+    } catch (err) {
+        console.error('⚠️ Erreur initialisation DB:', err.message);
+    }
+}
+
 // Middleware de vérification JWT
 const verifyToken = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
@@ -52,17 +164,14 @@ app.post('/api/auth/register', async (req, res) => {
         
         const conn = await pool.getConnection();
         
-        // Vérifier si email existe
         const [rows] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
         if (rows.length > 0) {
             await conn.release();
             return res.status(400).json({ error: 'Email déjà utilisé' });
         }
         
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // Créer utilisateur
         await conn.query(
             'INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)',
             [email, hashedPassword, nom, 'user']
@@ -97,7 +206,6 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(401).json({ error: 'Identifiants invalides' });
         }
         
-        // Générer JWT
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role },
             process.env.JWT_SECRET || 'secret123',
@@ -120,10 +228,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
-// ROUTES TARIFS (VINYLES, MATÉRIAUX, POSEURS)
+// ROUTES TARIFS
 // ============================================
 
-// GET tous les tarifs
 app.get('/api/tarifs/vinyles', verifyToken, async (req, res) => {
     try {
         const conn = await pool.getConnection();
@@ -157,7 +264,6 @@ app.get('/api/tarifs/poseurs', verifyToken, async (req, res) => {
     }
 });
 
-// POST créer
 app.post('/api/tarifs/vinyles', verifyToken, async (req, res) => {
     try {
         const { name, price, type } = req.body;
@@ -203,7 +309,6 @@ app.post('/api/tarifs/poseurs', verifyToken, async (req, res) => {
     }
 });
 
-// PUT modifier
 app.put('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
     try {
         const { name, price, type } = req.body;
@@ -219,7 +324,6 @@ app.put('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
     }
 });
 
-// DELETE
 app.delete('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
     try {
         const conn = await pool.getConnection();
@@ -265,7 +369,7 @@ app.get('/api/devis', verifyToken, async (req, res) => {
 });
 
 // ============================================
-// ROUTES ADMIN - GESTION UTILISATEURS
+// ROUTES ADMIN
 // ============================================
 
 app.get('/api/admin/users', verifyToken, async (req, res) => {
@@ -320,10 +424,6 @@ app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
     }
 });
 
-// ============================================
-// ROUTES ADMIN - STATS DASHBOARD
-// ============================================
-
 app.get('/api/admin/stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') {
@@ -361,7 +461,6 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/admin-dashboard.html'));
 });
 
-// Error handling
 app.use((err, req, res, next) => {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -369,8 +468,10 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`✅ DropStyle API running on http://localhost:${PORT}`);
+app.listen(PORT, async () => {
+    console.log('⏳ Initialisation de la base de données...');
+    await initDB();
+    console.log(`✅ DropStyle API running on port ${PORT}`);
 });
 
 module.exports = app;
