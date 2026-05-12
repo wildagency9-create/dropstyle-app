@@ -16,59 +16,88 @@
             --text-secondary: #999;
             --success: #4caf50;
             --danger: #ff5252;
+            --gold: #d4af37;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; width: 100%; }
+        html, body { width: 100%; min-height: 100vh; }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg-dark);
             color: var(--text-primary);
-            overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            line-height: 1.5;
         }
 
         header {
             background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.05) 100%);
             border-bottom: 2px solid var(--primary);
-            padding: 20px 32px;
-            margin: -20px -20px 20px -20px;
+            padding: 16px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white; font-size: 20px;
+        }
         h1 {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--primary);
+            font-size: 22px; font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        .logout-btn {
-            padding: 10px 20px;
-            background: var(--danger);
+        .header-actions { display: flex; gap: 10px; }
+        
+        button {
+            padding: 10px 18px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
             color: white;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s;
         }
+        button:hover { transform: translateY(-1px); }
+        button.calc-btn {
+            background: rgba(212,175,55,0.2);
+            color: var(--gold);
+            border: 1px solid var(--gold);
+        }
+        button.logout-btn {
+            background: rgba(255,82,82,0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+        button.danger { background: var(--danger); }
+        button.success { background: var(--success); }
+        button.small { padding: 6px 10px; font-size: 10px; }
 
-        .logout-btn:hover {
-            opacity: 0.9;
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
 
         .stat-card {
@@ -77,121 +106,93 @@
             border-radius: 8px;
             padding: 20px;
             text-align: center;
+            transition: transform 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
         }
 
+        .stat-icon { font-size: 32px; margin-bottom: 8px; }
         .stat-label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
-
         .stat-value {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
             color: var(--primary);
         }
 
-        .section {
-            margin-bottom: 32px;
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .tab-btn {
+            padding: 12px 18px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+            margin-bottom: -1px;
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
         }
 
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
         .section-title {
             font-size: 18px;
             font-weight: 700;
             color: var(--primary);
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid var(--border);
         }
 
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 10px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 13px;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        button {
-            padding: 10px 20px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            transition: all 0.3s;
-        }
-
-        button:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-
-        button.danger {
-            background: var(--danger);
-        }
-
-        button.danger:hover {
-            background: #ff3838;
-        }
-
-        .users-table {
-            width: 100%;
-            border-collapse: collapse;
+        .table-wrap {
             background: var(--bg-card);
             border-radius: 8px;
             overflow: hidden;
         }
-
-        .users-table th {
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
             background: rgba(255,87,34,0.1);
             padding: 12px;
             text-align: left;
             font-weight: 600;
             color: var(--primary);
-            border-bottom: 2px solid var(--border);
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
-
-        .users-table td {
+        td {
             padding: 12px;
             border-bottom: 1px solid var(--border);
             font-size: 13px;
         }
-
-        .users-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .users-table tr:hover {
-            background: rgba(255,87,34,0.05);
-        }
+        tr:last-child td { border: none; }
+        tr:hover { background: rgba(255,87,34,0.03); }
 
         .badge {
             display: inline-block;
@@ -201,48 +202,55 @@
             font-weight: 700;
             text-transform: uppercase;
         }
-
-        .badge.admin {
-            background: rgba(255,87,34,0.2);
-            color: var(--primary);
-        }
-
-        .badge.user {
-            background: rgba(76,175,80,0.2);
-            color: var(--success);
-        }
+        .badge.admin { background: rgba(255,87,34,0.2); color: var(--primary); }
+        .badge.user { background: rgba(76,175,80,0.2); color: var(--success); }
 
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.7);
             align-items: center;
             justify-content: center;
             z-index: 1000;
         }
-
-        .modal.active {
-            display: flex;
-        }
-
+        .modal.active { display: flex; }
         .modal-content {
             background: var(--bg-card);
             border: 2px solid var(--primary);
             border-radius: 8px;
             padding: 24px;
-            max-width: 400px;
+            max-width: 420px;
             width: 90%;
         }
-
         .modal-header {
             font-size: 18px;
             font-weight: 700;
             color: var(--primary);
             margin-bottom: 16px;
+        }
+
+        .form-group { margin-bottom: 12px; }
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         .modal-actions {
@@ -258,14 +266,12 @@
             margin-bottom: 16px;
             display: none;
         }
-
         .message.success {
             background: rgba(76,175,80,0.15);
             color: var(--success);
             border-left: 3px solid var(--success);
             display: block;
         }
-
         .message.error {
             background: rgba(255,82,82,0.15);
             color: var(--danger);
@@ -273,90 +279,275 @@
             display: block;
         }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
+        .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>🎛️ Dashboard Admin</h1>
+<header>
+    <div class="header-left">
+        <div class="logo-icon">D</div>
+        <h1>Dashboard Admin</h1>
+    </div>
+    <div class="header-actions">
+        <button class="calc-btn" onclick="window.location.href='/app'">Calculateur</button>
         <button class="logout-btn" onclick="logout()">Déconnexion</button>
-    </header>
+    </div>
+</header>
 
+<div class="container">
     <!-- STATS -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-label">Total Utilisateurs</div>
+            <div class="stat-icon">👥</div>
+            <div class="stat-label">Utilisateurs</div>
             <div class="stat-value" id="stat-users">0</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Total Devis</div>
+            <div class="stat-icon">📋</div>
+            <div class="stat-label">Devis</div>
             <div class="stat-value" id="stat-devis">0</div>
         </div>
         <div class="stat-card">
+            <div class="stat-icon">💰</div>
             <div class="stat-label">Revenu Total</div>
             <div class="stat-value" id="stat-revenue">0€</div>
         </div>
     </div>
 
-    <!-- MESSAGE -->
     <div class="message" id="message"></div>
 
-    <!-- SECTION USERS -->
-    <div class="section">
-        <div class="section-title">Gestion Utilisateurs</div>
-        
-        <button onclick="openAddUserModal()" style="margin-bottom: 16px;">+ Ajouter un utilisateur</button>
+    <!-- TABS -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('users')">👥 Utilisateurs</button>
+        <button class="tab-btn" onclick="switchTab('vinyles')">🎨 Vinyles</button>
+        <button class="tab-btn" onclick="switchTab('materiaux')">📋 Matériaux</button>
+        <button class="tab-btn" onclick="switchTab('poseurs')">👷 Poseurs</button>
+    </div>
 
-        <table class="users-table">
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Nom</th>
-                    <th>Rôle</th>
-                    <th>Inscrit le</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="users-list">
-                <tr><td colspan="5" style="text-align: center;">Chargement...</td></tr>
-            </tbody>
-        </table>
+    <!-- TAB USERS -->
+    <div class="tab-content active" id="tab-users">
+        <div class="section-header">
+            <div class="section-title">Gestion Utilisateurs</div>
+            <button onclick="openModal('modal-user')">+ Ajouter utilisateur</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Nom</th>
+                        <th>Rôle</th>
+                        <th>Inscrit le</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="users-list">
+                    <tr><td colspan="5" class="empty-state">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB VINYLES -->
+    <div class="tab-content" id="tab-vinyles">
+        <div class="section-header">
+            <div class="section-title">Gestion Vinyles</div>
+            <button onclick="openModal('modal-vinyle')">+ Ajouter vinyle</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Prix (€/m²)</th>
+                        <th>Type</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="vinyles-list">
+                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB MATERIAUX -->
+    <div class="tab-content" id="tab-materiaux">
+        <div class="section-header">
+            <div class="section-title">Gestion Matériaux</div>
+            <button onclick="openModal('modal-materiau')">+ Ajouter matériau</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Support</th>
+                        <th>Prix (€/m²)</th>
+                        <th>Catégorie</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="materiaux-list">
+                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB POSEURS -->
+    <div class="tab-content" id="tab-poseurs">
+        <div class="section-header">
+            <div class="section-title">Gestion Poseurs</div>
+            <button onclick="openModal('modal-poseur')">+ Ajouter poseur</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Tarif Journée (€)</th>
+                        <th>Tarif Demi-journée (€)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="poseurs-list">
+                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<!-- MODAL ADD USER -->
-<div class="modal" id="modal-add-user">
+<!-- MODAL USER -->
+<div class="modal" id="modal-user">
     <div class="modal-content">
         <div class="modal-header">Ajouter un utilisateur</div>
-        <form onsubmit="handleAddUser(event)">
+        <form onsubmit="addUser(event)">
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" id="add-email" required />
+                <input type="email" id="user-email" required>
             </div>
             <div class="form-group">
-                <label>Nom</label>
-                <input type="text" id="add-nom" required />
+                <label>Nom complet</label>
+                <input type="text" id="user-nom" required>
             </div>
             <div class="form-group">
                 <label>Mot de passe</label>
-                <input type="password" id="add-password" required />
+                <input type="password" id="user-password" required>
             </div>
             <div class="form-group">
                 <label>Rôle</label>
-                <select id="add-role">
+                <select id="user-role">
                     <option value="user">Utilisateur</option>
                     <option value="admin">Admin</option>
                 </select>
             </div>
             <div class="modal-actions">
-                <button type="button" onclick="closeModal('modal-add-user')">Annuler</button>
-                <button type="submit">Créer</button>
+                <button type="button" class="danger" onclick="closeModal('modal-user')">Annuler</button>
+                <button type="submit" class="success">Créer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL VINYLE -->
+<div class="modal" id="modal-vinyle">
+    <div class="modal-content">
+        <div class="modal-header" id="vinyle-modal-title">Ajouter un vinyle</div>
+        <form onsubmit="saveVinyle(event)">
+            <input type="hidden" id="vinyle-id">
+            <div class="form-group">
+                <label>Nom du vinyle</label>
+                <input type="text" id="vinyle-name" required placeholder="3M Scotchprint Premium">
+            </div>
+            <div class="row2">
+                <div class="form-group">
+                    <label>Prix (€/m²)</label>
+                    <input type="number" id="vinyle-price" required step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="vinyle-type">
+                        <option value="standard">Standard</option>
+                        <option value="premium">Premium</option>
+                        <option value="special">Spécial</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-vinyle')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL MATERIAU -->
+<div class="modal" id="modal-materiau">
+    <div class="modal-content">
+        <div class="modal-header" id="materiau-modal-title">Ajouter un matériau</div>
+        <form onsubmit="saveMateriau(event)">
+            <input type="hidden" id="materiau-id">
+            <div class="form-group">
+                <label>Support</label>
+                <input type="text" id="materiau-support" required placeholder="PVC 380g blanc">
+            </div>
+            <div class="row2">
+                <div class="form-group">
+                    <label>Prix (€/m²)</label>
+                    <input type="number" id="materiau-price" required step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Catégorie</label>
+                    <select id="materiau-categorie">
+                        <option value="pvc">PVC</option>
+                        <option value="acrylique">Acrylique</option>
+                        <option value="dibond">DiBond</option>
+                        <option value="aluminium">Aluminium</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-materiau')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL POSEUR -->
+<div class="modal" id="modal-poseur">
+    <div class="modal-content">
+        <div class="modal-header" id="poseur-modal-title">Ajouter un poseur</div>
+        <form onsubmit="savePoseur(event)">
+            <input type="hidden" id="poseur-id">
+            <div class="form-group">
+                <label>Nom</label>
+                <input type="text" id="poseur-nom" required placeholder="Jean Dupont">
+            </div>
+            <div class="row2">
+                <div class="form-group">
+                    <label>Tarif journée (€ HT)</label>
+                    <input type="number" id="poseur-jour" required step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Tarif demi-journée (€ HT)</label>
+                    <input type="number" id="poseur-demijour" required step="0.01" min="0">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-poseur')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
             </div>
         </form>
     </div>
@@ -376,9 +567,18 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    loadStats();
-    loadUsers();
+    loadAll();
 });
+
+async function loadAll() {
+    await Promise.all([
+        loadStats(),
+        loadUsers(),
+        loadVinyles(),
+        loadMateriaux(),
+        loadPoseurs()
+    ]);
+}
 
 async function loadStats() {
     try {
@@ -386,13 +586,10 @@ async function loadStats() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await resp.json();
-
         document.getElementById('stat-users').textContent = data.users;
         document.getElementById('stat-devis').textContent = data.devis;
-        document.getElementById('stat-revenue').textContent = data.revenue.toFixed(2) + '€';
-    } catch (err) {
-        console.error(err);
-    }
+        document.getElementById('stat-revenue').textContent = parseFloat(data.revenue).toFixed(2) + '€';
+    } catch (err) { console.error(err); }
 }
 
 async function loadUsers() {
@@ -402,89 +599,331 @@ async function loadUsers() {
         });
         const users = await resp.json();
 
-        const html = users.map(u => `
+        if (users.length === 0) {
+            document.getElementById('users-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur</td></tr>';
+            return;
+        }
+
+        document.getElementById('users-list').innerHTML = users.map(u => `
             <tr>
                 <td>${u.email}</td>
                 <td>${u.nom}</td>
                 <td><span class="badge ${u.role}">${u.role}</span></td>
                 <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+                <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Supprimer</button>` : '—'}</td>
+            </tr>
+        `).join('');
+    } catch (err) { console.error(err); }
+}
+
+async function loadVinyles() {
+    try {
+        const resp = await fetch(`${API_URL}/tarifs/vinyles`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const items = await resp.json();
+
+        if (items.length === 0) {
+            document.getElementById('vinyles-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun vinyle - cliquez sur "Ajouter vinyle"</td></tr>';
+            return;
+        }
+
+        document.getElementById('vinyles-list').innerHTML = items.map(v => `
+            <tr>
+                <td>${v.name}</td>
+                <td>${parseFloat(v.price).toFixed(2)}</td>
+                <td><span class="badge user">${v.type}</span></td>
                 <td>
-                    ${u.id !== user.id ? `<button class="danger" onclick="deleteUser(${u.id})">Supprimer</button>` : '—'}
+                    <button class="small" onclick='editVinyle(${JSON.stringify(v)})'>Modifier</button>
+                    <button class="danger small" onclick="deleteVinyle(${v.id})">Suppr.</button>
                 </td>
             </tr>
         `).join('');
-
-        document.getElementById('users-list').innerHTML = html;
-    } catch (err) {
-        console.error(err);
-    }
+    } catch (err) { console.error(err); }
 }
 
-function openAddUserModal() {
-    document.getElementById('modal-add-user').classList.add('active');
+async function loadMateriaux() {
+    try {
+        const resp = await fetch(`${API_URL}/tarifs/materiaux`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const items = await resp.json();
+
+        if (items.length === 0) {
+            document.getElementById('materiaux-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun matériau - cliquez sur "Ajouter matériau"</td></tr>';
+            return;
+        }
+
+        document.getElementById('materiaux-list').innerHTML = items.map(m => `
+            <tr>
+                <td>${m.support}</td>
+                <td>${parseFloat(m.price).toFixed(2)}</td>
+                <td><span class="badge user">${m.categorie}</span></td>
+                <td>
+                    <button class="small" onclick='editMateriau(${JSON.stringify(m)})'>Modifier</button>
+                    <button class="danger small" onclick="deleteMateriau(${m.id})">Suppr.</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) { console.error(err); }
+}
+
+async function loadPoseurs() {
+    try {
+        const resp = await fetch(`${API_URL}/tarifs/poseurs`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const items = await resp.json();
+
+        if (items.length === 0) {
+            document.getElementById('poseurs-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun poseur - cliquez sur "Ajouter poseur"</td></tr>';
+            return;
+        }
+
+        document.getElementById('poseurs-list').innerHTML = items.map(p => `
+            <tr>
+                <td>${p.nom}</td>
+                <td>${parseFloat(p.jour).toFixed(2)}</td>
+                <td>${parseFloat(p.demijour).toFixed(2)}</td>
+                <td>
+                    <button class="small" onclick='editPoseur(${JSON.stringify(p)})'>Modifier</button>
+                    <button class="danger small" onclick="deletePoseur(${p.id})">Suppr.</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) { console.error(err); }
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+}
+
+function openModal(id) {
+    if (id === 'modal-vinyle') {
+        document.getElementById('vinyle-id').value = '';
+        document.getElementById('vinyle-name').value = '';
+        document.getElementById('vinyle-price').value = '';
+        document.getElementById('vinyle-modal-title').textContent = 'Ajouter un vinyle';
+    }
+    if (id === 'modal-materiau') {
+        document.getElementById('materiau-id').value = '';
+        document.getElementById('materiau-support').value = '';
+        document.getElementById('materiau-price').value = '';
+        document.getElementById('materiau-modal-title').textContent = 'Ajouter un matériau';
+    }
+    if (id === 'modal-poseur') {
+        document.getElementById('poseur-id').value = '';
+        document.getElementById('poseur-nom').value = '';
+        document.getElementById('poseur-jour').value = '';
+        document.getElementById('poseur-demijour').value = '';
+        document.getElementById('poseur-modal-title').textContent = 'Ajouter un poseur';
+    }
+    document.getElementById(id).classList.add('active');
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-async function handleAddUser(event) {
+function showMessage(text, type) {
+    const el = document.getElementById('message');
+    el.textContent = text;
+    el.className = `message ${type}`;
+    setTimeout(() => el.className = 'message', 4000);
+}
+
+// USERS
+async function addUser(event) {
     event.preventDefault();
-    const email = document.getElementById('add-email').value;
-    const nom = document.getElementById('add-nom').value;
-    const password = document.getElementById('add-password').value;
-    const role = document.getElementById('add-role').value;
+    const email = document.getElementById('user-email').value;
+    const nom = document.getElementById('user-nom').value;
+    const password = document.getElementById('user-password').value;
+    const role = document.getElementById('user-role').value;
 
     try {
         const resp = await fetch(`${API_URL}/admin/users`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, nom, password, role })
         });
 
         if (resp.ok) {
             showMessage('Utilisateur créé', 'success');
-            closeModal('modal-add-user');
+            closeModal('modal-user');
             loadUsers();
             loadStats();
+            event.target.reset();
         } else {
             const err = await resp.json();
             showMessage(err.error || 'Erreur', 'error');
         }
-    } catch (err) {
-        showMessage('Erreur serveur', 'error');
-        console.error(err);
-    }
+    } catch (err) { showMessage('Erreur serveur', 'error'); }
 }
 
 async function deleteUser(id) {
-    if (!confirm('Êtes-vous sûr ?')) return;
-
+    if (!confirm('Supprimer cet utilisateur ?')) return;
     try {
-        const resp = await fetch(`${API_URL}/admin/users/${id}`, {
+        await fetch(`${API_URL}/admin/users/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (resp.ok) {
-            showMessage('Utilisateur supprimé', 'success');
-            loadUsers();
-            loadStats();
-        }
-    } catch (err) {
-        showMessage('Erreur', 'error');
-        console.error(err);
-    }
+        showMessage('Utilisateur supprimé', 'success');
+        loadUsers();
+        loadStats();
+    } catch (err) { showMessage('Erreur', 'error'); }
 }
 
-function showMessage(text, type) {
-    const el = document.getElementById('message');
-    el.textContent = text;
-    el.className = `message ${type}`;
-    setTimeout(() => el.className = 'message', 5000);
+// VINYLES
+async function saveVinyle(event) {
+    event.preventDefault();
+    const id = document.getElementById('vinyle-id').value;
+    const name = document.getElementById('vinyle-name').value;
+    const price = parseFloat(document.getElementById('vinyle-price').value);
+    const type = document.getElementById('vinyle-type').value;
+
+    try {
+        const url = id ? `${API_URL}/tarifs/vinyles/${id}` : `${API_URL}/tarifs/vinyles`;
+        const method = id ? 'PUT' : 'POST';
+
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, price, type })
+        });
+
+        if (resp.ok) {
+            showMessage(id ? 'Vinyle modifié' : 'Vinyle créé', 'success');
+            closeModal('modal-vinyle');
+            loadVinyles();
+            event.target.reset();
+        } else {
+            showMessage('Erreur', 'error');
+        }
+    } catch (err) { showMessage('Erreur serveur', 'error'); }
+}
+
+function editVinyle(v) {
+    document.getElementById('vinyle-id').value = v.id;
+    document.getElementById('vinyle-name').value = v.name;
+    document.getElementById('vinyle-price').value = v.price;
+    document.getElementById('vinyle-type').value = v.type;
+    document.getElementById('vinyle-modal-title').textContent = 'Modifier le vinyle';
+    document.getElementById('modal-vinyle').classList.add('active');
+}
+
+async function deleteVinyle(id) {
+    if (!confirm('Supprimer ce vinyle ?')) return;
+    try {
+        await fetch(`${API_URL}/tarifs/vinyles/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        showMessage('Vinyle supprimé', 'success');
+        loadVinyles();
+    } catch (err) { showMessage('Erreur', 'error'); }
+}
+
+// MATERIAUX
+async function saveMateriau(event) {
+    event.preventDefault();
+    const id = document.getElementById('materiau-id').value;
+    const support = document.getElementById('materiau-support').value;
+    const price = parseFloat(document.getElementById('materiau-price').value);
+    const categorie = document.getElementById('materiau-categorie').value;
+
+    try {
+        const url = id ? `${API_URL}/tarifs/materiaux/${id}` : `${API_URL}/tarifs/materiaux`;
+        const method = id ? 'PUT' : 'POST';
+
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ support, price, categorie })
+        });
+
+        if (resp.ok) {
+            showMessage(id ? 'Matériau modifié' : 'Matériau créé', 'success');
+            closeModal('modal-materiau');
+            loadMateriaux();
+            event.target.reset();
+        } else {
+            showMessage('Erreur', 'error');
+        }
+    } catch (err) { showMessage('Erreur serveur', 'error'); }
+}
+
+function editMateriau(m) {
+    document.getElementById('materiau-id').value = m.id;
+    document.getElementById('materiau-support').value = m.support;
+    document.getElementById('materiau-price').value = m.price;
+    document.getElementById('materiau-categorie').value = m.categorie;
+    document.getElementById('materiau-modal-title').textContent = 'Modifier le matériau';
+    document.getElementById('modal-materiau').classList.add('active');
+}
+
+async function deleteMateriau(id) {
+    if (!confirm('Supprimer ce matériau ?')) return;
+    try {
+        await fetch(`${API_URL}/tarifs/materiaux/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        showMessage('Matériau supprimé', 'success');
+        loadMateriaux();
+    } catch (err) { showMessage('Erreur', 'error'); }
+}
+
+// POSEURS
+async function savePoseur(event) {
+    event.preventDefault();
+    const id = document.getElementById('poseur-id').value;
+    const nom = document.getElementById('poseur-nom').value;
+    const jour = parseFloat(document.getElementById('poseur-jour').value);
+    const demijour = parseFloat(document.getElementById('poseur-demijour').value);
+
+    try {
+        const url = id ? `${API_URL}/tarifs/poseurs/${id}` : `${API_URL}/tarifs/poseurs`;
+        const method = id ? 'PUT' : 'POST';
+
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nom, jour, demijour })
+        });
+
+        if (resp.ok) {
+            showMessage(id ? 'Poseur modifié' : 'Poseur créé', 'success');
+            closeModal('modal-poseur');
+            loadPoseurs();
+            event.target.reset();
+        } else {
+            showMessage('Erreur', 'error');
+        }
+    } catch (err) { showMessage('Erreur serveur', 'error'); }
+}
+
+function editPoseur(p) {
+    document.getElementById('poseur-id').value = p.id;
+    document.getElementById('poseur-nom').value = p.nom;
+    document.getElementById('poseur-jour').value = p.jour;
+    document.getElementById('poseur-demijour').value = p.demijour;
+    document.getElementById('poseur-modal-title').textContent = 'Modifier le poseur';
+    document.getElementById('modal-poseur').classList.add('active');
+}
+
+async function deletePoseur(id) {
+    if (!confirm('Supprimer ce poseur ?')) return;
+    try {
+        await fetch(`${API_URL}/tarifs/poseurs/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        showMessage('Poseur supprimé', 'success');
+        loadPoseurs();
+    } catch (err) { showMessage('Erreur', 'error'); }
 }
 
 function logout() {
