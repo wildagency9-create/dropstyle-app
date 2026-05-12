@@ -16,6 +16,7 @@
             --text-secondary: #999;
             --text-light: #666;
             --danger: #ff5252;
+            --success: #4caf50;
             --gold: #d4af37;
         }
 
@@ -30,203 +31,172 @@
             overflow: hidden;
         }
 
-        .app {
-            display: flex;
-            height: 100vh;
-            flex-direction: column;
-        }
+        .app { display: flex; height: 100vh; flex-direction: column; }
 
         header {
             background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.05) 100%);
             border-bottom: 2px solid var(--primary);
-            padding: 20px 32px;
+            padding: 16px 28px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 2px 16px rgba(0,0,0,0.3);
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
+        .header-left { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
-            width: 48px;
-            height: 48px;
+            width: 42px; height: 42px;
             background: linear-gradient(135deg, var(--primary), #FF7043);
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: white;
-            font-size: 24px;
-            box-shadow: 0 4px 12px rgba(255,87,34,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white; font-size: 20px;
         }
-
         h1 {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 20px; font-weight: 700;
             background: linear-gradient(135deg, var(--primary), var(--gold));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .user-info {
-            font-size: 12px;
-            text-align: right;
-            color: var(--text-secondary);
-        }
-
-        .user-info strong {
-            color: var(--text-primary);
-            display: block;
-            margin-bottom: 4px;
-        }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .user-info { font-size: 11px; text-align: right; color: var(--text-secondary); }
+        .user-info strong { color: var(--text-primary); display: block; margin-bottom: 2px; }
 
         button {
-            padding: 10px 20px;
+            padding: 8px 16px;
             background: linear-gradient(135deg, var(--primary), #FF7043);
             color: white;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(255,87,34,0.2);
         }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(255,87,34,0.3);
+        button:hover { transform: translateY(-1px); }
+        button.logout-btn {
+            background: rgba(255,82,82,0.2);
+            color: #ff5252;
+            border: 1px solid #ff5252;
         }
+        button.admin-btn {
+            background: rgba(212,175,55,0.2);
+            color: var(--gold);
+            border: 1px solid var(--gold);
+        }
+        button.btn-block { width: 100%; padding: 12px; margin-top: 12px; }
 
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.2fr 1fr;
             flex: 1;
             overflow: hidden;
-            gap: 0;
         }
 
         .panel {
             overflow-y: auto;
-            padding: 28px;
-            display: flex;
-            flex-direction: column;
+            padding: 24px;
         }
-
-        .panel-left {
-            background: var(--bg-dark);
-            border-right: 1px solid var(--border);
-        }
-
-        .panel-right {
-            background: rgba(26,26,26,0.5);
-        }
+        .panel-left { background: var(--bg-dark); border-right: 1px solid var(--border); }
+        .panel-right { background: rgba(26,26,26,0.5); }
 
         .section-title {
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
+            font-size: 12px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.12em;
             color: var(--primary);
-            margin: 0 0 20px 0;
-            padding-bottom: 12px;
+            margin: 0 0 16px 0;
+            padding-bottom: 10px;
             border-bottom: 2px solid var(--border);
         }
 
         .tabs {
-            display: flex;
-            gap: 4px;
+            display: flex; gap: 4px;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
-
         .tab-btn {
-            padding: 12px 16px;
+            padding: 10px 14px;
             background: transparent;
             color: var(--text-secondary);
             border: none;
             border-bottom: 2px solid transparent;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             transition: all 0.3s ease;
             margin-bottom: -1px;
         }
-
         .tab-btn.active {
             color: var(--primary);
             border-bottom-color: var(--primary);
         }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
-
+        .form-group { margin-bottom: 14px; }
         label {
             display: block;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
-
         input, select {
             width: 100%;
-            padding: 10px 12px;
+            padding: 9px 11px;
             background: var(--bg-input);
             border: 1.5px solid var(--border);
             border-radius: 6px;
             color: var(--text-primary);
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.2s ease;
         }
-
         input:focus, select:focus {
             outline: none;
             border-color: var(--primary);
             background: rgba(255,87,34,0.05);
-            box-shadow: 0 0 0 3px rgba(255,87,34,0.1);
         }
+
+        .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+        .checkbox-row {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px;
+        }
+        .checkbox-row input { width: auto; }
+        .checkbox-row label { margin-bottom: 0; }
+
+        .conditional {
+            display: none;
+            padding-left: 16px;
+            border-left: 2px solid var(--primary);
+            margin-bottom: 12px;
+        }
+        .conditional.active { display: block; }
 
         .price-display {
             background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.08) 100%);
-            padding: 24px;
+            padding: 20px;
             border-radius: 10px;
             border: 2px solid var(--primary);
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             text-align: center;
             box-shadow: 0 4px 24px rgba(255,87,34,0.15);
         }
-
         .price-label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            margin-bottom: 10px;
-            font-weight: 600;
+            margin-bottom: 6px;
         }
-
         .price-value {
-            font-size: 48px;
+            font-size: 42px;
             font-weight: 700;
             background: linear-gradient(135deg, var(--primary), var(--gold));
             -webkit-background-clip: text;
@@ -234,6 +204,35 @@
             background-clip: text;
             line-height: 1;
         }
+        .price-ht {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .breakdown {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 11px;
+            border-bottom: 1px dashed var(--border);
+        }
+        .breakdown-row:last-child { border: none; }
+        .breakdown-row.total {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 13px;
+            padding-top: 10px;
+            border-top: 2px solid var(--primary);
+            margin-top: 6px;
+        }
+        .breakdown-row .label { color: var(--text-secondary); }
 
         .empty-state {
             text-align: center;
@@ -241,49 +240,25 @@
             color: var(--text-light);
         }
 
-        .empty-state p {
-            font-size: 14px;
-        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
-        .loading {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,87,34,0.3);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 18px;
+            background: var(--bg-card);
+            border-left: 3px solid var(--success);
+            color: var(--text-primary);
+            border-radius: 6px;
+            z-index: 999;
+            animation: slideIn 0.3s ease;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .logout-btn {
-            background: rgba(255,82,82,0.2);
-            color: #ff5252;
-            border: 1px solid #ff5252;
-            padding: 8px 16px;
-            font-size: 11px;
-        }
-
-        .logout-btn:hover {
-            background: #ff5252;
-            color: white;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .row2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
+        .notification.error { border-color: var(--danger); }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     </style>
 </head>
@@ -300,6 +275,7 @@
                 <strong id="user-nom">...</strong>
                 <span id="user-email">...</span>
             </div>
+            <button class="admin-btn" id="admin-btn" onclick="goAdmin()" style="display:none;">Admin</button>
             <button class="logout-btn" onclick="logout()">Déconnexion</button>
         </div>
     </header>
@@ -309,15 +285,16 @@
             <div class="section-title">Calculer un Devis</div>
             
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('vehicule')">Véhicule</button>
-                <button class="tab-btn" onclick="switchTab('signaletique')">Signalétique</button>
+                <button class="tab-btn active" onclick="switchTab('vehicule')">🚗 Véhicule</button>
+                <button class="tab-btn" onclick="switchTab('signaletique')">📋 Signalétique</button>
+                <button class="tab-btn" onclick="switchTab('historique'); renderHistorique()">📊 Historique</button>
             </div>
 
             <!-- TAB VEHICULE -->
             <div class="tab-content active" id="tab-vehicule">
                 <div class="form-group">
                     <label>Type de véhicule</label>
-                    <select id="v-type" onchange="loadVinyles()">
+                    <select id="v-type">
                         <option value="">— Sélectionner —</option>
                         <option value="citadine">Citadine</option>
                         <option value="berline">Berline / Break</option>
@@ -329,46 +306,173 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Vinyle</label>
-                    <select id="v-vinyle">
-                        <option value="">— Charger vinyles...</option>
+                    <label>Type de marquage</label>
+                    <select id="v-marquage">
+                        <option value="">— Sélectionner —</option>
+                        <option value="total">Covering Total</option>
+                        <option value="partiel">Covering Partiel</option>
+                        <option value="bandes">Bandes / Stickers</option>
+                        <option value="logos">Logos seuls</option>
+                        <option value="custome">Décoration custom</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label>Quantité</label>
-                    <input type="number" id="v-qty" value="1" min="1" />
+                    <label>Vinyle</label>
+                    <select id="v-vinyle">
+                        <option value="">— Chargement... —</option>
+                    </select>
                 </div>
 
-                <button onclick="calcVehicule()">Calculer</button>
+                <div class="row2">
+                    <div class="form-group">
+                        <label>Finition</label>
+                        <select id="v-finition">
+                            <option value="brillant">Brillant</option>
+                            <option value="mat">Mat</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Laminage UV</label>
+                        <select id="v-lam">
+                            <option value="non">Non</option>
+                            <option value="oui">Oui (+12%)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="v-pao-check" onchange="togglePAO()">
+                    <label for="v-pao-check">PAO / Design graphique (60€/h)</label>
+                </div>
+                <div class="conditional" id="v-pao-cond">
+                    <div class="form-group">
+                        <label>Heures PAO estimées</label>
+                        <input type="number" id="v-pao-h" value="2" min="0.5" step="0.5">
+                    </div>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="v-echenillage-check" onchange="toggleEchenillage()">
+                    <label for="v-echenillage-check">Échenillage (enlever ancien)</label>
+                </div>
+                <div class="conditional" id="v-echenillage-cond">
+                    <div class="form-group">
+                        <label>Forfait</label>
+                        <select id="v-echenillage">
+                            <option value="50">Petit (50€)</option>
+                            <option value="75">Moyen (75€)</option>
+                            <option value="100">Grand (100€)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Poseur</label>
+                    <select id="v-poseur">
+                        <option value="0">Sans pose</option>
+                    </select>
+                </div>
+
+                <div class="row2">
+                    <div class="form-group">
+                        <label>Durée pose</label>
+                        <select id="v-pose-duration">
+                            <option value="jour">Journée</option>
+                            <option value="demijour">Demi-journée</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantité</label>
+                        <input type="number" id="v-qty" value="1" min="1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Délai</label>
+                    <select id="v-delai">
+                        <option value="normal">Normal</option>
+                        <option value="urgent">Urgent (+15%)</option>
+                        <option value="express">Express (+25%)</option>
+                    </select>
+                </div>
+
+                <button onclick="calcVehicule()" class="btn-block">Calculer le prix</button>
             </div>
 
             <!-- TAB SIGNALETIQUE -->
             <div class="tab-content" id="tab-signaletique">
                 <div class="form-group">
-                    <label>Matériau</label>
-                    <select id="s-materiau">
-                        <option value="">— Charger matériaux...</option>
+                    <label>Type de support</label>
+                    <select id="s-type">
+                        <option value="">— Sélectionner —</option>
+                        <option value="panneau">Panneau alu</option>
+                        <option value="vitrophanie">Vitrophanie</option>
+                        <option value="adhesif">Adhésif mural</option>
+                        <option value="bache">Bâche PVC</option>
+                        <option value="rollup">Roll-up / Totem</option>
+                        <option value="lettrage">Lettrage découpé</option>
                     </select>
                 </div>
 
                 <div class="row2">
                     <div class="form-group">
                         <label>Largeur (cm)</label>
-                        <input type="number" id="s-larg" value="100" min="10" />
+                        <input type="number" id="s-larg" value="100" min="10">
                     </div>
                     <div class="form-group">
                         <label>Hauteur (cm)</label>
-                        <input type="number" id="s-haut" value="100" min="10" />
+                        <input type="number" id="s-haut" value="100" min="10">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Quantité</label>
-                    <input type="number" id="s-qty" value="1" min="1" />
+                    <label>Matériau</label>
+                    <select id="s-materiau">
+                        <option value="">— Chargement... —</option>
+                    </select>
                 </div>
 
-                <button onclick="calcSignaletique()">Calculer</button>
+                <div class="row2">
+                    <div class="form-group">
+                        <label>Finition</label>
+                        <select id="s-finition">
+                            <option value="aucune">Aucune</option>
+                            <option value="lam-brill">Laminage brillant (+8%)</option>
+                            <option value="lam-mat">Laminage mat (+8%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantité</label>
+                        <input type="number" id="s-qty" value="1" min="1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Pose</label>
+                    <select id="s-pose">
+                        <option value="non">Sans pose</option>
+                        <option value="oui">Avec pose (+180€)</option>
+                        <option value="nacelle">Avec pose + nacelle (+480€)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Délai</label>
+                    <select id="s-delai">
+                        <option value="normal">Normal</option>
+                        <option value="urgent">Urgent (+15%)</option>
+                        <option value="express">Express (+25%)</option>
+                    </select>
+                </div>
+
+                <button onclick="calcSignaletique()" class="btn-block">Calculer le prix</button>
+            </div>
+
+            <!-- TAB HISTORIQUE -->
+            <div class="tab-content" id="tab-historique">
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Tous tes devis sauvegardés</p>
+                <div id="historique-list"></div>
             </div>
         </div>
 
@@ -376,7 +480,7 @@
             <div class="section-title">Résultat</div>
             <div id="result">
                 <div class="empty-state">
-                    <p>Configurez et cliquez sur Calculer</p>
+                    <p>Configure et clique sur Calculer</p>
                 </div>
             </div>
         </div>
@@ -388,7 +492,6 @@ const API_URL = window.location.origin + '/api';
 let user = null;
 let token = null;
 
-// Check auth
 window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
     user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -401,30 +504,35 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-nom').textContent = user.nom;
     document.getElementById('user-email').textContent = user.email;
     
+    if (user.role === 'admin') {
+        document.getElementById('admin-btn').style.display = 'block';
+    }
+    
     loadTarifs();
 });
 
 async function loadTarifs() {
     try {
-        const [vinyles, materiaux] = await Promise.all([
+        const [vinyles, materiaux, poseurs] = await Promise.all([
             fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+            fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+            fetch(`${API_URL}/tarifs/poseurs`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
         ]);
 
-        const vinylesSelect = document.getElementById('v-vinyle');
-        vinylesSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
+        const vSelect = document.getElementById('v-vinyle');
+        vSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
             vinyles.map(v => `<option value="${v.id}">${v.name} (${v.price}€/m²)</option>`).join('');
 
-        const materiauxSelect = document.getElementById('s-materiau');
-        materiauxSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
+        const mSelect = document.getElementById('s-materiau');
+        mSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
             materiaux.map(m => `<option value="${m.id}">${m.support} (${m.price}€/m²)</option>`).join('');
+
+        const pSelect = document.getElementById('v-poseur');
+        pSelect.innerHTML = '<option value="0">Sans pose</option>' +
+            poseurs.map(p => `<option value="${p.id}">${p.nom} (${p.jour}€/j)</option>`).join('');
     } catch (err) {
         console.error('Erreur chargement tarifs:', err);
     }
-}
-
-function loadVinyles() {
-    // Déclenche après sélection type de véhicule
 }
 
 function switchTab(tab) {
@@ -434,109 +542,216 @@ function switchTab(tab) {
     event.target.classList.add('active');
 }
 
+function togglePAO() {
+    document.getElementById('v-pao-cond').classList.toggle('active', document.getElementById('v-pao-check').checked);
+}
+
+function toggleEchenillage() {
+    document.getElementById('v-echenillage-cond').classList.toggle('active', document.getElementById('v-echenillage-check').checked);
+}
+
 async function calcVehicule() {
     const type = document.getElementById('v-type').value;
-    const vinyleId = document.getElementById('v-vinyle').value;
+    const marquage = document.getElementById('v-marquage').value;
+    const vinyleId = parseInt(document.getElementById('v-vinyle').value);
     const qty = parseInt(document.getElementById('v-qty').value) || 1;
-
-    if (!type || !vinyleId) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p>Complétez tous les champs</p></div>';
+    const poseurId = parseInt(document.getElementById('v-poseur').value) || 0;
+    const poseDuration = document.getElementById('v-pose-duration').value;
+    const lam = document.getElementById('v-lam').value;
+    const delai = document.getElementById('v-delai').value;
+    
+    const paoCheck = document.getElementById('v-pao-check').checked;
+    const paoHours = paoCheck ? parseFloat(document.getElementById('v-pao-h').value) || 0 : 0;
+    
+    const echenillageCheck = document.getElementById('v-echenillage-check').checked;
+    const echenillagePrice = echenillageCheck ? parseFloat(document.getElementById('v-echenillage').value) || 0 : 0;
+    
+    if (!type || !marquage || !vinyleId) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color: var(--danger);">⚠️ Complétez les champs obligatoires</p></div>';
         return;
     }
 
     const surfaces = {
-        'citadine': 5.5,
-        'berline': 7,
-        'suv': 9,
-        'utilitaire': 11,
-        'fourgon': 15,
-        'camion': 25
+        'citadine': { total: 5.5, partiel: 2.8, bandes: 1.2, logos: 0.4, custome: 3 },
+        'berline': { total: 7, partiel: 3.5, bandes: 1.5, logos: 0.5, custome: 3.8 },
+        'suv': { total: 9, partiel: 4.5, bandes: 2, logos: 0.6, custome: 5 },
+        'utilitaire': { total: 11, partiel: 5.5, bandes: 2.5, logos: 0.7, custome: 6 },
+        'fourgon': { total: 15, partiel: 7.5, bandes: 3.5, logos: 1, custome: 8 },
+        'camion': { total: 25, partiel: 12.5, bandes: 6, logos: 1.5, custome: 14 }
     };
 
-    // Mock calculation (à améliorer avec API)
-    const m2 = surfaces[type];
     const vinylesResp = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } });
     const vinyles = await vinylesResp.json();
     const vinyle = vinyles.find(v => v.id == vinyleId);
-
     if (!vinyle) return;
 
-    const totalHT = m2 * vinyle.price * qty;
-    const totalTTC = totalHT * 1.2;
+    let poseur = null;
+    if (poseurId) {
+        const poseursResp = await fetch(`${API_URL}/tarifs/poseurs`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const poseurs = await poseursResp.json();
+        poseur = poseurs.find(p => p.id == poseurId);
+    }
+
+    const m2 = surfaces[type][marquage];
+    const vinyloHT = m2 * vinyle.price * qty;
+    const lamHT = lam === 'oui' ? vinyloHT * 0.12 : 0;
+    const paoHT = paoHours * 60;
+    const poseHT = poseur ? (poseDuration === 'jour' ? parseFloat(poseur.jour) : parseFloat(poseur.demijour)) * qty : 0;
+
+    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
+    const subHT = (vinyloHT + lamHT + paoHT + poseHT + echenillagePrice) * delaiMult;
+    const qtyDisc = qty >= 3 ? 0.95 : qty >= 2 ? 0.97 : 1;
+    const totalHT = subHT * qtyDisc;
+    const tva = totalHT * 0.2;
+    const totalTTC = totalHT + tva;
+
+    const rows = [
+        { label: `Vinyle ${vinyle.name} (${m2}m²)`, val: `${vinyloHT.toFixed(2)} €` },
+        lamHT > 0 ? { label: 'Laminage UV (+12%)', val: `+${lamHT.toFixed(2)} €` } : null,
+        paoHT > 0 ? { label: `PAO (${paoHours}h × 60€)`, val: `${paoHT.toFixed(2)} €` } : null,
+        echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)} €` } : null,
+        poseHT > 0 ? { label: `Pose ${poseur.nom}`, val: `${poseHT.toFixed(2)} €` } : null,
+        delai !== 'normal' ? { label: `Urgence (${delai === 'urgent' ? '+15%' : '+25%'})`, val: '×' + delaiMult.toFixed(2) } : null,
+        qtyDisc < 1 ? { label: `Remise quantité (×${qty})`, val: `-${((1-qtyDisc)*100).toFixed(1)}%` } : null
+    ].filter(Boolean);
 
     document.getElementById('result').innerHTML = `
         <div class="price-display">
             <div class="price-label">Véhicule × ${qty}</div>
             <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">
-                HT: ${totalHT.toFixed(2)}€ | TVA: ${(totalTTC - totalHT).toFixed(2)}€
+            <div class="price-ht">€ TTC</div>
+            <div class="price-ht" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">
+                HT: ${totalHT.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
             </div>
         </div>
+        <div class="breakdown">
+            ${rows.map(r => `
+                <div class="breakdown-row">
+                    <span class="label">${r.label}</span>
+                    <span class="value">${r.val}</span>
+                </div>
+            `).join('')}
+            <div class="breakdown-row total">
+                <span>TOTAL HT</span>
+                <span>${totalHT.toFixed(2).replace('.', ',')} €</span>
+            </div>
+        </div>
+        <button class="btn-block" onclick="saveDevis('vehicule', ${qty}, ${totalHT.toFixed(2)}, ${totalTTC.toFixed(2)})">Sauvegarder le devis</button>
     `;
-
-    // Sauvegarder devis
-    await fetch(`${API_URL}/devis`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            type: 'vehicule',
-            qty,
-            ht: totalHT.toFixed(2),
-            ttc: totalTTC.toFixed(2),
-            details: { type, vinyleId }
-        })
-    });
 }
 
 async function calcSignaletique() {
-    const materiauid = document.getElementById('s-materiau').value;
+    const type = document.getElementById('s-type').value;
     const larg = parseFloat(document.getElementById('s-larg').value) || 100;
     const haut = parseFloat(document.getElementById('s-haut').value) || 100;
     const qty = parseInt(document.getElementById('s-qty').value) || 1;
+    const materiauid = parseInt(document.getElementById('s-materiau').value);
+    const finition = document.getElementById('s-finition').value;
+    const pose = document.getElementById('s-pose').value;
+    const delai = document.getElementById('s-delai').value;
 
-    if (!materiauid) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p>Complétez tous les champs</p></div>';
+    if (!type || !materiauid) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color: var(--danger);">⚠️ Complétez les champs obligatoires</p></div>';
         return;
     }
 
-    const m2 = (larg * haut) / 10000;
     const materiauxResp = await fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } });
     const materiaux = await materiauxResp.json();
     const materiau = materiaux.find(m => m.id == materiauid);
-
     if (!materiau) return;
 
-    const totalHT = m2 * materiau.price * qty;
-    const totalTTC = totalHT * 1.2;
+    const m2 = (larg * haut) / 10000;
+    const matPrix = parseFloat(materiau.price) * m2 * qty;
+    const finAdd = finition !== 'aucune' ? matPrix * 0.08 : 0;
+    const poseAdd = pose === 'non' ? 0 : pose === 'oui' ? 180 : 480;
+
+    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
+    const totalHT = (matPrix + finAdd + poseAdd) * delaiMult;
+    const tva = totalHT * 0.2;
+    const totalTTC = totalHT + tva;
+
+    const rows = [
+        { label: `${materiau.support} (${m2.toFixed(2)}m²)`, val: `${matPrix.toFixed(2)} €` },
+        finAdd > 0 ? { label: `Laminage ${finition === 'lam-brill' ? 'brillant' : 'mat'} (+8%)`, val: `+${finAdd.toFixed(2)} €` } : null,
+        poseAdd > 0 ? { label: `Pose${pose === 'nacelle' ? ' + nacelle' : ''}`, val: `${poseAdd.toFixed(2)} €` } : null,
+        delai !== 'normal' ? { label: `Urgence`, val: '×' + delaiMult.toFixed(2) } : null
+    ].filter(Boolean);
 
     document.getElementById('result').innerHTML = `
         <div class="price-display">
             <div class="price-label">Signalétique ${m2.toFixed(2)}m² × ${qty}</div>
             <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">
-                HT: ${totalHT.toFixed(2)}€ | TVA: ${(totalTTC - totalHT).toFixed(2)}€
+            <div class="price-ht">€ TTC</div>
+            <div class="price-ht" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">
+                HT: ${totalHT.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
             </div>
         </div>
+        <div class="breakdown">
+            ${rows.map(r => `
+                <div class="breakdown-row">
+                    <span class="label">${r.label}</span>
+                    <span class="value">${r.val}</span>
+                </div>
+            `).join('')}
+            <div class="breakdown-row total">
+                <span>TOTAL HT</span>
+                <span>${totalHT.toFixed(2).replace('.', ',')} €</span>
+            </div>
+        </div>
+        <button class="btn-block" onclick="saveDevis('signaletique', ${qty}, ${totalHT.toFixed(2)}, ${totalTTC.toFixed(2)})">Sauvegarder le devis</button>
     `;
+}
 
-    // Sauvegarder devis
-    await fetch(`${API_URL}/devis`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            type: 'signaletique',
-            qty,
-            ht: totalHT.toFixed(2),
-            ttc: totalTTC.toFixed(2),
-            details: { materiauid, m2 }
-        })
-    });
+async function saveDevis(type, qty, ht, ttc) {
+    try {
+        await fetch(`${API_URL}/devis`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, qty, ht, ttc, details: {} })
+        });
+        showNotification('Devis sauvegardé ✓', 'success');
+    } catch (err) {
+        showNotification('Erreur de sauvegarde', 'error');
+    }
+}
+
+async function renderHistorique() {
+    try {
+        const resp = await fetch(`${API_URL}/devis`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const devis = await resp.json();
+
+        if (devis.length === 0) {
+            document.getElementById('historique-list').innerHTML = '<div class="empty-state"><p>Aucun devis sauvegardé</p></div>';
+            return;
+        }
+
+        document.getElementById('historique-list').innerHTML = devis.map(d => `
+            <div class="breakdown" style="margin-bottom: 8px;">
+                <div class="breakdown-row">
+                    <span>${d.type === 'vehicule' ? '🚗' : '📋'} ${d.type}</span>
+                    <span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <div class="breakdown-row">
+                    <span class="label">Qté: ${d.qty}</span>
+                    <span style="color: var(--primary); font-weight: 600;">${parseFloat(d.ttc).toFixed(2)}€ TTC</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function showNotification(msg, type) {
+    const el = document.createElement('div');
+    el.className = `notification ${type === 'error' ? 'error' : ''}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+function goAdmin() {
+    window.location.href = '/admin';
 }
 
 function logout() {
