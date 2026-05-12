@@ -37,8 +37,13 @@ async function initDB() {
             const [adminUser] = await conn.query('SELECT id FROM users WHERE email = ?', ['admin@dropstyle.com']);
             const adminId = adminUser[0].id;
             await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, '3M Scotchprint Standard', 12.50, 'standard']);
+            await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, '3M Scotchprint Premium', 18.00, 'premium']);
+            await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, 'Avery Supreme Wrapping', 14.20, 'premium']);
             await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'PVC 380g blanc', 15.00, 'pvc']);
+            await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'Acrylique PMMA 3mm', 22.50, 'acrylique']);
+            await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'DiBond 3mm', 18.75, 'dibond']);
             await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [adminId, 'Jean Pose Pro', 150.00, 85.00]);
+            await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [adminId, 'Marie Installation', 160.00, 90.00]);
         }
         await conn.release();
     } catch (err) {
@@ -60,6 +65,7 @@ const verifyToken = (req, res, next) => {
     }
 };
 
+// AUTH
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, nom } = req.body;
@@ -91,18 +97,100 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
+// VINYLES CRUD
 app.get('/api/tarifs/vinyles', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM vinyles WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.post('/api/tarifs/vinyles', verifyToken, async (req, res) => {
+    try { const { name, price, type } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [req.userId, name, price, type]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
+    try { const { name, price, type } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE vinyles SET name = ?, price = ?, type = ? WHERE id = ? AND user_id = ?', [name, price, type, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM vinyles WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
+// MATERIAUX CRUD
 app.get('/api/tarifs/materiaux', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM materiaux WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.post('/api/tarifs/materiaux', verifyToken, async (req, res) => {
+    try { const { support, price, categorie } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [req.userId, support, price, categorie]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/tarifs/materiaux/:id', verifyToken, async (req, res) => {
+    try { const { support, price, categorie } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE materiaux SET support = ?, price = ?, categorie = ? WHERE id = ? AND user_id = ?', [support, price, categorie, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tarifs/materiaux/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM materiaux WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
+// POSEURS CRUD
 app.get('/api/tarifs/poseurs', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.post('/api/tarifs/poseurs', verifyToken, async (req, res) => {
+    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [req.userId, nom, jour, demijour]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
+    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE poseurs SET nom = ?, jour = ?, demijour = ? WHERE id = ? AND user_id = ?', [nom, jour, demijour, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM poseurs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
+// DEVIS
+app.post('/api/devis', verifyToken, async (req, res) => {
+    try { const { type, qty, ht, ttc, details } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details)]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/devis', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ADMIN
+app.get('/api/admin/users', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query('SELECT id, email, nom, role, created_at FROM users');
+        await conn.release();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/users', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const { email, password, nom, role } = req.body;
+        const bcrypt = require('bcrypt');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const conn = await pool.getConnection();
+        await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, role]);
+        await conn.release();
+        res.status(201).json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const conn = await pool.getConnection();
+        await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/admin/stats', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const conn = await pool.getConnection();
+        const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
+        const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis');
+        const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis');
+        await conn.release();
+        res.json({ users: users[0].count, devis: devis[0].count, revenue: revenue[0].total || 0 });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ROUTES FRONTEND
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/index.html')); });
 app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/app.html')); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/admin-dashboard.html')); });
