@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DropStyle — Admin Dashboard</title>
+    <title>DropStyle — Admin</title>
     <style>
         :root {
             --primary: #FF5722;
@@ -18,19 +18,15 @@
             --danger: #ff5252;
             --gold: #d4af37;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; min-height: 100vh; }
-        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg-dark);
             color: var(--text-primary);
-            line-height: 1.5;
+            min-height: 100vh;
         }
-
         header {
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.05) 100%);
+            background: linear-gradient(135deg, var(--bg-card), rgba(255,87,34,0.05));
             border-bottom: 2px solid var(--primary);
             padding: 16px 32px;
             display: flex;
@@ -40,7 +36,6 @@
             top: 0;
             z-index: 100;
         }
-
         .header-left { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
             width: 42px; height: 42px;
@@ -56,9 +51,6 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-
-        .header-actions { display: flex; gap: 10px; }
-        
         button {
             padding: 10px 18px;
             background: linear-gradient(135deg, var(--primary), #FF7043);
@@ -69,64 +61,32 @@
             font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
             transition: all 0.3s;
         }
         button:hover { transform: translateY(-1px); }
-        button.calc-btn {
-            background: rgba(212,175,55,0.2);
-            color: var(--gold);
-            border: 1px solid var(--gold);
-        }
-        button.logout-btn {
-            background: rgba(255,82,82,0.2);
-            color: var(--danger);
-            border: 1px solid var(--danger);
-        }
+        button.calc-btn { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
+        button.logout-btn { background: rgba(255,82,82,0.2); color: var(--danger); border: 1px solid var(--danger); }
         button.danger { background: var(--danger); }
         button.success { background: var(--success); }
         button.small { padding: 6px 10px; font-size: 10px; }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
+        .header-actions { display: flex; gap: 10px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
             margin-bottom: 28px;
         }
-
         .stat-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 20px;
             text-align: center;
-            transition: transform 0.3s;
         }
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--primary);
-        }
-
         .stat-icon { font-size: 32px; margin-bottom: 8px; }
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 6px;
-        }
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
+        .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
+        .stat-value { font-size: 32px; font-weight: 700; color: var(--primary); }
         .tabs {
             display: flex;
             gap: 4px;
@@ -147,64 +107,19 @@
             white-space: nowrap;
             margin-bottom: -1px;
         }
-        .tab-btn.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .table-wrap {
-            background: var(--bg-card);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th {
-            background: rgba(255,87,34,0.1);
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--primary);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-        td {
-            padding: 12px;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
-        }
-        tr:last-child td { border: none; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .section-title { font-size: 18px; font-weight: 700; color: var(--primary); }
+        .table-wrap { background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,87,34,0.1); padding: 12px; text-align: left; font-weight: 600; color: var(--primary); font-size: 11px; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
         tr:hover { background: rgba(255,87,34,0.03); }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
         .badge.admin { background: rgba(255,87,34,0.2); color: var(--primary); }
         .badge.user { background: rgba(76,175,80,0.2); color: var(--success); }
-
         .modal {
             display: none;
             position: fixed;
@@ -220,25 +135,14 @@
             border: 2px solid var(--primary);
             border-radius: 8px;
             padding: 24px;
-            max-width: 420px;
+            max-width: 480px;
             width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
         }
-        .modal-header {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 16px;
-        }
-
+        .modal-header { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 16px; }
         .form-group { margin-bottom: 12px; }
-        label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }
+        label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
         input, select {
             width: 100%;
             padding: 10px;
@@ -248,46 +152,18 @@
             color: var(--text-primary);
             font-size: 13px;
         }
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
+        select option {
+            background: var(--bg-dark);
+            color: var(--primary);
         }
-
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-top: 16px;
-        }
-
-        .message {
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            display: none;
-        }
-        .message.success {
-            background: rgba(76,175,80,0.15);
-            color: var(--success);
-            border-left: 3px solid var(--success);
-            display: block;
-        }
-        .message.error {
-            background: rgba(255,82,82,0.15);
-            color: var(--danger);
-            border-left: 3px solid var(--danger);
-            display: block;
-        }
-
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+        .message { padding: 12px; border-radius: 6px; margin-bottom: 16px; display: none; }
+        .message.success { background: rgba(76,175,80,0.15); color: var(--success); border-left: 3px solid var(--success); display: block; }
+        .message.error { background: rgba(255,82,82,0.15); color: var(--danger); border-left: 3px solid var(--danger); display: block; }
         .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-
-        .empty-state {
-            text-align: center;
-            padding: 30px;
-            color: var(--text-secondary);
-            font-size: 13px;
-        }
+        .empty-state { text-align: center; padding: 30px; color: var(--text-secondary); font-size: 13px; }
     </style>
 </head>
 <body>
@@ -304,126 +180,65 @@
 </header>
 
 <div class="container">
-    <!-- STATS -->
     <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-label">Utilisateurs</div>
-            <div class="stat-value" id="stat-users">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">📋</div>
-            <div class="stat-label">Devis</div>
-            <div class="stat-value" id="stat-devis">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">💰</div>
-            <div class="stat-label">Revenu Total</div>
-            <div class="stat-value" id="stat-revenue">0€</div>
-        </div>
+        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
+        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenu Total</div><div class="stat-value" id="stat-revenue">0€</div></div>
     </div>
 
     <div class="message" id="message"></div>
 
-    <!-- TABS -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('users')">👥 Utilisateurs</button>
-        <button class="tab-btn" onclick="switchTab('vinyles')">🎨 Vinyles</button>
-        <button class="tab-btn" onclick="switchTab('materiaux')">📋 Matériaux</button>
-        <button class="tab-btn" onclick="switchTab('poseurs')">👷 Poseurs</button>
+        <button class="tab-btn active" onclick="switchTab('users', this)">👥 Utilisateurs</button>
+        <button class="tab-btn" onclick="switchTab('vinyles', this)">🎨 Vinyles</button>
+        <button class="tab-btn" onclick="switchTab('materiaux', this)">📋 Matériaux</button>
+        <button class="tab-btn" onclick="switchTab('poseurs', this)">👷 Poseurs</button>
+        <button class="tab-btn" onclick="switchTab('impressions', this)">🖨️ Impressions</button>
     </div>
 
-    <!-- TAB USERS -->
+    <!-- USERS -->
     <div class="tab-content active" id="tab-users">
-        <div class="section-header">
-            <div class="section-title">Gestion Utilisateurs</div>
-            <button onclick="openModal('modal-user')">+ Ajouter utilisateur</button>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Email</th>
-                        <th>Nom</th>
-                        <th>Rôle</th>
-                        <th>Inscrit le</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="users-list">
-                    <tr><td colspan="5" class="empty-state">Chargement...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="section-header"><div class="section-title">Gestion Utilisateurs</div><button onclick="openModal('modal-user')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Inscrit</th><th>Action</th></tr></thead>
+            <tbody id="users-list"><tr><td colspan="5" class="empty-state">Chargement...</td></tr></tbody>
+        </table></div>
     </div>
 
-    <!-- TAB VINYLES -->
+    <!-- VINYLES -->
     <div class="tab-content" id="tab-vinyles">
-        <div class="section-header">
-            <div class="section-title">Gestion Vinyles</div>
-            <button onclick="openModal('modal-vinyle')">+ Ajouter vinyle</button>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th>Prix (€/m²)</th>
-                        <th>Type</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="vinyles-list">
-                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="section-header"><div class="section-title">Gestion Vinyles</div><button onclick="openModal('modal-vinyle')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Nom</th><th>Prix (€/m²)</th><th>Type</th><th>Action</th></tr></thead>
+            <tbody id="vinyles-list"></tbody>
+        </table></div>
     </div>
 
-    <!-- TAB MATERIAUX -->
+    <!-- MATERIAUX -->
     <div class="tab-content" id="tab-materiaux">
-        <div class="section-header">
-            <div class="section-title">Gestion Matériaux</div>
-            <button onclick="openModal('modal-materiau')">+ Ajouter matériau</button>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Support</th>
-                        <th>Prix (€/m²)</th>
-                        <th>Catégorie</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="materiaux-list">
-                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="section-header"><div class="section-title">Gestion Matériaux</div><button onclick="openModal('modal-materiau')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Support</th><th>Prix (€/m²)</th><th>Catégorie</th><th>Action</th></tr></thead>
+            <tbody id="materiaux-list"></tbody>
+        </table></div>
     </div>
 
-    <!-- TAB POSEURS -->
+    <!-- POSEURS -->
     <div class="tab-content" id="tab-poseurs">
-        <div class="section-header">
-            <div class="section-title">Gestion Poseurs</div>
-            <button onclick="openModal('modal-poseur')">+ Ajouter poseur</button>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th>Tarif Journée (€)</th>
-                        <th>Tarif Demi-journée (€)</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="poseurs-list">
-                    <tr><td colspan="4" class="empty-state">Chargement...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="section-header"><div class="section-title">Gestion Poseurs</div><button onclick="openModal('modal-poseur')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Nom</th><th>Journée (€)</th><th>Demi-jour (€)</th><th>Action</th></tr></thead>
+            <tbody id="poseurs-list"></tbody>
+        </table></div>
+    </div>
+
+    <!-- IMPRESSIONS -->
+    <div class="tab-content" id="tab-impressions">
+        <div class="section-header"><div class="section-title">Gestion Impressions Exaprint</div><button onclick="openModal('modal-impression')">+ Ajouter prix</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Type</th><th>Format</th><th>Grammage</th><th>Finition</th><th>Qté</th><th>Prix Exa (€)</th><th>Prix Client × 2</th><th>Action</th></tr></thead>
+            <tbody id="impressions-list"></tbody>
+        </table></div>
     </div>
 </div>
 
@@ -432,24 +247,11 @@
     <div class="modal-content">
         <div class="modal-header">Ajouter un utilisateur</div>
         <form onsubmit="addUser(event)">
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="user-email" required>
-            </div>
-            <div class="form-group">
-                <label>Nom complet</label>
-                <input type="text" id="user-nom" required>
-            </div>
-            <div class="form-group">
-                <label>Mot de passe</label>
-                <input type="password" id="user-password" required>
-            </div>
-            <div class="form-group">
-                <label>Rôle</label>
-                <select id="user-role">
-                    <option value="user">Utilisateur</option>
-                    <option value="admin">Admin</option>
-                </select>
+            <div class="form-group"><label>Email</label><input type="email" id="user-email" required></div>
+            <div class="form-group"><label>Nom</label><input type="text" id="user-nom" required></div>
+            <div class="form-group"><label>Mot de passe</label><input type="password" id="user-password" required></div>
+            <div class="form-group"><label>Rôle</label>
+                <select id="user-role"><option value="user">Utilisateur</option><option value="admin">Admin</option></select>
             </div>
             <div class="modal-actions">
                 <button type="button" class="danger" onclick="closeModal('modal-user')">Annuler</button>
@@ -462,25 +264,14 @@
 <!-- MODAL VINYLE -->
 <div class="modal" id="modal-vinyle">
     <div class="modal-content">
-        <div class="modal-header" id="vinyle-modal-title">Ajouter un vinyle</div>
+        <div class="modal-header" id="vinyle-title">Ajouter un vinyle</div>
         <form onsubmit="saveVinyle(event)">
             <input type="hidden" id="vinyle-id">
-            <div class="form-group">
-                <label>Nom du vinyle</label>
-                <input type="text" id="vinyle-name" required placeholder="3M Scotchprint Premium">
-            </div>
+            <div class="form-group"><label>Nom</label><input type="text" id="vinyle-name" required placeholder="3M Scotchprint Premium"></div>
             <div class="row2">
-                <div class="form-group">
-                    <label>Prix (€/m²)</label>
-                    <input type="number" id="vinyle-price" required step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Type</label>
-                    <select id="vinyle-type">
-                        <option value="standard">Standard</option>
-                        <option value="premium">Premium</option>
-                        <option value="special">Spécial</option>
-                    </select>
+                <div class="form-group"><label>Prix (€/m²)</label><input type="number" id="vinyle-price" required step="0.01"></div>
+                <div class="form-group"><label>Type</label>
+                    <select id="vinyle-type"><option value="standard">Standard</option><option value="premium">Premium</option><option value="special">Spécial</option></select>
                 </div>
             </div>
             <div class="modal-actions">
@@ -494,26 +285,16 @@
 <!-- MODAL MATERIAU -->
 <div class="modal" id="modal-materiau">
     <div class="modal-content">
-        <div class="modal-header" id="materiau-modal-title">Ajouter un matériau</div>
+        <div class="modal-header" id="materiau-title">Ajouter un matériau</div>
         <form onsubmit="saveMateriau(event)">
             <input type="hidden" id="materiau-id">
-            <div class="form-group">
-                <label>Support</label>
-                <input type="text" id="materiau-support" required placeholder="PVC 380g blanc">
-            </div>
+            <div class="form-group"><label>Support</label><input type="text" id="materiau-support" required placeholder="PVC 380g blanc"></div>
             <div class="row2">
-                <div class="form-group">
-                    <label>Prix (€/m²)</label>
-                    <input type="number" id="materiau-price" required step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Catégorie</label>
+                <div class="form-group"><label>Prix (€/m²)</label><input type="number" id="materiau-price" required step="0.01"></div>
+                <div class="form-group"><label>Catégorie</label>
                     <select id="materiau-categorie">
-                        <option value="pvc">PVC</option>
-                        <option value="acrylique">Acrylique</option>
-                        <option value="dibond">DiBond</option>
-                        <option value="aluminium">Aluminium</option>
-                        <option value="autre">Autre</option>
+                        <option value="pvc">PVC</option><option value="acrylique">Acrylique</option>
+                        <option value="dibond">DiBond</option><option value="aluminium">Aluminium</option><option value="autre">Autre</option>
                     </select>
                 </div>
             </div>
@@ -528,22 +309,13 @@
 <!-- MODAL POSEUR -->
 <div class="modal" id="modal-poseur">
     <div class="modal-content">
-        <div class="modal-header" id="poseur-modal-title">Ajouter un poseur</div>
+        <div class="modal-header" id="poseur-title">Ajouter un poseur</div>
         <form onsubmit="savePoseur(event)">
             <input type="hidden" id="poseur-id">
-            <div class="form-group">
-                <label>Nom</label>
-                <input type="text" id="poseur-nom" required placeholder="Jean Dupont">
-            </div>
+            <div class="form-group"><label>Nom</label><input type="text" id="poseur-nom" required placeholder="Jean Dupont"></div>
             <div class="row2">
-                <div class="form-group">
-                    <label>Tarif journée (€ HT)</label>
-                    <input type="number" id="poseur-jour" required step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Tarif demi-journée (€ HT)</label>
-                    <input type="number" id="poseur-demijour" required step="0.01" min="0">
-                </div>
+                <div class="form-group"><label>Tarif jour (€)</label><input type="number" id="poseur-jour" required step="0.01"></div>
+                <div class="form-group"><label>Tarif demi-jour (€)</label><input type="number" id="poseur-demijour" required step="0.01"></div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="danger" onclick="closeModal('modal-poseur')">Annuler</button>
@@ -553,39 +325,90 @@
     </div>
 </div>
 
+<!-- MODAL IMPRESSION -->
+<div class="modal" id="modal-impression">
+    <div class="modal-content">
+        <div class="modal-header" id="impression-title">Ajouter prix Exaprint</div>
+        <form onsubmit="saveImpression(event)">
+            <input type="hidden" id="impression-id">
+            <div class="row2">
+                <div class="form-group"><label>Type</label>
+                    <select id="impression-type" required>
+                        <option value="Flyer">Flyer / Dépliant</option>
+                        <option value="Carte de visite">Carte de visite</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Format</label>
+                    <select id="impression-format" required>
+                        <option value="A7">A7 (74x105mm)</option>
+                        <option value="A6">A6 (105x148mm)</option>
+                        <option value="A5">A5 (148x210mm)</option>
+                        <option value="DL">DL (99x210mm)</option>
+                        <option value="A4">A4 (210x297mm)</option>
+                        <option value="Standard">Standard (85x55mm)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row2">
+                <div class="form-group"><label>Grammage</label>
+                    <select id="impression-grammage" required>
+                        <option value="135g">135g</option>
+                        <option value="170g">170g</option>
+                        <option value="250g">250g</option>
+                        <option value="300g">300g</option>
+                        <option value="350g">350g</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Finition</label>
+                    <select id="impression-finition" required>
+                        <option value="Mat">Mat</option>
+                        <option value="Brillant">Brillant</option>
+                        <option value="Soft Touch">Soft Touch</option>
+                        <option value="Pelliculé brillant">Pelliculé brillant</option>
+                        <option value="Pelliculé mat">Pelliculé mat</option>
+                        <option value="Vernis sélectif">Vernis sélectif</option>
+                        <option value="Dorure à chaud">Dorure à chaud</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row2">
+                <div class="form-group"><label>Quantité</label>
+                    <select id="impression-quantite" required>
+                        <option value="100">100</option><option value="250">250</option>
+                        <option value="500">500</option><option value="1000">1000</option>
+                        <option value="2500">2500</option><option value="5000">5000</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Prix Exaprint HT (€)</label>
+                    <input type="number" id="impression-prix" required step="0.01" placeholder="45.00">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-impression')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 const API_URL = window.location.origin + '/api';
-let token = null;
-let user = null;
+let token = null, user = null;
 
 window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
     user = JSON.parse(localStorage.getItem('user') || 'null');
-
-    if (!token || user?.role !== 'admin') {
-        window.location.href = '/';
-        return;
-    }
-
+    if (!token || user?.role !== 'admin') { window.location.href = '/'; return; }
     loadAll();
 });
 
 async function loadAll() {
-    await Promise.all([
-        loadStats(),
-        loadUsers(),
-        loadVinyles(),
-        loadMateriaux(),
-        loadPoseurs()
-    ]);
+    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions()]);
 }
 
 async function loadStats() {
     try {
-        const resp = await fetch(`${API_URL}/admin/stats`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await resp.json();
+        const data = await fetch(`${API_URL}/admin/stats`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
         document.getElementById('stat-users').textContent = data.users;
         document.getElementById('stat-devis').textContent = data.devis;
         document.getElementById('stat-revenue').textContent = parseFloat(data.revenue).toFixed(2) + '€';
@@ -593,112 +416,77 @@ async function loadStats() {
 }
 
 async function loadUsers() {
-    try {
-        const resp = await fetch(`${API_URL}/admin/users`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const users = await resp.json();
-
-        if (users.length === 0) {
-            document.getElementById('users-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur</td></tr>';
-            return;
-        }
-
-        document.getElementById('users-list').innerHTML = users.map(u => `
-            <tr>
-                <td>${u.email}</td>
-                <td>${u.nom}</td>
-                <td><span class="badge ${u.role}">${u.role}</span></td>
-                <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
-                <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Supprimer</button>` : '—'}</td>
-            </tr>
-        `).join('');
-    } catch (err) { console.error(err); }
+    const users = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (users.length === 0) {
+        document.getElementById('users-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur</td></tr>';
+        return;
+    }
+    document.getElementById('users-list').innerHTML = users.map(u => `
+        <tr><td>${u.email}</td><td>${u.nom}</td>
+        <td><span class="badge ${u.role}">${u.role}</span></td>
+        <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+        <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td></tr>`).join('');
 }
 
 async function loadVinyles() {
-    try {
-        const resp = await fetch(`${API_URL}/tarifs/vinyles`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const items = await resp.json();
-
-        if (items.length === 0) {
-            document.getElementById('vinyles-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun vinyle - cliquez sur "Ajouter vinyle"</td></tr>';
-            return;
-        }
-
-        document.getElementById('vinyles-list').innerHTML = items.map(v => `
-            <tr>
-                <td>${v.name}</td>
-                <td>${parseFloat(v.price).toFixed(2)}</td>
-                <td><span class="badge user">${v.type}</span></td>
-                <td>
-                    <button class="small" onclick='editVinyle(${JSON.stringify(v)})'>Modifier</button>
-                    <button class="danger small" onclick="deleteVinyle(${v.id})">Suppr.</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) { console.error(err); }
+    const items = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (items.length === 0) {
+        document.getElementById('vinyles-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun vinyle</td></tr>';
+        return;
+    }
+    document.getElementById('vinyles-list').innerHTML = items.map(v => `
+        <tr><td>${v.name}</td><td>${parseFloat(v.price).toFixed(2)}</td>
+        <td><span class="badge user">${v.type}</span></td>
+        <td><button class="small" onclick='editVinyle(${JSON.stringify(v)})'>Modif</button>
+        <button class="danger small" onclick="deleteVinyle(${v.id})">Suppr</button></td></tr>`).join('');
 }
 
 async function loadMateriaux() {
-    try {
-        const resp = await fetch(`${API_URL}/tarifs/materiaux`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const items = await resp.json();
-
-        if (items.length === 0) {
-            document.getElementById('materiaux-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun matériau - cliquez sur "Ajouter matériau"</td></tr>';
-            return;
-        }
-
-        document.getElementById('materiaux-list').innerHTML = items.map(m => `
-            <tr>
-                <td>${m.support}</td>
-                <td>${parseFloat(m.price).toFixed(2)}</td>
-                <td><span class="badge user">${m.categorie}</span></td>
-                <td>
-                    <button class="small" onclick='editMateriau(${JSON.stringify(m)})'>Modifier</button>
-                    <button class="danger small" onclick="deleteMateriau(${m.id})">Suppr.</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) { console.error(err); }
+    const items = await fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (items.length === 0) {
+        document.getElementById('materiaux-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun matériau</td></tr>';
+        return;
+    }
+    document.getElementById('materiaux-list').innerHTML = items.map(m => `
+        <tr><td>${m.support}</td><td>${parseFloat(m.price).toFixed(2)}</td>
+        <td><span class="badge user">${m.categorie}</span></td>
+        <td><button class="small" onclick='editMateriau(${JSON.stringify(m)})'>Modif</button>
+        <button class="danger small" onclick="deleteMateriau(${m.id})">Suppr</button></td></tr>`).join('');
 }
 
 async function loadPoseurs() {
-    try {
-        const resp = await fetch(`${API_URL}/tarifs/poseurs`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const items = await resp.json();
-
-        if (items.length === 0) {
-            document.getElementById('poseurs-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun poseur - cliquez sur "Ajouter poseur"</td></tr>';
-            return;
-        }
-
-        document.getElementById('poseurs-list').innerHTML = items.map(p => `
-            <tr>
-                <td>${p.nom}</td>
-                <td>${parseFloat(p.jour).toFixed(2)}</td>
-                <td>${parseFloat(p.demijour).toFixed(2)}</td>
-                <td>
-                    <button class="small" onclick='editPoseur(${JSON.stringify(p)})'>Modifier</button>
-                    <button class="danger small" onclick="deletePoseur(${p.id})">Suppr.</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) { console.error(err); }
+    const items = await fetch(`${API_URL}/tarifs/poseurs`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (items.length === 0) {
+        document.getElementById('poseurs-list').innerHTML = '<tr><td colspan="4" class="empty-state">Aucun poseur</td></tr>';
+        return;
+    }
+    document.getElementById('poseurs-list').innerHTML = items.map(p => `
+        <tr><td>${p.nom}</td><td>${parseFloat(p.jour).toFixed(2)}</td>
+        <td>${parseFloat(p.demijour).toFixed(2)}</td>
+        <td><button class="small" onclick='editPoseur(${JSON.stringify(p)})'>Modif</button>
+        <button class="danger small" onclick="deletePoseur(${p.id})">Suppr</button></td></tr>`).join('');
 }
 
-function switchTab(tab) {
+async function loadImpressions() {
+    const items = await fetch(`${API_URL}/tarifs/impressions`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (items.length === 0) {
+        document.getElementById('impressions-list').innerHTML = '<tr><td colspan="8" class="empty-state">Aucun prix impression</td></tr>';
+        return;
+    }
+    document.getElementById('impressions-list').innerHTML = items.map(i => `
+        <tr><td><span class="badge admin">${i.type}</span></td><td>${i.format}</td>
+        <td>${i.grammage}</td><td>${i.finition}</td><td>${i.quantite}</td>
+        <td>${parseFloat(i.prix_exa).toFixed(2)} €</td>
+        <td style="color:var(--primary);font-weight:600;">${(parseFloat(i.prix_exa) * 2).toFixed(2)} €</td>
+        <td><button class="small" onclick='editImpression(${JSON.stringify(i)})'>Modif</button>
+        <button class="danger small" onclick="deleteImpression(${i.id})">Suppr</button></td></tr>`).join('');
+}
+
+function switchTab(tab, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
-    event.target.classList.add('active');
+    btn.classList.add('active');
 }
 
 function openModal(id) {
@@ -706,27 +494,30 @@ function openModal(id) {
         document.getElementById('vinyle-id').value = '';
         document.getElementById('vinyle-name').value = '';
         document.getElementById('vinyle-price').value = '';
-        document.getElementById('vinyle-modal-title').textContent = 'Ajouter un vinyle';
+        document.getElementById('vinyle-title').textContent = 'Ajouter un vinyle';
     }
     if (id === 'modal-materiau') {
         document.getElementById('materiau-id').value = '';
         document.getElementById('materiau-support').value = '';
         document.getElementById('materiau-price').value = '';
-        document.getElementById('materiau-modal-title').textContent = 'Ajouter un matériau';
+        document.getElementById('materiau-title').textContent = 'Ajouter un matériau';
     }
     if (id === 'modal-poseur') {
         document.getElementById('poseur-id').value = '';
         document.getElementById('poseur-nom').value = '';
         document.getElementById('poseur-jour').value = '';
         document.getElementById('poseur-demijour').value = '';
-        document.getElementById('poseur-modal-title').textContent = 'Ajouter un poseur';
+        document.getElementById('poseur-title').textContent = 'Ajouter un poseur';
+    }
+    if (id === 'modal-impression') {
+        document.getElementById('impression-id').value = '';
+        document.getElementById('impression-prix').value = '';
+        document.getElementById('impression-title').textContent = 'Ajouter prix Exaprint';
     }
     document.getElementById(id).classList.add('active');
 }
 
-function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-}
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 function showMessage(text, type) {
     const el = document.getElementById('message');
@@ -735,74 +526,44 @@ function showMessage(text, type) {
     setTimeout(() => el.className = 'message', 4000);
 }
 
-// USERS
 async function addUser(event) {
     event.preventDefault();
-    const email = document.getElementById('user-email').value;
-    const nom = document.getElementById('user-nom').value;
-    const password = document.getElementById('user-password').value;
-    const role = document.getElementById('user-role').value;
-
-    try {
-        const resp = await fetch(`${API_URL}/admin/users`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, nom, password, role })
-        });
-
-        if (resp.ok) {
-            showMessage('Utilisateur créé', 'success');
-            closeModal('modal-user');
-            loadUsers();
-            loadStats();
-            event.target.reset();
-        } else {
-            const err = await resp.json();
-            showMessage(err.error || 'Erreur', 'error');
-        }
-    } catch (err) { showMessage('Erreur serveur', 'error'); }
+    const data = {
+        email: document.getElementById('user-email').value,
+        nom: document.getElementById('user-nom').value,
+        password: document.getElementById('user-password').value,
+        role: document.getElementById('user-role').value
+    };
+    const resp = await fetch(`${API_URL}/admin/users`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage('Utilisateur créé', 'success'); closeModal('modal-user'); loadUsers(); loadStats(); event.target.reset(); }
+    else showMessage('Erreur', 'error');
 }
 
 async function deleteUser(id) {
     if (!confirm('Supprimer cet utilisateur ?')) return;
-    try {
-        await fetch(`${API_URL}/admin/users/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        showMessage('Utilisateur supprimé', 'success');
-        loadUsers();
-        loadStats();
-    } catch (err) { showMessage('Erreur', 'error'); }
+    await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); loadUsers(); loadStats();
 }
 
-// VINYLES
 async function saveVinyle(event) {
     event.preventDefault();
     const id = document.getElementById('vinyle-id').value;
-    const name = document.getElementById('vinyle-name').value;
-    const price = parseFloat(document.getElementById('vinyle-price').value);
-    const type = document.getElementById('vinyle-type').value;
-
-    try {
-        const url = id ? `${API_URL}/tarifs/vinyles/${id}` : `${API_URL}/tarifs/vinyles`;
-        const method = id ? 'PUT' : 'POST';
-
-        const resp = await fetch(url, {
-            method,
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, price, type })
-        });
-
-        if (resp.ok) {
-            showMessage(id ? 'Vinyle modifié' : 'Vinyle créé', 'success');
-            closeModal('modal-vinyle');
-            loadVinyles();
-            event.target.reset();
-        } else {
-            showMessage('Erreur', 'error');
-        }
-    } catch (err) { showMessage('Erreur serveur', 'error'); }
+    const data = {
+        name: document.getElementById('vinyle-name').value,
+        price: parseFloat(document.getElementById('vinyle-price').value),
+        type: document.getElementById('vinyle-type').value
+    };
+    const url = id ? `${API_URL}/tarifs/vinyles/${id}` : `${API_URL}/tarifs/vinyles`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-vinyle'); loadVinyles(); }
 }
 
 function editVinyle(v) {
@@ -810,49 +571,31 @@ function editVinyle(v) {
     document.getElementById('vinyle-name').value = v.name;
     document.getElementById('vinyle-price').value = v.price;
     document.getElementById('vinyle-type').value = v.type;
-    document.getElementById('vinyle-modal-title').textContent = 'Modifier le vinyle';
+    document.getElementById('vinyle-title').textContent = 'Modifier le vinyle';
     document.getElementById('modal-vinyle').classList.add('active');
 }
 
 async function deleteVinyle(id) {
-    if (!confirm('Supprimer ce vinyle ?')) return;
-    try {
-        await fetch(`${API_URL}/tarifs/vinyles/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        showMessage('Vinyle supprimé', 'success');
-        loadVinyles();
-    } catch (err) { showMessage('Erreur', 'error'); }
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/vinyles/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); loadVinyles();
 }
 
-// MATERIAUX
 async function saveMateriau(event) {
     event.preventDefault();
     const id = document.getElementById('materiau-id').value;
-    const support = document.getElementById('materiau-support').value;
-    const price = parseFloat(document.getElementById('materiau-price').value);
-    const categorie = document.getElementById('materiau-categorie').value;
-
-    try {
-        const url = id ? `${API_URL}/tarifs/materiaux/${id}` : `${API_URL}/tarifs/materiaux`;
-        const method = id ? 'PUT' : 'POST';
-
-        const resp = await fetch(url, {
-            method,
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ support, price, categorie })
-        });
-
-        if (resp.ok) {
-            showMessage(id ? 'Matériau modifié' : 'Matériau créé', 'success');
-            closeModal('modal-materiau');
-            loadMateriaux();
-            event.target.reset();
-        } else {
-            showMessage('Erreur', 'error');
-        }
-    } catch (err) { showMessage('Erreur serveur', 'error'); }
+    const data = {
+        support: document.getElementById('materiau-support').value,
+        price: parseFloat(document.getElementById('materiau-price').value),
+        categorie: document.getElementById('materiau-categorie').value
+    };
+    const url = id ? `${API_URL}/tarifs/materiaux/${id}` : `${API_URL}/tarifs/materiaux`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-materiau'); loadMateriaux(); }
 }
 
 function editMateriau(m) {
@@ -860,49 +603,31 @@ function editMateriau(m) {
     document.getElementById('materiau-support').value = m.support;
     document.getElementById('materiau-price').value = m.price;
     document.getElementById('materiau-categorie').value = m.categorie;
-    document.getElementById('materiau-modal-title').textContent = 'Modifier le matériau';
+    document.getElementById('materiau-title').textContent = 'Modifier le matériau';
     document.getElementById('modal-materiau').classList.add('active');
 }
 
 async function deleteMateriau(id) {
-    if (!confirm('Supprimer ce matériau ?')) return;
-    try {
-        await fetch(`${API_URL}/tarifs/materiaux/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        showMessage('Matériau supprimé', 'success');
-        loadMateriaux();
-    } catch (err) { showMessage('Erreur', 'error'); }
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/materiaux/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); loadMateriaux();
 }
 
-// POSEURS
 async function savePoseur(event) {
     event.preventDefault();
     const id = document.getElementById('poseur-id').value;
-    const nom = document.getElementById('poseur-nom').value;
-    const jour = parseFloat(document.getElementById('poseur-jour').value);
-    const demijour = parseFloat(document.getElementById('poseur-demijour').value);
-
-    try {
-        const url = id ? `${API_URL}/tarifs/poseurs/${id}` : `${API_URL}/tarifs/poseurs`;
-        const method = id ? 'PUT' : 'POST';
-
-        const resp = await fetch(url, {
-            method,
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nom, jour, demijour })
-        });
-
-        if (resp.ok) {
-            showMessage(id ? 'Poseur modifié' : 'Poseur créé', 'success');
-            closeModal('modal-poseur');
-            loadPoseurs();
-            event.target.reset();
-        } else {
-            showMessage('Erreur', 'error');
-        }
-    } catch (err) { showMessage('Erreur serveur', 'error'); }
+    const data = {
+        nom: document.getElementById('poseur-nom').value,
+        jour: parseFloat(document.getElementById('poseur-jour').value),
+        demijour: parseFloat(document.getElementById('poseur-demijour').value)
+    };
+    const url = id ? `${API_URL}/tarifs/poseurs/${id}` : `${API_URL}/tarifs/poseurs`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-poseur'); loadPoseurs(); }
 }
 
 function editPoseur(p) {
@@ -910,20 +635,52 @@ function editPoseur(p) {
     document.getElementById('poseur-nom').value = p.nom;
     document.getElementById('poseur-jour').value = p.jour;
     document.getElementById('poseur-demijour').value = p.demijour;
-    document.getElementById('poseur-modal-title').textContent = 'Modifier le poseur';
+    document.getElementById('poseur-title').textContent = 'Modifier le poseur';
     document.getElementById('modal-poseur').classList.add('active');
 }
 
 async function deletePoseur(id) {
-    if (!confirm('Supprimer ce poseur ?')) return;
-    try {
-        await fetch(`${API_URL}/tarifs/poseurs/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        showMessage('Poseur supprimé', 'success');
-        loadPoseurs();
-    } catch (err) { showMessage('Erreur', 'error'); }
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/poseurs/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); loadPoseurs();
+}
+
+async function saveImpression(event) {
+    event.preventDefault();
+    const id = document.getElementById('impression-id').value;
+    const data = {
+        type: document.getElementById('impression-type').value,
+        format: document.getElementById('impression-format').value,
+        grammage: document.getElementById('impression-grammage').value,
+        finition: document.getElementById('impression-finition').value,
+        quantite: parseInt(document.getElementById('impression-quantite').value),
+        prix_exa: parseFloat(document.getElementById('impression-prix').value)
+    };
+    const url = id ? `${API_URL}/tarifs/impressions/${id}` : `${API_URL}/tarifs/impressions`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-impression'); loadImpressions(); }
+}
+
+function editImpression(i) {
+    document.getElementById('impression-id').value = i.id;
+    document.getElementById('impression-type').value = i.type;
+    document.getElementById('impression-format').value = i.format;
+    document.getElementById('impression-grammage').value = i.grammage;
+    document.getElementById('impression-finition').value = i.finition;
+    document.getElementById('impression-quantite').value = i.quantite;
+    document.getElementById('impression-prix').value = i.prix_exa;
+    document.getElementById('impression-title').textContent = 'Modifier le prix';
+    document.getElementById('modal-impression').classList.add('active');
+}
+
+async function deleteImpression(id) {
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/impressions/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); loadImpressions();
 }
 
 function logout() {
