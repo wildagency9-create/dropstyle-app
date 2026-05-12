@@ -9,7 +9,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(path.join(__dirname, 'frontend')));
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
@@ -66,17 +66,12 @@ app.post('/api/auth/register', async (req, res) => {
         const bcrypt = require('bcrypt');
         const conn = await pool.getConnection();
         const [rows] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
-        if (rows.length > 0) {
-            await conn.release();
-            return res.status(400).json({ error: 'Email déjà utilisé' });
-        }
+        if (rows.length > 0) { await conn.release(); return res.status(400).json({ error: 'Email déjà utilisé' }); }
         const hashedPassword = await bcrypt.hash(password, 10);
         await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, 'user']);
         await conn.release();
         res.status(201).json({ message: 'Utilisateur créé' });
-    } catch (err) {
-        res.status(500).json({ error: 'Erreur serveur' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -93,184 +88,24 @@ app.post('/api/auth/login', async (req, res) => {
         if (!valid) return res.status(401).json({ error: 'Identifiants invalides' });
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'secret123', { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
-    } catch (err) {
-        res.status(500).json({ error: 'Erreur serveur' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
 app.get('/api/tarifs/vinyles', verifyToken, async (req, res) => {
-    try {
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM vinyles WHERE user_id = ?', [req.userId]);
-        await conn.release();
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM vinyles WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/tarifs/materiaux', verifyToken, async (req, res) => {
-    try {
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM materiaux WHERE user_id = ?', [req.userId]);
-        await conn.release();
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM materiaux WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/tarifs/poseurs', verifyToken, async (req, res) => {
-    try {
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId]);
-        await conn.release();
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/tarifs/vinyles', verifyToken, async (req, res) => {
-    try {
-        const { name, price, type } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [req.userId, name, price, type]);
-        await conn.release();
-        res.status(201).json({ message: 'Vinyle créé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/tarifs/materiaux', verifyToken, async (req, res) => {
-    try {
-        const { support, price, categorie } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [req.userId, support, price, categorie]);
-        await conn.release();
-        res.status(201).json({ message: 'Matériau créé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/tarifs/poseurs', verifyToken, async (req, res) => {
-    try {
-        const { nom, jour, demijour } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [req.userId, nom, jour, demijour]);
-        await conn.release();
-        res.status(201).json({ message: 'Poseur créé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.put('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
-    try {
-        const { name, price, type } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query('UPDATE vinyles SET name = ?, price = ?, type = ? WHERE id = ? AND user_id = ?', [name, price, type, req.params.id, req.userId]);
-        await conn.release();
-        res.json({ message: 'Vinyle modifié' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
-    try {
-        const conn = await pool.getConnection();
-        await conn.query('DELETE FROM vinyles WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
-        await conn.release();
-        res.json({ message: 'Vinyle supprimé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/devis', verifyToken, async (req, res) => {
-    try {
-        const { type, qty, ht, ttc, details } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details)]);
-        await conn.release();
-        res.status(201).json({ message: 'Devis sauvegardé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/devis', verifyToken, async (req, res) => {
-    try {
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]);
-        await conn.release();
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/admin/users', verifyToken, async (req, res) => {
-    try {
-        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT id, email, nom, role, created_at FROM users');
-        await conn.release();
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/admin/users', verifyToken, async (req, res) => {
-    try {
-        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const { email, password, nom, role } = req.body;
-        const bcrypt = require('bcrypt');
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const conn = await pool.getConnection();
-        await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, role]);
-        await conn.release();
-        res.status(201).json({ message: 'Utilisateur créé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
-    try {
-        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-        await conn.release();
-        res.json({ message: 'Utilisateur supprimé' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/admin/stats', verifyToken, async (req, res) => {
-    try {
-        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
-        const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis');
-        const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis');
-        await conn.release();
-        res.json({ users: users[0].count, devis: devis[0].count, revenue: revenue[0].total || 0 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/index.html')); });
-app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/app.html')); });
-app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/admin-dashboard.html')); });
-
-app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: 'Erreur serveur' }); });
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/index.html')); });
+app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/app.html')); });
+app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/admin-dashboard.html')); });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
