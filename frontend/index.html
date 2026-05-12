@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropStyle — Connexion</title>
+    <style>
+        :root {
+            --primary: #FF5722;
+            --primary-dark: #E64A19;
+            --bg-dark: #0a0a0a;
+            --bg-card: #1a1a1a;
+            --bg-input: #2a2a2a;
+            --border: #404040;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999;
+            --gold: #d4af37;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body { height: 100%; width: 100%; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(255,87,34,0.1) 100%);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .logo-area {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 28px;
+            margin: 0 auto 16px;
+            box-shadow: 0 4px 12px rgba(255,87,34,0.3);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255,87,34,0.05);
+            box-shadow: 0 0 0 3px rgba(255,87,34,0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 2px 8px rgba(255,87,34,0.2);
+            margin-top: 8px;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(255,87,34,0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .message {
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .message.success {
+            background: rgba(76,175,80,0.15);
+            color: #4caf50;
+            border-left: 3px solid #4caf50;
+            display: block;
+        }
+
+        .message.error {
+            background: rgba(255,82,82,0.15);
+            color: #ff5252;
+            border-left: 3px solid #ff5252;
+            display: block;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+
+        .links a {
+            color: var(--primary);
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .links a:hover {
+            color: #FF7043;
+        }
+
+        .loader {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,87,34,0.3);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="logo-area">
+            <div class="logo-icon">D</div>
+            <h1>DropStyle</h1>
+            <p class="subtitle">Calculateur de Prix</p>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')">Connexion</button>
+            <button class="tab-btn" onclick="switchTab('register')">Inscription</button>
+        </div>
+
+        <!-- TAB LOGIN -->
+        <div class="tab-content active" id="tab-login">
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" placeholder="vous@example.com" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required />
+                </div>
+
+                <button type="submit" id="login-btn">Connexion</button>
+                <div class="loader" id="login-loader"></div>
+            </form>
+
+            <div class="links">
+                Demo : admin@dropstyle.com / admin123
+            </div>
+        </div>
+
+        <!-- TAB REGISTER -->
+        <div class="tab-content" id="tab-register">
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Nom complet</label>
+                    <input type="text" id="register-nom" placeholder="Jean Dupont" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="register-email" placeholder="vous@example.com" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="register-password" placeholder="••••••••" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Confirmer mot de passe</label>
+                    <input type="password" id="register-confirm" placeholder="••••••••" required />
+                </div>
+
+                <button type="submit" id="register-btn">S'inscrire</button>
+                <div class="loader" id="register-loader"></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_URL = window.location.origin + '/api';
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('active');
+    });
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+    document.getElementById('message').className = 'message';
+}
+
+function showMessage(text, type) {
+    const el = document.getElementById('message');
+    el.textContent = text;
+    el.className = `message ${type}`;
+    setTimeout(() => { el.className = 'message'; }, 5000);
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    document.getElementById('login-btn').style.display = 'none';
+    document.getElementById('login-loader').style.display = 'block';
+
+    try {
+        const response = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || 'Erreur de connexion', 'error');
+        } else {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            
+            if (data.user.role === 'admin') {
+                window.location.href = '/admin';
+            } else {
+                window.location.href = '/app';
+            }
+        }
+    } catch (err) {
+        showMessage('Erreur serveur', 'error');
+        console.error(err);
+    } finally {
+        document.getElementById('login-btn').style.display = 'block';
+        document.getElementById('login-loader').style.display = 'none';
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    const nom = document.getElementById('register-nom').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+    const confirm = document.getElementById('register-confirm').value;
+
+    if (password !== confirm) {
+        showMessage('Les mots de passe ne correspondent pas', 'error');
+        return;
+    }
+
+    document.getElementById('register-btn').style.display = 'none';
+    document.getElementById('register-loader').style.display = 'block';
+
+    try {
+        const response = await fetch(`${API_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, nom })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || 'Erreur d\'inscription', 'error');
+        } else {
+            showMessage('Inscription réussie ! Connectez-vous.', 'success');
+            setTimeout(() => {
+                document.getElementById('register-email').value = '';
+                document.getElementById('register-password').value = '';
+                switchTab('login');
+            }, 2000);
+        }
+    } catch (err) {
+        showMessage('Erreur serveur', 'error');
+        console.error(err);
+    } finally {
+        document.getElementById('register-btn').style.display = 'block';
+        document.getElementById('register-loader').style.display = 'none';
+    }
+}
+
+// Check si déjà login
+window.addEventListener('DOMContentLoaded', () => {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    
+    if (token && user) {
+        if (user.role === 'admin') {
+            window.location.href = '/admin';
+        } else {
+            window.location.href = '/app';
+        }
+    }
+});
+</script>
+
+</body>
+</html>

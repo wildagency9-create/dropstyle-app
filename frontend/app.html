@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropStyle — Calculateur</title>
+    <style>
+        :root {
+            --primary: #FF5722;
+            --primary-dark: #E64A19;
+            --bg-dark: #0a0a0a;
+            --bg-card: #1a1a1a;
+            --bg-input: #2a2a2a;
+            --border: #404040;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999;
+            --text-light: #666;
+            --danger: #ff5252;
+            --gold: #d4af37;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        .app {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.05) 100%);
+            border-bottom: 2px solid var(--primary);
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(255,87,34,0.3);
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            font-size: 12px;
+            text-align: right;
+            color: var(--text-secondary);
+        }
+
+        .user-info strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255,87,34,0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(255,87,34,0.3);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .panel {
+            overflow-y: auto;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-left {
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border);
+        }
+
+        .panel-right {
+            background: rgba(26,26,26,0.5);
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--primary);
+            margin: 0 0 20px 0;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 12px 16px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            margin-bottom: -1px;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255,87,34,0.05);
+            box-shadow: 0 0 0 3px rgba(255,87,34,0.1);
+        }
+
+        .price-display {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.08) 100%);
+            padding: 24px;
+            border-radius: 10px;
+            border: 2px solid var(--primary);
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 24px rgba(255,87,34,0.15);
+        }
+
+        .price-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .price-value {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,87,34,0.3);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .logout-btn {
+            background: rgba(255,82,82,0.2);
+            color: #ff5252;
+            border: 1px solid #ff5252;
+            padding: 8px 16px;
+            font-size: 11px;
+        }
+
+        .logout-btn:hover {
+            background: #ff5252;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <header>
+        <div class="header-left">
+            <div class="logo-icon">D</div>
+            <h1>DropStyle</h1>
+        </div>
+        <div class="header-actions">
+            <div class="user-info">
+                <strong id="user-nom">...</strong>
+                <span id="user-email">...</span>
+            </div>
+            <button class="logout-btn" onclick="logout()">Déconnexion</button>
+        </div>
+    </header>
+
+    <div class="main-grid">
+        <div class="panel panel-left">
+            <div class="section-title">Calculer un Devis</div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('vehicule')">Véhicule</button>
+                <button class="tab-btn" onclick="switchTab('signaletique')">Signalétique</button>
+            </div>
+
+            <!-- TAB VEHICULE -->
+            <div class="tab-content active" id="tab-vehicule">
+                <div class="form-group">
+                    <label>Type de véhicule</label>
+                    <select id="v-type" onchange="loadVinyles()">
+                        <option value="">— Sélectionner —</option>
+                        <option value="citadine">Citadine</option>
+                        <option value="berline">Berline / Break</option>
+                        <option value="suv">SUV / 4x4</option>
+                        <option value="utilitaire">Utilitaire</option>
+                        <option value="fourgon">Fourgon</option>
+                        <option value="camion">Camion / PL</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Vinyle</label>
+                    <select id="v-vinyle">
+                        <option value="">— Charger vinyles...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantité</label>
+                    <input type="number" id="v-qty" value="1" min="1" />
+                </div>
+
+                <button onclick="calcVehicule()">Calculer</button>
+            </div>
+
+            <!-- TAB SIGNALETIQUE -->
+            <div class="tab-content" id="tab-signaletique">
+                <div class="form-group">
+                    <label>Matériau</label>
+                    <select id="s-materiau">
+                        <option value="">— Charger matériaux...</option>
+                    </select>
+                </div>
+
+                <div class="row2">
+                    <div class="form-group">
+                        <label>Largeur (cm)</label>
+                        <input type="number" id="s-larg" value="100" min="10" />
+                    </div>
+                    <div class="form-group">
+                        <label>Hauteur (cm)</label>
+                        <input type="number" id="s-haut" value="100" min="10" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantité</label>
+                    <input type="number" id="s-qty" value="1" min="1" />
+                </div>
+
+                <button onclick="calcSignaletique()">Calculer</button>
+            </div>
+        </div>
+
+        <div class="panel panel-right">
+            <div class="section-title">Résultat</div>
+            <div id="result">
+                <div class="empty-state">
+                    <p>Configurez et cliquez sur Calculer</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_URL = window.location.origin + '/api';
+let user = null;
+let token = null;
+
+// Check auth
+window.addEventListener('DOMContentLoaded', () => {
+    token = localStorage.getItem('token');
+    user = JSON.parse(localStorage.getItem('user') || 'null');
+
+    if (!token || !user) {
+        window.location.href = '/';
+        return;
+    }
+
+    document.getElementById('user-nom').textContent = user.nom;
+    document.getElementById('user-email').textContent = user.email;
+    
+    loadTarifs();
+});
+
+async function loadTarifs() {
+    try {
+        const [vinyles, materiaux] = await Promise.all([
+            fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+            fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        ]);
+
+        const vinylesSelect = document.getElementById('v-vinyle');
+        vinylesSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
+            vinyles.map(v => `<option value="${v.id}">${v.name} (${v.price}€/m²)</option>`).join('');
+
+        const materiauxSelect = document.getElementById('s-materiau');
+        materiauxSelect.innerHTML = '<option value="">— Sélectionner —</option>' +
+            materiaux.map(m => `<option value="${m.id}">${m.support} (${m.price}€/m²)</option>`).join('');
+    } catch (err) {
+        console.error('Erreur chargement tarifs:', err);
+    }
+}
+
+function loadVinyles() {
+    // Déclenche après sélection type de véhicule
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+}
+
+async function calcVehicule() {
+    const type = document.getElementById('v-type').value;
+    const vinyleId = document.getElementById('v-vinyle').value;
+    const qty = parseInt(document.getElementById('v-qty').value) || 1;
+
+    if (!type || !vinyleId) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p>Complétez tous les champs</p></div>';
+        return;
+    }
+
+    const surfaces = {
+        'citadine': 5.5,
+        'berline': 7,
+        'suv': 9,
+        'utilitaire': 11,
+        'fourgon': 15,
+        'camion': 25
+    };
+
+    // Mock calculation (à améliorer avec API)
+    const m2 = surfaces[type];
+    const vinylesResp = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const vinyles = await vinylesResp.json();
+    const vinyle = vinyles.find(v => v.id == vinyleId);
+
+    if (!vinyle) return;
+
+    const totalHT = m2 * vinyle.price * qty;
+    const totalTTC = totalHT * 1.2;
+
+    document.getElementById('result').innerHTML = `
+        <div class="price-display">
+            <div class="price-label">Véhicule × ${qty}</div>
+            <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">
+                HT: ${totalHT.toFixed(2)}€ | TVA: ${(totalTTC - totalHT).toFixed(2)}€
+            </div>
+        </div>
+    `;
+
+    // Sauvegarder devis
+    await fetch(`${API_URL}/devis`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            type: 'vehicule',
+            qty,
+            ht: totalHT.toFixed(2),
+            ttc: totalTTC.toFixed(2),
+            details: { type, vinyleId }
+        })
+    });
+}
+
+async function calcSignaletique() {
+    const materiauid = document.getElementById('s-materiau').value;
+    const larg = parseFloat(document.getElementById('s-larg').value) || 100;
+    const haut = parseFloat(document.getElementById('s-haut').value) || 100;
+    const qty = parseInt(document.getElementById('s-qty').value) || 1;
+
+    if (!materiauid) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p>Complétez tous les champs</p></div>';
+        return;
+    }
+
+    const m2 = (larg * haut) / 10000;
+    const materiauxResp = await fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const materiaux = await materiauxResp.json();
+    const materiau = materiaux.find(m => m.id == materiauid);
+
+    if (!materiau) return;
+
+    const totalHT = m2 * materiau.price * qty;
+    const totalTTC = totalHT * 1.2;
+
+    document.getElementById('result').innerHTML = `
+        <div class="price-display">
+            <div class="price-label">Signalétique ${m2.toFixed(2)}m² × ${qty}</div>
+            <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px;">
+                HT: ${totalHT.toFixed(2)}€ | TVA: ${(totalTTC - totalHT).toFixed(2)}€
+            </div>
+        </div>
+    `;
+
+    // Sauvegarder devis
+    await fetch(`${API_URL}/devis`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            type: 'signaletique',
+            qty,
+            ht: totalHT.toFixed(2),
+            ttc: totalTTC.toFixed(2),
+            details: { materiauid, m2 }
+        })
+    });
+}
+
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
+}
+</script>
+
+</body>
+</html>
