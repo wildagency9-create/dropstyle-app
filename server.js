@@ -28,7 +28,9 @@ async function initDB() {
         await conn.query(`CREATE TABLE IF NOT EXISTS vinyles (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, name VARCHAR(255) NOT NULL, price DECIMAL(10, 2) NOT NULL, type VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS materiaux (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, support VARCHAR(255) NOT NULL, price DECIMAL(10, 2) NOT NULL, categorie VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS poseurs (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, jour DECIMAL(10, 2) NOT NULL, demijour DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+        await conn.query(`CREATE TABLE IF NOT EXISTS impressions (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, type VARCHAR(50) NOT NULL, format VARCHAR(50) NOT NULL, grammage VARCHAR(50), finition VARCHAR(100), quantite INT NOT NULL, prix_exa DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS devis (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, type VARCHAR(50) NOT NULL, qty INT NOT NULL, ht DECIMAL(10, 2) NOT NULL, ttc DECIMAL(10, 2) NOT NULL, details JSON, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+        
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
             const bcrypt = require('bcrypt');
@@ -36,14 +38,31 @@ async function initDB() {
             await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', ['admin@dropstyle.com', hashedPassword, 'Admin DropStyle', 'admin']);
             const [adminUser] = await conn.query('SELECT id FROM users WHERE email = ?', ['admin@dropstyle.com']);
             const adminId = adminUser[0].id;
+            
+            // Vinyles
             await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, '3M Scotchprint Standard', 12.50, 'standard']);
             await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, '3M Scotchprint Premium', 18.00, 'premium']);
             await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [adminId, 'Avery Supreme Wrapping', 14.20, 'premium']);
+            
+            // Matériaux
             await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'PVC 380g blanc', 15.00, 'pvc']);
             await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'Acrylique PMMA 3mm', 22.50, 'acrylique']);
             await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [adminId, 'DiBond 3mm', 18.75, 'dibond']);
+            
+            // Poseurs
             await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [adminId, 'Jean Pose Pro', 150.00, 85.00]);
             await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [adminId, 'Marie Installation', 160.00, 90.00]);
+            
+            // Impressions (exemples Exaprint)
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Flyer', 'A6', '170g', 'Mat', 500, 25.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Flyer', 'A6', '170g', 'Mat', 1000, 45.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Flyer', 'A6', '170g', 'Brillant', 1000, 48.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Flyer', 'A5', '170g', 'Mat', 500, 35.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Flyer', 'A5', '170g', 'Mat', 1000, 55.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Carte de visite', 'Standard', '300g', 'Mat', 100, 18.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Carte de visite', 'Standard', '300g', 'Mat', 500, 35.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Carte de visite', 'Standard', '350g', 'Pelliculé mat', 500, 45.00]);
+            await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [adminId, 'Carte de visite', 'Standard', '350g', 'Soft Touch', 500, 55.00]);
         }
         await conn.release();
     } catch (err) {
@@ -137,6 +156,20 @@ app.put('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
 });
 app.delete('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM poseurs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// IMPRESSIONS CRUD
+app.get('/api/tarifs/impressions', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM impressions WHERE user_id = ? ORDER BY type, format, grammage, finition, quantite', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/tarifs/impressions', verifyToken, async (req, res) => {
+    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [req.userId, type, format, grammage, finition, quantite, prix_exa]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
+    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE impressions SET type = ?, format = ?, grammage = ?, finition = ?, quantite = ?, prix_exa = ? WHERE id = ? AND user_id = ?', [type, format, grammage, finition, quantite, prix_exa, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM impressions WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // DEVIS
