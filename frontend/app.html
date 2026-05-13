@@ -29,7 +29,7 @@
         }
         .app { display: flex; height: 100vh; flex-direction: column; }
         header {
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.05) 100%);
+            background: linear-gradient(135deg, var(--bg-card), rgba(255,87,34,0.05));
             border-bottom: 2px solid var(--primary);
             padding: 16px 28px;
             display: flex;
@@ -82,10 +82,8 @@
         .panel-right { background: rgba(26,26,26,0.5); }
 
         .section-title {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
+            font-size: 12px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.12em;
             color: var(--primary);
             margin-bottom: 16px;
             padding-bottom: 10px;
@@ -134,7 +132,6 @@
         }
         input:focus { outline: none; border-color: var(--primary); }
 
-        /* CUSTOM DROPDOWN */
         .dropdown { position: relative; }
         .dropdown-btn {
             width: 100%;
@@ -150,8 +147,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            text-transform: none;
-            letter-spacing: 0;
         }
         .dropdown-btn:hover { border-color: var(--primary); background: rgba(255,87,34,0.05); }
         .dropdown-btn::after { content: '▼'; font-size: 10px; color: var(--primary); }
@@ -168,7 +163,6 @@
             max-height: 200px;
             overflow-y: auto;
             z-index: 100;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
         }
         .dropdown.open .dropdown-list { display: block; }
         .dropdown-item {
@@ -182,6 +176,7 @@
         .dropdown-item:hover { background: rgba(255,87,34,0.15); }
 
         .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .checkbox-row input { width: auto; }
         .checkbox-row label { margin-bottom: 0; }
@@ -189,7 +184,7 @@
         .conditional.active { display: block; }
 
         .price-display {
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255,87,34,0.08) 100%);
+            background: linear-gradient(135deg, var(--bg-card), rgba(255,87,34,0.08));
             padding: 20px;
             border-radius: 10px;
             border: 2px solid var(--primary);
@@ -227,6 +222,43 @@
         }
         .breakdown-row .label { color: var(--text-secondary); }
 
+        .optimization-box {
+            background: rgba(76,175,80,0.1);
+            border: 1px solid var(--success);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .optimization-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--success);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .laize-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .laize-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+            font-size: 11px;
+        }
+        .laize-card.best {
+            border-color: var(--success);
+            background: rgba(76,175,80,0.05);
+        }
+        .laize-card-title { color: var(--text-secondary); font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
+        .laize-card-value { font-size: 14px; font-weight: 700; color: var(--primary); }
+        .laize-card.best .laize-card-value { color: var(--success); }
+        .laize-card-detail { font-size: 9px; color: var(--text-light); margin-top: 4px; }
+
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -259,6 +291,22 @@
             width: 100%;
         }
         .exa-link:hover { background: var(--primary); color: white; }
+
+        .visual-preview {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .visual-preview-title { font-size: 10px; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; }
+        .visual-sticker {
+            display: inline-block;
+            background: var(--primary);
+            margin: 2px;
+            box-shadow: 0 0 0 1px var(--bg-card);
+        }
     </style>
 </head>
 <body>
@@ -285,54 +333,52 @@
             
             <div class="tabs">
                 <button class="tab-btn active" onclick="switchTab('vehicule', this)">🚗 Véhicule</button>
-                <button class="tab-btn" onclick="switchTab('signaletique', this)">📋 Signalétique</button>
-                <button class="tab-btn" onclick="switchTab('impression', this)">🖨️ Impression</button>
-                <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Historique</button>
+                <button class="tab-btn" onclick="switchTab('signaletique', this)">📋 Signal.</button>
+                <button class="tab-btn" onclick="switchTab('impression', this)">🖨️ Print</button>
+                <button class="tab-btn" onclick="switchTab('stickers', this)">🏷️ Stickers</button>
+                <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Hist.</button>
             </div>
 
-            <!-- VEHICULE -->
+            <!-- VEHICULE (raccourci) -->
             <div class="tab-content active" id="tab-vehicule">
                 <div class="form-group"><label>Type de véhicule</label>
                     <div class="dropdown" id="dd-v-type">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-type')"><span class="dropdown-label">— Sélectionner —</span></button>
-                        <div class="dropdown-list" id="list-v-type">
-                            <div class="dropdown-item" data-value="citadine">Citadine</div>
-                            <div class="dropdown-item" data-value="berline">Berline / Break</div>
-                            <div class="dropdown-item" data-value="suv">SUV / 4x4</div>
-                            <div class="dropdown-item" data-value="utilitaire">Utilitaire</div>
-                            <div class="dropdown-item" data-value="fourgon">Fourgon</div>
-                            <div class="dropdown-item" data-value="camion">Camion / PL</div>
+                        <div class="dropdown-list">
+                            <div class="dropdown-item" data-value="citadine" onclick="selectDropdownItem(this)">Citadine</div>
+                            <div class="dropdown-item" data-value="berline" onclick="selectDropdownItem(this)">Berline / Break</div>
+                            <div class="dropdown-item" data-value="suv" onclick="selectDropdownItem(this)">SUV / 4x4</div>
+                            <div class="dropdown-item" data-value="utilitaire" onclick="selectDropdownItem(this)">Utilitaire</div>
+                            <div class="dropdown-item" data-value="fourgon" onclick="selectDropdownItem(this)">Fourgon</div>
+                            <div class="dropdown-item" data-value="camion" onclick="selectDropdownItem(this)">Camion / PL</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Type de marquage</label>
                     <div class="dropdown" id="dd-v-marquage">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-marquage')"><span class="dropdown-label">— Sélectionner —</span></button>
-                        <div class="dropdown-list" id="list-v-marquage">
-                            <div class="dropdown-item" data-value="total">Covering Total</div>
-                            <div class="dropdown-item" data-value="partiel">Covering Partiel</div>
-                            <div class="dropdown-item" data-value="bandes">Bandes / Stickers</div>
-                            <div class="dropdown-item" data-value="logos">Logos seuls</div>
-                            <div class="dropdown-item" data-value="custome">Décoration custom</div>
+                        <div class="dropdown-list">
+                            <div class="dropdown-item" data-value="total" onclick="selectDropdownItem(this)">Covering Total</div>
+                            <div class="dropdown-item" data-value="partiel" onclick="selectDropdownItem(this)">Covering Partiel</div>
+                            <div class="dropdown-item" data-value="bandes" onclick="selectDropdownItem(this)">Bandes / Stickers</div>
+                            <div class="dropdown-item" data-value="logos" onclick="selectDropdownItem(this)">Logos seuls</div>
+                            <div class="dropdown-item" data-value="custome" onclick="selectDropdownItem(this)">Décoration custom</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Vinyle</label>
                     <div class="dropdown" id="dd-v-vinyle">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
                         <div class="dropdown-list" id="list-v-vinyle"></div>
                     </div>
                 </div>
-
                 <div class="row2">
                     <div class="form-group"><label>Finition</label>
                         <div class="dropdown" id="dd-v-finition">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-v-finition')"><span class="dropdown-label">Brillant</span></button>
                             <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="brillant">Brillant</div>
-                                <div class="dropdown-item" data-value="mat">Mat</div>
+                                <div class="dropdown-item" data-value="brillant" onclick="selectDropdownItem(this)">Brillant</div>
+                                <div class="dropdown-item" data-value="mat" onclick="selectDropdownItem(this)">Mat</div>
                             </div>
                         </div>
                     </div>
@@ -340,75 +386,57 @@
                         <div class="dropdown" id="dd-v-lam">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-v-lam')"><span class="dropdown-label">Non</span></button>
                             <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="non">Non</div>
-                                <div class="dropdown-item" data-value="oui">Oui (+12%)</div>
+                                <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Non</div>
+                                <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Oui (+12%)</div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="checkbox-row">
-                    <input type="checkbox" id="v-pao-check" onchange="togglePAO()">
-                    <label for="v-pao-check">PAO / Design graphique (60€/h)</label>
-                </div>
-                <div class="conditional" id="v-pao-cond">
-                    <div class="form-group"><label>Heures PAO</label>
-                        <input type="number" id="v-pao-h" value="2" min="0.5" step="0.5">
-                    </div>
-                </div>
-
-                <div class="checkbox-row">
-                    <input type="checkbox" id="v-echenillage-check" onchange="toggleEchenillage()">
-                    <label for="v-echenillage-check">Échenillage</label>
-                </div>
+                <div class="checkbox-row"><input type="checkbox" id="v-pao-check" onchange="togglePAO()"><label for="v-pao-check">PAO / Design (60€/h)</label></div>
+                <div class="conditional" id="v-pao-cond"><div class="form-group"><label>Heures PAO</label><input type="number" id="v-pao-h" value="2" min="0.5" step="0.5"></div></div>
+                <div class="checkbox-row"><input type="checkbox" id="v-echenillage-check" onchange="toggleEchenillage()"><label for="v-echenillage-check">Échenillage</label></div>
                 <div class="conditional" id="v-echenillage-cond">
                     <div class="form-group"><label>Forfait</label>
                         <div class="dropdown" id="dd-v-echenillage">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-v-echenillage')"><span class="dropdown-label">Petit (50€)</span></button>
                             <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="50">Petit (50€)</div>
-                                <div class="dropdown-item" data-value="75">Moyen (75€)</div>
-                                <div class="dropdown-item" data-value="100">Grand (100€)</div>
+                                <div class="dropdown-item" data-value="50" onclick="selectDropdownItem(this)">Petit (50€)</div>
+                                <div class="dropdown-item" data-value="75" onclick="selectDropdownItem(this)">Moyen (75€)</div>
+                                <div class="dropdown-item" data-value="100" onclick="selectDropdownItem(this)">Grand (100€)</div>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Poseur</label>
                     <div class="dropdown" id="dd-v-poseur">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-poseur')"><span class="dropdown-label">Sans pose</span></button>
                         <div class="dropdown-list" id="list-v-poseur">
-                            <div class="dropdown-item" data-value="0">Sans pose</div>
+                            <div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans pose</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="row2">
                     <div class="form-group"><label>Durée pose</label>
                         <div class="dropdown" id="dd-v-pose-duration">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-v-pose-duration')"><span class="dropdown-label">Journée</span></button>
                             <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="jour">Journée</div>
-                                <div class="dropdown-item" data-value="demijour">Demi-journée</div>
+                                <div class="dropdown-item" data-value="jour" onclick="selectDropdownItem(this)">Journée</div>
+                                <div class="dropdown-item" data-value="demijour" onclick="selectDropdownItem(this)">Demi-journée</div>
                             </div>
                         </div>
                     </div>
-                    <div class="form-group"><label>Quantité</label>
-                        <input type="number" id="v-qty" value="1" min="1">
-                    </div>
+                    <div class="form-group"><label>Quantité</label><input type="number" id="v-qty" value="1" min="1"></div>
                 </div>
-
                 <div class="form-group"><label>Délai</label>
                     <div class="dropdown" id="dd-v-delai">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-delai')"><span class="dropdown-label">Normal</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="normal">Normal</div>
-                            <div class="dropdown-item" data-value="urgent">Urgent (+15%)</div>
-                            <div class="dropdown-item" data-value="express">Express (+25%)</div>
+                            <div class="dropdown-item" data-value="normal" onclick="selectDropdownItem(this)">Normal</div>
+                            <div class="dropdown-item" data-value="urgent" onclick="selectDropdownItem(this)">Urgent (+15%)</div>
+                            <div class="dropdown-item" data-value="express" onclick="selectDropdownItem(this)">Express (+25%)</div>
                         </div>
                     </div>
                 </div>
-
                 <button onclick="calcVehicule()" class="btn-block">Calculer le prix</button>
             </div>
 
@@ -418,64 +446,58 @@
                     <div class="dropdown" id="dd-s-type">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-type')"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="panneau">Panneau alu</div>
-                            <div class="dropdown-item" data-value="vitrophanie">Vitrophanie</div>
-                            <div class="dropdown-item" data-value="adhesif">Adhésif mural</div>
-                            <div class="dropdown-item" data-value="bache">Bâche PVC</div>
-                            <div class="dropdown-item" data-value="rollup">Roll-up / Totem</div>
-                            <div class="dropdown-item" data-value="lettrage">Lettrage découpé</div>
+                            <div class="dropdown-item" data-value="panneau" onclick="selectDropdownItem(this)">Panneau alu</div>
+                            <div class="dropdown-item" data-value="vitrophanie" onclick="selectDropdownItem(this)">Vitrophanie</div>
+                            <div class="dropdown-item" data-value="adhesif" onclick="selectDropdownItem(this)">Adhésif mural</div>
+                            <div class="dropdown-item" data-value="bache" onclick="selectDropdownItem(this)">Bâche PVC</div>
+                            <div class="dropdown-item" data-value="rollup" onclick="selectDropdownItem(this)">Roll-up / Totem</div>
+                            <div class="dropdown-item" data-value="lettrage" onclick="selectDropdownItem(this)">Lettrage découpé</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="row2">
                     <div class="form-group"><label>Largeur (cm)</label><input type="number" id="s-larg" value="100" min="10"></div>
                     <div class="form-group"><label>Hauteur (cm)</label><input type="number" id="s-haut" value="100" min="10"></div>
                 </div>
-
                 <div class="form-group"><label>Matériau</label>
                     <div class="dropdown" id="dd-s-materiau">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-materiau')"><span class="dropdown-label">— Chargement... —</span></button>
                         <div class="dropdown-list" id="list-s-materiau"></div>
                     </div>
                 </div>
-
                 <div class="row2">
                     <div class="form-group"><label>Finition</label>
                         <div class="dropdown" id="dd-s-finition">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-s-finition')"><span class="dropdown-label">Aucune</span></button>
                             <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="aucune">Aucune</div>
-                                <div class="dropdown-item" data-value="lam-brill">Laminage brillant (+8%)</div>
-                                <div class="dropdown-item" data-value="lam-mat">Laminage mat (+8%)</div>
+                                <div class="dropdown-item" data-value="aucune" onclick="selectDropdownItem(this)">Aucune</div>
+                                <div class="dropdown-item" data-value="lam-brill" onclick="selectDropdownItem(this)">Laminage brillant (+8%)</div>
+                                <div class="dropdown-item" data-value="lam-mat" onclick="selectDropdownItem(this)">Laminage mat (+8%)</div>
                             </div>
                         </div>
                     </div>
                     <div class="form-group"><label>Quantité</label><input type="number" id="s-qty" value="1" min="1"></div>
                 </div>
-
                 <div class="form-group"><label>Pose</label>
                     <div class="dropdown" id="dd-s-pose">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-pose')"><span class="dropdown-label">Sans pose</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="non">Sans pose</div>
-                            <div class="dropdown-item" data-value="oui">Avec pose (+180€)</div>
-                            <div class="dropdown-item" data-value="nacelle">Avec pose + nacelle (+480€)</div>
+                            <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Sans pose</div>
+                            <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Avec pose (+180€)</div>
+                            <div class="dropdown-item" data-value="nacelle" onclick="selectDropdownItem(this)">Avec pose + nacelle (+480€)</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Délai</label>
                     <div class="dropdown" id="dd-s-delai">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-delai')"><span class="dropdown-label">Normal</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="normal">Normal</div>
-                            <div class="dropdown-item" data-value="urgent">Urgent (+15%)</div>
-                            <div class="dropdown-item" data-value="express">Express (+25%)</div>
+                            <div class="dropdown-item" data-value="normal" onclick="selectDropdownItem(this)">Normal</div>
+                            <div class="dropdown-item" data-value="urgent" onclick="selectDropdownItem(this)">Urgent (+15%)</div>
+                            <div class="dropdown-item" data-value="express" onclick="selectDropdownItem(this)">Express (+25%)</div>
                         </div>
                     </div>
                 </div>
-
                 <button onclick="calcSignaletique()" class="btn-block">Calculer le prix</button>
             </div>
 
@@ -485,42 +507,133 @@
                     <div class="dropdown" id="dd-i-type">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-i-type'); loadImpressionFilters()"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="Flyer">Flyer / Dépliant</div>
-                            <div class="dropdown-item" data-value="Carte de visite">Carte de visite</div>
+                            <div class="dropdown-item" data-value="Flyer" onclick="selectDropdownItem(this)">Flyer / Dépliant</div>
+                            <div class="dropdown-item" data-value="Carte de visite" onclick="selectDropdownItem(this)">Carte de visite</div>
                         </div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Format</label>
                     <div class="dropdown" id="dd-i-format">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-i-format')"><span class="dropdown-label">— Sélectionner type d'abord —</span></button>
                         <div class="dropdown-list" id="list-i-format"></div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Grammage</label>
                     <div class="dropdown" id="dd-i-grammage">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-i-grammage')"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list" id="list-i-grammage"></div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Finition</label>
                     <div class="dropdown" id="dd-i-finition">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-i-finition')"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list" id="list-i-finition"></div>
                     </div>
                 </div>
-
                 <div class="form-group"><label>Quantité</label>
                     <div class="dropdown" id="dd-i-quantite">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-i-quantite')"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list" id="list-i-quantite"></div>
                     </div>
                 </div>
-
                 <button onclick="calcImpression()" class="btn-block">Calculer le prix</button>
                 <a href="https://www.exaprint.fr" target="_blank" class="exa-link">📋 Voir prix sur Exaprint</a>
+            </div>
+
+            <!-- STICKERS -->
+            <div class="tab-content" id="tab-stickers">
+                <div class="row2">
+                    <div class="form-group"><label>Largeur sticker (mm)</label><input type="number" id="st-larg" value="80" min="5"></div>
+                    <div class="form-group"><label>Hauteur sticker (mm)</label><input type="number" id="st-haut" value="60" min="5"></div>
+                </div>
+
+                <div class="row2">
+                    <div class="form-group"><label>Forme</label>
+                        <div class="dropdown" id="dd-st-forme">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-forme')"><span class="dropdown-label">Rectangulaire</span></button>
+                            <div class="dropdown-list">
+                                <div class="dropdown-item" data-value="rectangle" onclick="selectDropdownItem(this)">Rectangulaire (100%)</div>
+                                <div class="dropdown-item" data-value="carre" onclick="selectDropdownItem(this)">Carré (100%)</div>
+                                <div class="dropdown-item" data-value="rond" onclick="selectDropdownItem(this)">Rond (78%)</div>
+                                <div class="dropdown-item" data-value="ovale" onclick="selectDropdownItem(this)">Ovale (78%)</div>
+                                <div class="dropdown-item" data-value="custom" onclick="selectDropdownItem(this)">Custom (85%)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Quantité</label><input type="number" id="st-qty" value="100" min="1"></div>
+                </div>
+
+                <div class="form-group"><label>Vinyle</label>
+                    <div class="dropdown" id="dd-st-vinyle">
+                        <button class="dropdown-btn" onclick="toggleDropdown('dd-st-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
+                        <div class="dropdown-list" id="list-st-vinyle"></div>
+                    </div>
+                </div>
+
+                <div class="row2">
+                    <div class="form-group"><label>Laminage UV</label>
+                        <div class="dropdown" id="dd-st-lam">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-lam')"><span class="dropdown-label">Non</span></button>
+                            <div class="dropdown-list">
+                                <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Non</div>
+                                <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Oui (+12%)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Laize</label>
+                        <div class="dropdown" id="dd-st-laize">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-laize')"><span class="dropdown-label">Optimale (auto)</span></button>
+                            <div class="dropdown-list">
+                                <div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>
+                                <div class="dropdown-item" data-value="950" onclick="selectDropdownItem(this)">Forcer 950mm</div>
+                                <div class="dropdown-item" data-value="1270" onclick="selectDropdownItem(this)">Forcer 1270mm</div>
+                                <div class="dropdown-item" data-value="1480" onclick="selectDropdownItem(this)">Forcer 1480mm</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checkbox-row"><input type="checkbox" id="st-echenillage-check" onchange="toggleStickerEch()"><label for="st-echenillage-check">Échenillage requis</label></div>
+                <div class="conditional" id="st-echenillage-cond">
+                    <div class="form-group"><label>Mode de calcul</label>
+                        <div class="dropdown" id="dd-st-ech-mode">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-ech-mode')"><span class="dropdown-label">Temps par sticker</span></button>
+                            <div class="dropdown-list">
+                                <div class="dropdown-item" data-value="temps" onclick="selectDropdownItem(this)">Temps par sticker</div>
+                                <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait fixe</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" id="st-ech-temps-group">
+                        <label>Secondes par sticker</label>
+                        <input type="number" id="st-ech-temps" value="1.2" step="0.1" min="0.1">
+                        <p style="font-size:10px;color:var(--text-light);margin-top:4px;">Tarif: 60€/h = 1€/min</p>
+                    </div>
+                    <div class="form-group" id="st-ech-forfait-group" style="display:none;">
+                        <label>Forfait (€)</label>
+                        <div class="dropdown" id="dd-st-ech-forfait">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-ech-forfait')"><span class="dropdown-label">Petit (50€)</span></button>
+                            <div class="dropdown-list">
+                                <div class="dropdown-item" data-value="50" onclick="selectDropdownItem(this)">Petit (50€)</div>
+                                <div class="dropdown-item" data-value="75" onclick="selectDropdownItem(this)">Moyen (75€)</div>
+                                <div class="dropdown-item" data-value="100" onclick="selectDropdownItem(this)">Grand (100€)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group"><label>Délai</label>
+                    <div class="dropdown" id="dd-st-delai">
+                        <button class="dropdown-btn" onclick="toggleDropdown('dd-st-delai')"><span class="dropdown-label">Normal</span></button>
+                        <div class="dropdown-list">
+                            <div class="dropdown-item" data-value="normal" onclick="selectDropdownItem(this)">Normal</div>
+                            <div class="dropdown-item" data-value="urgent" onclick="selectDropdownItem(this)">Urgent (+15%)</div>
+                            <div class="dropdown-item" data-value="express" onclick="selectDropdownItem(this)">Express (+25%)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="calcStickers()" class="btn-block">Calculer optimisation</button>
             </div>
 
             <!-- HISTORIQUE -->
@@ -551,7 +664,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-nom').textContent = user.nom;
     document.getElementById('user-email').textContent = user.email;
     if (user.role === 'admin') document.getElementById('admin-btn').style.display = 'block';
-    
     setupDropdownListeners();
     loadTarifs();
 });
@@ -561,10 +673,6 @@ function setupDropdownListeners() {
         if (!e.target.closest('.dropdown')) {
             document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
         }
-    });
-    
-    document.querySelectorAll('.dropdown-item').forEach(item => {
-        item.addEventListener('click', (e) => selectDropdownItem(e.target));
     });
 }
 
@@ -580,7 +688,13 @@ function selectDropdownItem(item) {
     label.textContent = item.textContent;
     dd.dataset.value = item.dataset.value;
     dd.classList.remove('open');
+    
     if (dd.id === 'dd-i-type') loadImpressionFilters();
+    if (dd.id === 'dd-st-ech-mode') {
+        const mode = item.dataset.value;
+        document.getElementById('st-ech-temps-group').style.display = mode === 'temps' ? 'block' : 'none';
+        document.getElementById('st-ech-forfait-group').style.display = mode === 'forfait' ? 'block' : 'none';
+    }
 }
 
 function getDropdownValue(id) {
@@ -598,8 +712,11 @@ async function loadTarifs() {
         
         allImpressions = impressions;
         
-        document.getElementById('list-v-vinyle').innerHTML = vinyles.map(v => 
+        const vinyleHTML = vinyles.map(v => 
             `<div class="dropdown-item" data-value="${v.id}" onclick="selectDropdownItem(this)">${v.name} (${v.price}€/m²)</div>`).join('');
+        
+        document.getElementById('list-v-vinyle').innerHTML = vinyleHTML;
+        document.getElementById('list-st-vinyle').innerHTML = vinyleHTML;
         
         document.getElementById('list-s-materiau').innerHTML = materiaux.map(m => 
             `<div class="dropdown-item" data-value="${m.id}" onclick="selectDropdownItem(this)">${m.support} (${m.price}€/m²)</div>`).join('');
@@ -612,9 +729,7 @@ async function loadTarifs() {
 function loadImpressionFilters() {
     const type = getDropdownValue('dd-i-type');
     if (!type) return;
-    
     const filtered = allImpressions.filter(i => i.type === type);
-    
     const formats = [...new Set(filtered.map(i => i.format))];
     const grammages = [...new Set(filtered.map(i => i.grammage))];
     const finitions = [...new Set(filtered.map(i => i.finition))];
@@ -642,6 +757,154 @@ function togglePAO() {
 }
 function toggleEchenillage() {
     document.getElementById('v-echenillage-cond').classList.toggle('active', document.getElementById('v-echenillage-check').checked);
+}
+function toggleStickerEch() {
+    document.getElementById('st-echenillage-cond').classList.toggle('active', document.getElementById('st-echenillage-check').checked);
+}
+
+// ============ STICKERS - OPTIMISATION ============
+function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6) {
+    const stickersParRangee = Math.floor(laize / (stickerW + espace));
+    if (stickersParRangee === 0) return null;
+    
+    const nbRangees = Math.ceil(qty / stickersParRangee);
+    const longueurMm = nbRangees * (stickerH + espace);
+    const surfaceM2 = (laize * longueurMm) / 1000000;
+    const stickersTotal = stickersParRangee * nbRangees;
+    const pertes = stickersTotal - qty;
+    
+    return {
+        laize,
+        stickersParRangee,
+        nbRangees,
+        longueurMm,
+        longueurCm: (longueurMm / 10).toFixed(1),
+        surfaceM2: surfaceM2.toFixed(3),
+        surfaceM2Num: surfaceM2,
+        stickersTotal,
+        pertes
+    };
+}
+
+async function calcStickers() {
+    const stickerW = parseFloat(document.getElementById('st-larg').value) || 80;
+    const stickerH = parseFloat(document.getElementById('st-haut').value) || 60;
+    const qty = parseInt(document.getElementById('st-qty').value) || 100;
+    const forme = getDropdownValue('dd-st-forme') || 'rectangle';
+    const vinyleId = parseInt(getDropdownValue('dd-st-vinyle'));
+    const lam = getDropdownValue('dd-st-lam') || 'non';
+    const laizeChoice = getDropdownValue('dd-st-laize') || 'auto';
+    const delai = getDropdownValue('dd-st-delai') || 'normal';
+    
+    const echCheck = document.getElementById('st-echenillage-check').checked;
+    const echMode = getDropdownValue('dd-st-ech-mode') || 'temps';
+    const echTemps = parseFloat(document.getElementById('st-ech-temps').value) || 1.2;
+    const echForfait = parseFloat(getDropdownValue('dd-st-ech-forfait')) || 50;
+    
+    if (!vinyleId) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
+        return;
+    }
+    
+    const vinyles = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    const vinyle = vinyles.find(v => v.id == vinyleId);
+    
+    // Calcul des 3 laizes
+    const laizes = [950, 1270, 1480];
+    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty)).filter(r => r !== null);
+    
+    if (results.length === 0) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sticker trop grand pour les laizes disponibles</p></div>';
+        return;
+    }
+    
+    // Choisir la meilleure laize
+    let bestResult;
+    if (laizeChoice === 'auto') {
+        bestResult = results.reduce((a, b) => a.surfaceM2Num < b.surfaceM2Num ? a : b);
+    } else {
+        bestResult = results.find(r => r.laize == laizeChoice) || results[0];
+    }
+    
+    // Coefficient forme
+    const coefForme = { rectangle: 1, carre: 1, rond: 1.28, ovale: 1.28, custom: 1.18 }[forme] || 1;
+    const surfaceAvecForme = bestResult.surfaceM2Num * coefForme;
+    
+    // Calculs prix
+    const vinyleHT = surfaceAvecForme * parseFloat(vinyle.price);
+    const lamHT = lam === 'oui' ? vinyleHT * 0.12 : 0;
+    
+    let echHT = 0;
+    if (echCheck) {
+        if (echMode === 'temps') {
+            echHT = (qty * echTemps / 60); // €/min à 60€/h
+        } else {
+            echHT = echForfait;
+        }
+    }
+    
+    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
+    const totalHT = (vinyleHT + lamHT + echHT) * delaiMult;
+    const tva = totalHT * 0.2;
+    const totalTTC = totalHT + tva;
+    
+    // Affichage
+    const compareHTML = results.map(r => {
+        const isBest = r.laize === bestResult.laize;
+        const diff = r.surfaceM2Num - bestResult.surfaceM2Num;
+        const diffPct = bestResult.surfaceM2Num > 0 ? (diff / bestResult.surfaceM2Num * 100).toFixed(1) : 0;
+        return `
+            <div class="laize-card ${isBest ? 'best' : ''}">
+                <div class="laize-card-title">${r.laize}mm</div>
+                <div class="laize-card-value">${r.surfaceM2} m²</div>
+                <div class="laize-card-detail">${r.stickersParRangee}/rangée × ${r.nbRangees} rangées</div>
+                ${isBest ? '<div class="laize-card-detail" style="color:var(--success);font-weight:700;">⭐ OPTIMAL</div>' : 
+                  `<div class="laize-card-detail">+${diffPct}% perte</div>`}
+            </div>
+        `;
+    }).join('');
+    
+    const rows = [
+        { label: `Vinyle ${vinyle.name}`, val: `${surfaceAvecForme.toFixed(3)} m²` },
+        { label: `Prix vinyle (${vinyle.price}€/m²)`, val: `${vinyleHT.toFixed(2)} €` },
+        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: `inclus` } : null,
+        lamHT > 0 ? { label: 'Laminage UV (+12%)', val: `+${lamHT.toFixed(2)} €` } : null,
+        echCheck ? { 
+            label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s)` : 'Échenillage forfait', 
+            val: `${echHT.toFixed(2)} €` 
+        } : null,
+        delai !== 'normal' ? { label: `Urgence`, val: '×' + delaiMult.toFixed(2) } : null
+    ].filter(Boolean);
+    
+    document.getElementById('result').innerHTML = `
+        <div class="optimization-box">
+            <div class="optimization-title">🎯 Optimisation laize</div>
+            <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px;">
+                Recommandée : ${bestResult.laize}mm
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);">
+                ${bestResult.stickersParRangee} stickers/rangée × ${bestResult.nbRangees} rangées<br>
+                Longueur vinyle : ${bestResult.longueurCm} cm<br>
+                Surface utilisée : ${bestResult.surfaceM2} m²<br>
+                Pertes : ${bestResult.pertes} emplacement(s)
+            </div>
+            <div class="laize-compare">${compareHTML}</div>
+        </div>
+        
+        <div class="price-display">
+            <div class="price-label">${qty} stickers ${stickerW}×${stickerH}mm</div>
+            <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
+            <div class="price-ht">€ TTC</div>
+            <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+                HT: ${totalHT.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
+            </div>
+        </div>
+        <div class="breakdown">
+            ${rows.map(r => `<div class="breakdown-row"><span class="label">${r.label}</span><span>${r.val}</span></div>`).join('')}
+            <div class="breakdown-row total"><span>TOTAL HT</span><span>${totalHT.toFixed(2).replace('.', ',')} €</span></div>
+        </div>
+        <button class="btn-block" onclick="saveDevis('stickers', ${qty}, ${totalHT.toFixed(2)}, ${totalTTC.toFixed(2)})">Sauvegarder le devis</button>
+    `;
 }
 
 async function calcVehicule() {
@@ -815,8 +1078,9 @@ async function renderHistorique() {
             document.getElementById('historique-list').innerHTML = '<div class="empty-state"><p>Aucun devis</p></div>';
             return;
         }
+        const icons = { vehicule: '🚗', signaletique: '📋', impression: '🖨️', stickers: '🏷️' };
         document.getElementById('historique-list').innerHTML = devis.map(d => {
-            const icon = d.type === 'vehicule' ? '🚗' : d.type === 'signaletique' ? '📋' : '🖨️';
+            const icon = icons[d.type] || '📄';
             return `<div class="breakdown" style="margin-bottom:8px;">
                 <div class="breakdown-row"><span>${icon} ${d.type}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
                 <div class="breakdown-row"><span class="label">Qté: ${d.qty}</span><span style="color:var(--primary);font-weight:600;">${parseFloat(d.ttc).toFixed(2)}€ TTC</span></div>
