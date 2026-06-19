@@ -194,6 +194,7 @@
         <button class="tab-btn" onclick="switchTab('materiaux', this)">📋 Matériaux</button>
         <button class="tab-btn" onclick="switchTab('poseurs', this)">👷 Poseurs</button>
         <button class="tab-btn" onclick="switchTab('impressions', this)">🖨️ Impressions</button>
+        <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
     </div>
 
     <!-- USERS -->
@@ -236,9 +237,62 @@
     <div class="tab-content" id="tab-impressions">
         <div class="section-header"><div class="section-title">Gestion Impressions Exaprint</div><button onclick="openModal('modal-impression')">+ Ajouter prix</button></div>
         <div class="table-wrap"><table>
-            <thead><tr><th>Type</th><th>Format</th><th>Grammage</th><th>Finition</th><th>Qté</th><th>Prix Exa (€)</th><th>Prix Client × 2</th><th>Action</th></tr></thead>
+            <thead><tr><th>Type</th><th>Format</th><th>Grammage</th><th>Finition</th><th>Qté</th><th>Prix Exa (€)</th><th>Prix Client</th><th>Action</th></tr></thead>
             <tbody id="impressions-list"></tbody>
         </table></div>
+    </div>
+
+    <!-- MOTEUR (V5) -->
+    <div class="tab-content" id="tab-moteur">
+        <div class="section-header"><div class="section-title">Paramètres du moteur</div><button class="success" onclick="saveParametres()">💾 Enregistrer</button></div>
+        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <div class="row2">
+                <div class="form-group"><label>Coefficient de marge (×)</label><input type="number" step="0.1" id="param-coefficient" oninput="testMoteur()"></div>
+                <div class="form-group"><label>Lamination (€/m²)</label><input type="number" step="0.01" id="param-lamination_m2" oninput="testMoteur()"></div>
+                <div class="form-group"><label>PAO forfait (€)</label><input type="number" step="0.01" id="param-pao_forfait" oninput="testMoteur()"></div>
+                <div class="form-group"><label>PAO horaire (€/h)</label><input type="number" step="0.01" id="param-pao_horaire" oninput="testMoteur()"></div>
+            </div>
+            <p style="color:var(--text-secondary);font-size:12px;margin-top:4px;">Le coût vinyle et les supports panneaux viennent des onglets Vinyles &amp; Matériaux. Les tarifs de pose viennent de l'onglet Poseurs.</p>
+        </div>
+
+        <div class="section-header"><div class="section-title">Forfaits véhicule</div><button onclick="openModal('modal-forfait')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Nom</th><th>Prix (€)</th><th>Action</th></tr></thead>
+            <tbody id="forfaits-list"></tbody>
+        </table></div>
+
+        <div class="section-header" style="margin-top:28px;"><div class="section-title">Test du moteur (live)</div></div>
+        <div class="table-wrap" style="padding:20px;">
+            <div class="row2">
+                <div class="form-group"><label>Produit</label>
+                    <select id="test-produit" onchange="switchTest();testMoteur()">
+                        <option value="veh">Marquage véhicule (m²)</option>
+                        <option value="for">Marquage véhicule (forfait)</option>
+                        <option value="pan">Panneau signalétique</option>
+                        <option value="pao">PAO</option>
+                    </select>
+                </div>
+            </div>
+            <div id="test-veh" class="row3">
+                <div class="form-group"><label>Vinyle</label><select id="test-vinyle" onchange="testMoteur()"></select></div>
+                <div class="form-group"><label>Surface (m²)</label><input type="number" step="0.1" id="test-surface" value="20" oninput="testMoteur()"></div>
+                <div class="form-group"><label>Lamination</label><select id="test-lam" onchange="testMoteur()"><option value="1">Oui</option><option value="0">Non</option></select></div>
+                <div class="form-group"><label>Poseur</label><select id="test-poseur" onchange="testMoteur()"></select></div>
+                <div class="form-group"><label>Pose (jours)</label><input type="number" step="0.5" id="test-jours" value="1" oninput="testMoteur()"></div>
+            </div>
+            <div id="test-for" class="row2" style="display:none;">
+                <div class="form-group"><label>Forfait</label><select id="test-forfait" onchange="testMoteur()"></select></div>
+            </div>
+            <div id="test-pan" class="row3" style="display:none;">
+                <div class="form-group"><label>Matériau</label><select id="test-materiau" onchange="testMoteur()"></select></div>
+                <div class="form-group"><label>Surface (m²)</label><input type="number" step="0.1" id="test-pansurf" value="2" oninput="testMoteur()"></div>
+            </div>
+            <div id="test-pao" class="row2" style="display:none;">
+                <div class="form-group"><label>Mode</label><select id="test-paomode" onchange="testMoteur()"><option value="forfait">Forfait</option><option value="horaire">Horaire</option></select></div>
+                <div class="form-group"><label>Heures</label><input type="number" step="0.5" id="test-paoheures" value="4" oninput="testMoteur()"></div>
+            </div>
+            <div id="test-result" style="margin-top:16px;"></div>
+        </div>
     </div>
 </div>
 
@@ -391,9 +445,25 @@
     </div>
 </div>
 
+<!-- MODAL FORFAIT (V5) -->
+<div class="modal" id="modal-forfait">
+    <div class="modal-content">
+        <div class="modal-header" id="forfait-title">Ajouter un forfait</div>
+        <form onsubmit="saveForfait(event)">
+            <input type="hidden" id="forfait-id">
+            <div class="form-group"><label>Nom du forfait</label><input type="text" id="forfait-nom" required placeholder="Partner Long M (complet)"></div>
+            <div class="form-group"><label>Prix de vente (€)</label><input type="number" id="forfait-prix" required step="0.01" placeholder="3670.00"></div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-forfait')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 const API_URL = window.location.origin + '/api';
-let token = null, user = null;
+let token = null, user = null, coef = 2;
 
 window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
@@ -403,7 +473,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadAll() {
-    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions()]);
+    await loadParametres();
+    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits()]);
+    await populateTestSelects();
+    testMoteur();
 }
 
 async function loadStats() {
@@ -477,7 +550,7 @@ async function loadImpressions() {
         <tr><td><span class="badge admin">${i.type}</span></td><td>${i.format}</td>
         <td>${i.grammage}</td><td>${i.finition}</td><td>${i.quantite}</td>
         <td>${parseFloat(i.prix_exa).toFixed(2)} €</td>
-        <td style="color:var(--primary);font-weight:600;">${(parseFloat(i.prix_exa) * 2).toFixed(2)} €</td>
+        <td style="color:var(--primary);font-weight:600;">${(parseFloat(i.prix_exa) * coef).toFixed(2)} €</td>
         <td><button class="small" onclick='editImpression(${JSON.stringify(i)})'>Modif</button>
         <button class="danger small" onclick="deleteImpression(${i.id})">Suppr</button></td></tr>`).join('');
 }
@@ -513,6 +586,12 @@ function openModal(id) {
         document.getElementById('impression-id').value = '';
         document.getElementById('impression-prix').value = '';
         document.getElementById('impression-title').textContent = 'Ajouter prix Exaprint';
+    }
+    if (id === 'modal-forfait') {
+        document.getElementById('forfait-id').value = '';
+        document.getElementById('forfait-nom').value = '';
+        document.getElementById('forfait-prix').value = '';
+        document.getElementById('forfait-title').textContent = 'Ajouter un forfait';
     }
     document.getElementById(id).classList.add('active');
 }
@@ -681,6 +760,130 @@ async function deleteImpression(id) {
     if (!confirm('Supprimer ?')) return;
     await fetch(`${API_URL}/tarifs/impressions/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
     showMessage('Supprimé', 'success'); loadImpressions();
+}
+
+// ===== V5 — MOTEUR DE PRIX =====
+function mtNum(id) { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
+function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
+
+async function loadParametres() {
+    try {
+        const p = await fetch(`${API_URL}/parametres`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        coef = parseFloat(p.coefficient) || 2;
+        document.getElementById('param-coefficient').value = p.coefficient ?? 2;
+        document.getElementById('param-lamination_m2').value = p.lamination_m2 ?? 0;
+        document.getElementById('param-pao_forfait').value = p.pao_forfait ?? 0;
+        document.getElementById('param-pao_horaire').value = p.pao_horaire ?? 0;
+    } catch (err) { console.error(err); }
+}
+
+async function saveParametres() {
+    const data = {
+        coefficient: mtNum('param-coefficient'),
+        lamination_m2: mtNum('param-lamination_m2'),
+        pao_forfait: mtNum('param-pao_forfait'),
+        pao_horaire: mtNum('param-pao_horaire')
+    };
+    const resp = await fetch(`${API_URL}/parametres`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { coef = data.coefficient || 2; showMessage('Paramètres enregistrés', 'success'); loadImpressions(); testMoteur(); }
+    else showMessage('Erreur', 'error');
+}
+
+async function loadForfaits() {
+    const items = await fetch(`${API_URL}/tarifs/forfaits`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (!items.length) { document.getElementById('forfaits-list').innerHTML = '<tr><td colspan="3" class="empty-state">Aucun forfait</td></tr>'; return; }
+    document.getElementById('forfaits-list').innerHTML = items.map(f => `
+        <tr><td>${f.nom}</td><td>${parseFloat(f.prix).toFixed(2)} €</td>
+        <td><button class="small" onclick='editForfait(${JSON.stringify(f)})'>Modif</button>
+        <button class="danger small" onclick="deleteForfait(${f.id})">Suppr</button></td></tr>`).join('');
+}
+
+async function saveForfait(event) {
+    event.preventDefault();
+    const id = document.getElementById('forfait-id').value;
+    const data = { nom: document.getElementById('forfait-nom').value, prix: parseFloat(document.getElementById('forfait-prix').value) };
+    const url = id ? `${API_URL}/tarifs/forfaits/${id}` : `${API_URL}/tarifs/forfaits`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-forfait'); await loadForfaits(); await populateTestSelects(); testMoteur(); }
+}
+
+function editForfait(f) {
+    document.getElementById('forfait-id').value = f.id;
+    document.getElementById('forfait-nom').value = f.nom;
+    document.getElementById('forfait-prix').value = f.prix;
+    document.getElementById('forfait-title').textContent = 'Modifier le forfait';
+    document.getElementById('modal-forfait').classList.add('active');
+}
+
+async function deleteForfait(id) {
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/forfaits/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); await loadForfaits(); await populateTestSelects(); testMoteur();
+}
+
+async function populateTestSelects() {
+    const h = { 'Authorization': `Bearer ${token}` };
+    const [vinyles, materiaux, poseurs, forfaits] = await Promise.all([
+        fetch(`${API_URL}/tarifs/vinyles`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/tarifs/materiaux`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/tarifs/poseurs`, { headers: h }).then(r => r.json()),
+        fetch(`${API_URL}/tarifs/forfaits`, { headers: h }).then(r => r.json())
+    ]);
+    document.getElementById('test-vinyle').innerHTML = vinyles.map(v => `<option value="${v.id}" data-price="${v.price}">${v.name} (${parseFloat(v.price).toFixed(2)} €/m²)</option>`).join('') || '<option data-price="0">— aucun —</option>';
+    document.getElementById('test-materiau').innerHTML = materiaux.map(m => `<option value="${m.id}" data-price="${m.price}">${m.support} (${parseFloat(m.price).toFixed(2)} €/m²)</option>`).join('') || '<option data-price="0">— aucun —</option>';
+    document.getElementById('test-poseur').innerHTML = poseurs.map(p => `<option value="${p.id}" data-jour="${p.jour}">${p.nom} (${parseFloat(p.jour).toFixed(2)} €/j)</option>`).join('') || '<option data-jour="0">— aucun —</option>';
+    document.getElementById('test-forfait').innerHTML = forfaits.map(f => `<option value="${f.id}" data-prix="${f.prix}">${f.nom} (${parseFloat(f.prix).toFixed(2)} €)</option>`).join('') || '<option data-prix="0">— aucun —</option>';
+}
+
+function switchTest() {
+    const p = document.getElementById('test-produit').value;
+    ['veh', 'for', 'pan', 'pao'].forEach(g => {
+        document.getElementById('test-' + g).style.display = (g === p) ? 'grid' : 'none';
+    });
+}
+
+function testMoteur() {
+    const el = document.getElementById('test-result');
+    if (!el) return;
+    const c = mtNum('param-coefficient') || 2;
+    const p = document.getElementById('test-produit').value;
+    let lines = [];
+    if (p === 'veh') {
+        const s = mtNum('test-surface');
+        lines.push(['cout', `Vinyle (${s} m²)`, s * mtSel('test-vinyle', 'data-price')]);
+        if (document.getElementById('test-lam').value === '1') lines.push(['cout', 'Lamination', s * mtNum('param-lamination_m2')]);
+        const jr = mtNum('test-jours');
+        if (jr > 0) lines.push(['vente', `Pose (${jr} j)`, jr * mtSel('test-poseur', 'data-jour')]);
+    } else if (p === 'for') {
+        lines.push(['vente', 'Forfait véhicule', mtSel('test-forfait', 'data-prix')]);
+    } else if (p === 'pan') {
+        const s = mtNum('test-pansurf');
+        lines.push(['cout', `Support (${s} m²)`, s * mtSel('test-materiau', 'data-price')]);
+    } else {
+        const mode = document.getElementById('test-paomode').value;
+        if (mode === 'horaire') { const h = mtNum('test-paoheures'); lines.push(['vente', `PAO (${h} h)`, h * mtNum('param-pao_horaire')]); }
+        else lines.push(['vente', 'PAO forfait', mtNum('param-pao_forfait')]);
+    }
+    const cout = lines.filter(l => l[0] === 'cout').reduce((a, l) => a + l[2], 0);
+    const vente = lines.filter(l => l[0] === 'vente').reduce((a, l) => a + l[2], 0);
+    const total = cout * c + vente;
+    let html = lines.map(l => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+        <span><span class="badge ${l[0] === 'cout' ? 'admin' : 'user'}">${l[0] === 'cout' ? 'coût' : 'vente'}</span> ${l[1]}</span>
+        <span>${l[2].toFixed(2)} €</span></div>`).join('');
+    if (cout > 0) html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-secondary);">
+        <span>Déboursé matière × ${c}</span><span>${cout.toFixed(2)} → ${(cout * c).toFixed(2)} €</span></div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-top:12px;border-top:2px solid var(--primary);">
+        <span style="color:var(--text-secondary);text-transform:uppercase;font-size:11px;">Prix de vente HT</span>
+        <span style="font-size:26px;font-weight:700;color:var(--primary);">${total.toFixed(2)} €</span></div>`;
+    el.innerHTML = html;
 }
 
 function logout() {
