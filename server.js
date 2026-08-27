@@ -341,38 +341,70 @@ const SHEET_PARAM_MAP = {
 };
 
 async function fetchSheetsData() {
-    const base = `https://docs.google.com/spreadsheets/d/${SHEETS_ID}/gviz/tq?tqx=out:csv&sheet=`;
+    const base = `https://docs.google.com/spreadsheets/d/${SHEETS_ID}/gviz/tq?tqx=out:csv&headers=0&sheet=`;
     const [csvParams, csvTarifs] = await Promise.all([
         httpGet(base + encodeURIComponent('Paramètres')),
         httpGet(base + encodeURIComponent('Tarifs matières'))
     ]);
     if (csvParams.trimStart().startsWith('<')) throw new Error('ACCES');
-    // Parametres : ligne dont la colonne A = P01..P24, valeur retenue en colonne E (repli D puis C)
+    // Parametres : ligne dont la colonne A = P01..P24. Les colonnes sont reperees via la
+    // ligne d'en-tetes (retenue / validee / proposee) pour tolerer une restructuration du Sheets.
     const parametres = {};
+    let colRetenue = -1, colValidee = -1, colProposee = -1;
     for (const row of parseCSV(csvParams)) {
         const code = (row[0] || '').trim();
+        const lower = row.map(c => String(c || '').toLowerCase());
+        if (colRetenue < 0 && lower.some(c => c.includes('param'))) {
+            colRetenue = lower.findIndex(c => c.includes('retenue'));
+            colValidee = lower.findIndex(c => c.includes('valid'));
+            colProposee = lower.findIndex(c => c.includes('propos'));
+        }
         if (/^P\d{2}$/.test(code) && SHEET_PARAM_MAP[code]) {
-            const val = cleanNum(row[4]) ?? cleanNum(row[3]) ?? cleanNum(row[2]);
+            let val = null;
+            if (colRetenue >= 0) val = cleanNum(row[colRetenue]);
+            if (val === null && colValidee >= 0) val = cleanNum(row[colValidee]);
+            if (val === null && colProposee >= 0) val = cleanNum(row[colProposee]);
+            if (val === null) val = cleanNum(row[4]) ?? cleanNum(row[3]) ?? cleanNum(row[2]);
             if (val !== null) parametres[SHEET_PARAM_MAP[code]] = val;
         }
     }
-    // Tarifs : sections VINYLES / LAMINATIONS / TAPES / MATERIAUX PANNEAUX
+    // Tarifs : sections VINYLES / LAMINATIONS / TAPES / MATERIAUX PANNEAUX.
+    // La ligne d'en-tetes de chaque section indique ou sont les colonnes prix / valide / laizes,
+    // pour tolerer toute restructuration du Sheets par l'entreprise.
     const tables = { vinyles: [], laminations: [], tapes: [], materiaux: [] };
-    let current = null, skipHeader = false;
+    let current = null, pendingHeader = false;
+    let colPrix = 1, colValide = -1, colLaizes = 3;
     for (const row of parseCSV(csvTarifs)) {
         const a = (row[0] || '').trim();
         const aU = a.toUpperCase();
-        if (aU.startsWith('VINYLES')) { current = 'vinyles'; skipHeader = true; continue; }
-        if (aU.startsWith('LAMINATION')) { current = 'laminations'; skipHeader = true; continue; }
-        if (aU.startsWith('TAPES')) { current = 'tapes'; skipHeader = true; continue; }
-        if (aU.startsWith('MATÉRIAUX') || aU.startsWith('MATERIAUX')) { current = 'materiaux'; skipHeader = true; continue; }
-        if (aU.startsWith('QUESTION')) { current = null; continue; }
-        if (!current) continue;
-        if (skipHeader) { skipHeader = false; continue; }
-        if (!a || a.startsWith('(')) continue;
-        const prix = cleanNum(row[2]) ?? cleanNum(row[1]);
+        if (aU.startsWith('VINYLES')) { current = 'vinyles'; pendingHeader = true; continue; }
+        if (aU.startsWith('LAMINATIONS')) { current = 'laminations'; pendingHeader = true; continue; }
+        if (aU.startsWith('TAPES')) { current = 'tapes'; pendingHeader = true; continue; }
+        if (aU.startsWith('MATÉRIAUX') || aU.startsWith('MATERIAUX')) { current = 'materiaux'; pendingHeader = true; continue; }
+        if (aU.startsWith('QUESTION') || aU.startsWith('IMPORTANT')) { current = null; continue; }
+        if (!current || !a) continue;
+        if (pendingHeader) {
+            // ligne d'en-tetes de la section : reperer les colonnes
+            const lower = row.map(c => String(c || '').toLowerCase());
+            const iPrix = lower.findIndex(c => c.includes('prix') && !c.includes('valid'));
+            const iValide = lower.findIndex(c => c.includes('valid'));
+            const iLaizes = lower.findIndex(c => c.includes('laize') || c.includes('format'));
+            pendingHeader = false;
+            if (iPrix >= 0 || iLaizes >= 0) {
+                colPrix = iPrix >= 0 ? iPrix : 1;
+                colValide = iValide;
+                colLaizes = iLaizes >= 0 ? iLaizes : 2;
+                continue;
+            }
+            // pas une ligne d'en-tetes (elle a ete supprimee ?) : colonnes par defaut, et la ligne est traitee comme une donnee
+            colPrix = 1; colValide = -1; colLaizes = 2;
+        }
+        if (a.startsWith('(')) continue;
+        let prix = null;
+        if (colValide >= 0) prix = cleanNum(row[colValide]);
+        if (prix === null) prix = cleanNum(row[colPrix]);
         if (prix === null) continue;
-        tables[current].push({ nom: a, prix, laizes: (row[3] || '').trim() });
+        tables[current].push({ nom: a, prix, laizes: (row[colLaizes] || '').trim() });
     }
     return { parametres, tables };
 }
