@@ -246,14 +246,53 @@
     <div class="tab-content" id="tab-moteur">
         <div class="section-header"><div class="section-title">Paramètres du moteur</div><button class="success" onclick="saveParametres()">💾 Enregistrer</button></div>
         <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px;">Codes P01–P24 du classeur de validation. Les lignes COÛT (matière) sont multipliées par le coefficient ; les lignes VENTE (pose, PAO) sont ajoutées telles quelles.</p>
+            <div style="font-weight:700;font-size:12px;margin:8px 0;color:var(--primary);">Général</div>
             <div class="row2">
-                <div class="form-group"><label>Coefficient de marge (×)</label><input type="number" step="0.1" id="param-coefficient" oninput="testMoteur()"></div>
-                <div class="form-group"><label>Lamination (€/m²)</label><input type="number" step="0.01" id="param-lamination_m2" oninput="testMoteur()"></div>
-                <div class="form-group"><label>PAO forfait (€)</label><input type="number" step="0.01" id="param-pao_forfait" oninput="testMoteur()"></div>
-                <div class="form-group"><label>PAO horaire (€/h)</label><input type="number" step="0.01" id="param-pao_horaire" oninput="testMoteur()"></div>
+                <div class="form-group"><label>P01 · Coefficient matière (×)</label><input type="number" step="0.05" id="param-coefficient" oninput="testMoteur()"></div>
+                <div class="form-group"><label>P02 · TVA (%)</label><input type="number" step="0.1" id="param-tva"></div>
+                <div class="form-group"><label>P03 · Minimum de commande (€ HT)</label><input type="number" step="1" id="param-minimum_commande"></div>
+                <div class="form-group"><label>P04 · Frais de dossier (€ HT)</label><input type="number" step="1" id="param-frais_dossier"></div>
+                <div class="form-group"><label>P05 · Arrondi commercial (€)</label><input type="number" step="1" id="param-arrondi"></div>
+                <div class="form-group"><label>P06 · Majoration urgent (×)</label><input type="number" step="0.01" id="param-coef_urgent"></div>
+                <div class="form-group"><label>P07 · Majoration express (×)</label><input type="number" step="0.01" id="param-coef_express"></div>
+                <div class="form-group"><label>P08 · Remise 2 véhicules (%)</label><input type="number" step="0.5" id="param-remise_qte2"></div>
+                <div class="form-group"><label>P09 · Remise 3+ véhicules (%)</label><input type="number" step="0.5" id="param-remise_qte3"></div>
             </div>
-            <p style="color:var(--text-secondary);font-size:12px;margin-top:4px;">Le coût vinyle et les supports panneaux viennent des onglets Vinyles &amp; Matériaux. Les tarifs de pose viennent de l'onglet Poseurs.</p>
+            <div style="font-weight:700;font-size:12px;margin:8px 0;color:var(--primary);">Matière</div>
+            <div class="row2">
+                <div class="form-group"><label>P10 · Coef chute véhicule (×)</label><input type="number" step="0.01" id="param-chute_vehicule"></div>
+                <div class="form-group"><label>P11 · Coef chute signalétique (×)</label><input type="number" step="0.01" id="param-chute_signaletique"></div>
+                <div class="form-group"><label>P12 · Lamination défaut (€/m² achat)</label><input type="number" step="0.01" id="param-lamination_m2" oninput="testMoteur()"></div>
+                <div class="form-group"><label>P23 · Impression numérique (€/m² coût)</label><input type="number" step="0.5" id="param-impression_m2"></div>
+                <div class="form-group"><label>P13 · Espace stickers (mm)</label><input type="number" step="1" id="param-espace_stickers"></div>
+                <div class="form-group"><label>P14 · Coef forme ronde (×)</label><input type="number" step="0.01" id="param-coef_forme_rond"></div>
+                <div class="form-group"><label>P15 · Coef forme custom (×)</label><input type="number" step="0.01" id="param-coef_forme_custom"></div>
+            </div>
+            <div style="font-weight:700;font-size:12px;margin:8px 0;color:var(--primary);">Main d'œuvre (prix de vente)</div>
+            <div class="row2">
+                <div class="form-group"><label>P16 · PAO forfait (€)</label><input type="number" step="1" id="param-pao_forfait" oninput="testMoteur()"></div>
+                <div class="form-group"><label>P17 · PAO horaire (€/h)</label><input type="number" step="1" id="param-pao_horaire" oninput="testMoteur()"></div>
+                <div class="form-group"><label>P18 · Pose atelier jour (€)</label><input type="number" step="1" id="param-pose_atelier_jour"></div>
+                <div class="form-group"><label>P19 · Pose atelier ½ jour (€)</label><input type="number" step="1" id="param-pose_atelier_demi"></div>
+                <div class="form-group"><label>P20 · Pose site / point (€)</label><input type="number" step="1" id="param-pose_site_point"></div>
+                <div class="form-group"><label>P21 · Taux horaire atelier (€/h)</label><input type="number" step="1" id="param-taux_horaire_atelier"></div>
+                <div class="form-group"><label>P24 · Coef pose sous-traitant (×)</label><input type="number" step="0.05" id="param-coef_pose_st"></div>
+                <div class="form-group"><label>P22 · Coef impression Exaprint (×)</label><input type="number" step="0.05" id="param-coef_impression"></div>
+            </div>
         </div>
+
+        <div class="section-header"><div class="section-title">Synchronisation Google Sheets</div><button onclick="syncPreview()">🔄 Synchroniser depuis Google Sheets</button></div>
+        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <p style="color:var(--text-secondary);font-size:12px;">Source : classeur « DropStyle moteur validation » partagé en lecture (feuilles <b>Paramètres</b> et <b>Tarifs matières</b>). La synchro met à jour les paramètres P01–P24 et les tables Vinyles, Laminations, Tapes et Panneaux. Un aperçu des changements est affiché avant application — rien n'est écrit sans confirmation.</p>
+            <div id="sync-result" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="section-header"><div class="section-title">Laminations &amp; tapes (synchronisés depuis le Sheets)</div></div>
+        <div class="table-wrap" style="margin-bottom:24px;"><table>
+            <thead><tr><th>Type</th><th>Nom</th><th>Prix achat (€/m²)</th><th>Laizes (mm)</th></tr></thead>
+            <tbody id="laminations-list"><tr><td colspan="4" class="empty-state">Aucune donnée — lancer une synchronisation</td></tr></tbody>
+        </table></div>
 
         <div class="section-header"><div class="section-title">Forfaits véhicule</div><button onclick="openModal('modal-forfait')">+ Ajouter</button></div>
         <div class="table-wrap"><table>
@@ -367,6 +406,7 @@
         <form onsubmit="savePoseur(event)">
             <input type="hidden" id="poseur-id">
             <div class="form-group"><label>Nom</label><input type="text" id="poseur-nom" required placeholder="Jean Dupont"></div>
+            <div class="form-group"><label>Type de tarif</label><select id="poseur-type"><option value="vente">Vente directe (prix client)</option><option value="cout">Coût sous-traitant (majoré × P24)</option></select></div>
             <div class="row2">
                 <div class="form-group"><label>Tarif jour (€)</label><input type="number" id="poseur-jour" required step="0.01"></div>
                 <div class="form-group"><label>Tarif demi-jour (€)</label><input type="number" id="poseur-demijour" required step="0.01"></div>
@@ -474,7 +514,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function loadAll() {
     await loadParametres();
-    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits()]);
+    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadLaminations()]);
     await populateTestSelects();
     testMoteur();
 }
@@ -534,7 +574,7 @@ async function loadPoseurs() {
         return;
     }
     document.getElementById('poseurs-list').innerHTML = items.map(p => `
-        <tr><td>${p.nom}</td><td>${parseFloat(p.jour).toFixed(2)}</td>
+        <tr><td>${p.nom}${p.type_prix === 'cout' ? ' <span class="badge admin">coût × P24</span>' : ''}</td><td>${parseFloat(p.jour).toFixed(2)}</td>
         <td>${parseFloat(p.demijour).toFixed(2)}</td>
         <td><button class="small" onclick='editPoseur(${JSON.stringify(p)})'>Modif</button>
         <button class="danger small" onclick="deletePoseur(${p.id})">Suppr</button></td></tr>`).join('');
@@ -698,7 +738,8 @@ async function savePoseur(event) {
     const data = {
         nom: document.getElementById('poseur-nom').value,
         jour: parseFloat(document.getElementById('poseur-jour').value),
-        demijour: parseFloat(document.getElementById('poseur-demijour').value)
+        demijour: parseFloat(document.getElementById('poseur-demijour').value),
+        type_prix: document.getElementById('poseur-type').value
     };
     const url = id ? `${API_URL}/tarifs/poseurs/${id}` : `${API_URL}/tarifs/poseurs`;
     const resp = await fetch(url, {
@@ -714,6 +755,7 @@ function editPoseur(p) {
     document.getElementById('poseur-nom').value = p.nom;
     document.getElementById('poseur-jour').value = p.jour;
     document.getElementById('poseur-demijour').value = p.demijour;
+    document.getElementById('poseur-type').value = p.type_prix || 'vente';
     document.getElementById('poseur-title').textContent = 'Modifier le poseur';
     document.getElementById('modal-poseur').classList.add('active');
 }
@@ -766,24 +808,25 @@ async function deleteImpression(id) {
 function mtNum(id) { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
 function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
 
+const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression'];
+
 async function loadParametres() {
     try {
         const p = await fetch(`${API_URL}/parametres`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
         coef = parseFloat(p.coefficient) || 2;
-        document.getElementById('param-coefficient').value = p.coefficient ?? 2;
-        document.getElementById('param-lamination_m2').value = p.lamination_m2 ?? 0;
-        document.getElementById('param-pao_forfait').value = p.pao_forfait ?? 0;
-        document.getElementById('param-pao_horaire').value = p.pao_horaire ?? 0;
+        PARAM_KEYS.forEach(k => {
+            const el = document.getElementById('param-' + k);
+            if (el && p[k] !== undefined) el.value = p[k];
+        });
     } catch (err) { console.error(err); }
 }
 
 async function saveParametres() {
-    const data = {
-        coefficient: mtNum('param-coefficient'),
-        lamination_m2: mtNum('param-lamination_m2'),
-        pao_forfait: mtNum('param-pao_forfait'),
-        pao_horaire: mtNum('param-pao_horaire')
-    };
+    const data = {};
+    PARAM_KEYS.forEach(k => {
+        const el = document.getElementById('param-' + k);
+        if (el) data[k] = mtNum('param-' + k);
+    });
     const resp = await fetch(`${API_URL}/parametres`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -791,6 +834,56 @@ async function saveParametres() {
     });
     if (resp.ok) { coef = data.coefficient || 2; showMessage('Paramètres enregistrés', 'success'); loadImpressions(); testMoteur(); }
     else showMessage('Erreur', 'error');
+}
+
+// ===== V6 — SYNCHRONISATION GOOGLE SHEETS =====
+async function syncPreview() {
+    const el = document.getElementById('sync-result');
+    el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">⏳ Lecture du Google Sheets...</p>';
+    try {
+        const r = await fetch(`${API_URL}/sync-sheets/preview`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const d = await r.json();
+        if (!r.ok) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">❌ ${d.error}</p>`; return; }
+        let html = '';
+        if (d.parametres.length) {
+            html += '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">Paramètres modifiés :</div>' + d.parametres.map(x =>
+                `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${x.cle}</span><span>${x.avant === null ? '—' : x.avant} → <b>${x.apres}</b></span></div>`).join('');
+        } else {
+            html += '<p style="font-size:12px;color:var(--text-secondary);">Paramètres : aucun changement.</p>';
+        }
+        html += '<div style="font-weight:700;font-size:12px;margin:10px 0 6px;">Tables (remplacées par le contenu du Sheets) :</div>';
+        for (const [nom, tinfo] of Object.entries(d.tables)) {
+            html += `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">${nom} : ${tinfo.avant} ligne(s) → <b>${tinfo.apres}</b> — ${tinfo.items.slice(0, 4).join(', ')}${tinfo.items.length > 4 ? '…' : ''}</div>`;
+        }
+        html += `<button class="success" style="margin-top:12px;" onclick="syncApply()">✅ Appliquer la synchronisation</button>`;
+        el.innerHTML = html;
+    } catch (err) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">❌ ${err.message}</p>`; }
+}
+
+async function syncApply() {
+    const el = document.getElementById('sync-result');
+    el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">⏳ Application...</p>';
+    try {
+        const r = await fetch(`${API_URL}/sync-sheets/apply`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        const d = await r.json();
+        if (!r.ok) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">❌ ${d.error}</p>`; return; }
+        el.innerHTML = `<p style="font-size:12px;color:var(--success);">✅ Synchronisation appliquée : ${d.parametres} paramètres, ${d.vinyles} vinyles, ${d.laminations} laminations, ${d.tapes} tapes, ${d.materiaux} panneaux.</p>`;
+        showMessage('Synchronisé depuis Google Sheets', 'success');
+        await loadParametres(); await loadVinyles(); await loadMateriaux(); await loadLaminations(); await populateTestSelects(); testMoteur();
+    } catch (err) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">❌ ${err.message}</p>`; }
+}
+
+async function loadLaminations() {
+    try {
+        const h = { 'Authorization': `Bearer ${token}` };
+        const [lams, tapes] = await Promise.all([
+            fetch(`${API_URL}/tarifs/laminations`, { headers: h }).then(r => r.json()),
+            fetch(`${API_URL}/tarifs/tapes`, { headers: h }).then(r => r.json())
+        ]);
+        const rows = lams.map(l => `<tr><td>Lamination</td><td>${l.nom}</td><td>${parseFloat(l.prix).toFixed(2)}</td><td>${l.laizes || '—'}</td></tr>`)
+            .concat(tapes.map(t => `<tr><td>Tape</td><td>${t.nom}</td><td>${parseFloat(t.prix).toFixed(2)}</td><td>${t.laizes || '—'}</td></tr>`));
+        document.getElementById('laminations-list').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="empty-state">Aucune donnée — lancer une synchronisation</td></tr>';
+    } catch (err) { console.error(err); }
 }
 
 async function loadForfaits() {

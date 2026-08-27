@@ -366,12 +366,32 @@
                         </div>
                     </div>
                 </div>
+                <div class="form-group"><label>Mode de calcul</label>
+                    <div class="dropdown" id="dd-v-mode">
+                        <button class="dropdown-btn" onclick="toggleDropdown('dd-v-mode')"><span class="dropdown-label">Calcul au m² (avancé)</span></button>
+                        <div class="dropdown-list">
+                            <div class="dropdown-item" data-value="m2" onclick="selectDropdownItem(this)">Calcul au m² (avancé)</div>
+                            <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait fixe (historique)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="conditional" id="v-forfait-cond">
+                    <div class="form-group"><label>Forfait</label>
+                        <div class="dropdown" id="dd-v-forfait">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-v-forfait')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-v-forfait"></div>
+                        </div>
+                    </div>
+                    <p style="font-size:10px;color:var(--text-light);margin-top:4px;">💡 Prix issus de tes factures historiques. Le forfait remplace matière + pose + PAO ; délai, frais de dossier et arrondi s'appliquent ensuite.</p>
+                </div>
                 <div class="form-group"><label>Vinyle</label>
                     <div class="dropdown" id="dd-v-vinyle">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
                         <div class="dropdown-list" id="list-v-vinyle"></div>
                     </div>
                 </div>
+                <div class="checkbox-row"><input type="checkbox" id="v-imprime-check" checked><label for="v-imprime-check">Vinyle imprimé (ajoute le coût d'impression)</label></div>
+                <div class="checkbox-row"><input type="checkbox" id="v-tape-check"><label for="v-tape-check">Tape de transfert (lettrage découpé)</label></div>
                 <div class="row2">
                     <div class="form-group"><label>Finition</label>
                         <div class="dropdown" id="dd-v-finition">
@@ -382,18 +402,28 @@
                             </div>
                         </div>
                     </div>
-                    <div class="form-group"><label>Laminage UV</label>
+                    <div class="form-group"><label>Lamination</label>
                         <div class="dropdown" id="dd-v-lam">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-v-lam')"><span class="dropdown-label">Non</span></button>
-                            <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Non</div>
-                                <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Oui (+12%)</div>
-                            </div>
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-v-lam')"><span class="dropdown-label">Sans</span></button>
+                            <div class="dropdown-list" id="list-v-lam"><div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div></div>
                         </div>
                     </div>
                 </div>
-                <div class="checkbox-row"><input type="checkbox" id="v-pao-check" onchange="togglePAO()"><label for="v-pao-check">PAO / Design (60€/h)</label></div>
-                <div class="conditional" id="v-pao-cond"><div class="form-group"><label>Heures PAO</label><input type="number" id="v-pao-h" value="2" min="0.5" step="0.5"></div></div>
+                <div class="checkbox-row"><input type="checkbox" id="v-pao-check" onchange="togglePAO()"><label for="v-pao-check">PAO / Design</label></div>
+                <div class="conditional" id="v-pao-cond">
+                    <div class="row2">
+                        <div class="form-group"><label>Mode PAO</label>
+                            <div class="dropdown" id="dd-v-pao-mode">
+                                <button class="dropdown-btn" onclick="toggleDropdown('dd-v-pao-mode')"><span class="dropdown-label">Forfait</span></button>
+                                <div class="dropdown-list">
+                                    <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait</div>
+                                    <div class="dropdown-item" data-value="horaire" onclick="selectDropdownItem(this)">À l'heure</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group" id="v-pao-h-group" style="display:none;"><label>Heures PAO</label><input type="number" id="v-pao-h" value="2" min="0.5" step="0.5"></div>
+                    </div>
+                </div>
                 <div class="checkbox-row"><input type="checkbox" id="v-echenillage-check" onchange="toggleEchenillage()"><label for="v-echenillage-check">Échenillage</label></div>
                 <div class="conditional" id="v-echenillage-cond">
                     <div class="form-group"><label>Forfait</label>
@@ -466,28 +496,24 @@
                     </div>
                 </div>
                 <div class="row2">
-                    <div class="form-group"><label>Finition</label>
-                        <div class="dropdown" id="dd-s-finition">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-finition')"><span class="dropdown-label">Aucune</span></button>
-                            <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="aucune" onclick="selectDropdownItem(this)">Aucune</div>
-                                <div class="dropdown-item" data-value="lam-brill" onclick="selectDropdownItem(this)">Laminage brillant (+8%)</div>
-                                <div class="dropdown-item" data-value="lam-mat" onclick="selectDropdownItem(this)">Laminage mat (+8%)</div>
-                            </div>
+                    <div class="form-group"><label>Lamination</label>
+                        <div class="dropdown" id="dd-s-lam">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-lam')"><span class="dropdown-label">Sans</span></button>
+                            <div class="dropdown-list" id="list-s-lam"><div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div></div>
                         </div>
                     </div>
                     <div class="form-group"><label>Quantité</label><input type="number" id="s-qty" value="1" min="1"></div>
                 </div>
-                <div class="form-group"><label>Pose</label>
-                    <div class="dropdown" id="dd-s-pose">
-                        <button class="dropdown-btn" onclick="toggleDropdown('dd-s-pose')"><span class="dropdown-label">Sans pose</span></button>
-                        <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Sans pose</div>
-                            <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Avec pose (+180€)</div>
-                            <div class="dropdown-item" data-value="nacelle" onclick="selectDropdownItem(this)">Avec pose + nacelle (+480€)</div>
+                <div class="checkbox-row"><input type="checkbox" id="s-visuel-check" onchange="toggleVisuel()"><label for="s-visuel-check">Visuel imprimé contrecollé</label></div>
+                <div class="conditional" id="s-visuel-cond">
+                    <div class="form-group"><label>Vinyle du visuel</label>
+                        <div class="dropdown" id="dd-s-vinyle">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-s-vinyle"></div>
                         </div>
                     </div>
                 </div>
+                <div class="form-group"><label>Pose sur site (nb de points, 0 = sans pose)</label><input type="number" id="s-pose-points" value="0" min="0" step="1"></div>
                 <div class="form-group"><label>Délai</label>
                     <div class="dropdown" id="dd-s-delai">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-delai')"><span class="dropdown-label">Normal</span></button>
@@ -569,25 +595,21 @@
                         <div class="dropdown-list" id="list-st-vinyle"></div>
                     </div>
                 </div>
+                <div class="checkbox-row"><input type="checkbox" id="st-imprime-check" checked><label for="st-imprime-check">Stickers imprimés (ajoute le coût d'impression)</label></div>
+                <div class="form-group"><label>Découpe / calage (heures)</label><input type="number" id="st-dec-h" value="0.5" min="0" step="0.25"></div>
 
                 <div class="row2">
-                    <div class="form-group"><label>Laminage UV</label>
+                    <div class="form-group"><label>Lamination</label>
                         <div class="dropdown" id="dd-st-lam">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-lam')"><span class="dropdown-label">Non</span></button>
-                            <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="non" onclick="selectDropdownItem(this)">Non</div>
-                                <div class="dropdown-item" data-value="oui" onclick="selectDropdownItem(this)">Oui (+12%)</div>
-                            </div>
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-lam')"><span class="dropdown-label">Sans</span></button>
+                            <div class="dropdown-list" id="list-st-lam"><div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div></div>
                         </div>
                     </div>
                     <div class="form-group"><label>Laize</label>
                         <div class="dropdown" id="dd-st-laize">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-st-laize')"><span class="dropdown-label">Optimale (auto)</span></button>
-                            <div class="dropdown-list">
+                            <div class="dropdown-list" id="list-st-laize">
                                 <div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>
-                                <div class="dropdown-item" data-value="950" onclick="selectDropdownItem(this)">Forcer 950mm</div>
-                                <div class="dropdown-item" data-value="1270" onclick="selectDropdownItem(this)">Forcer 1270mm</div>
-                                <div class="dropdown-item" data-value="1480" onclick="selectDropdownItem(this)">Forcer 1480mm</div>
                             </div>
                         </div>
                     </div>
@@ -607,7 +629,7 @@
                     <div class="form-group" id="st-ech-temps-group">
                         <label>Secondes par sticker</label>
                         <input type="number" id="st-ech-temps" value="1.2" step="0.1" min="0.1">
-                        <p style="font-size:10px;color:var(--text-light);margin-top:4px;">Tarif: 60€/h = 1€/min</p>
+                        <p style="font-size:10px;color:var(--text-light);margin-top:4px;" id="st-ech-taux-note">Tarif : taux horaire atelier (paramètre P21)</p>
                     </div>
                     <div class="form-group" id="st-ech-forfait-group" style="display:none;">
                         <label>Forfait (€)</label>
@@ -656,6 +678,45 @@
 const API_URL = window.location.origin + '/api';
 let user = null, token = null;
 let allImpressions = [];
+// V6 — moteur unifie : parametres + tarifs charges au demarrage
+let PARAMS = {};
+let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [];
+
+async function apiFetch(path) {
+    const r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (r.status === 401 || r.status === 403) { logout(); throw new Error('Session expirée'); }
+    return r.json();
+}
+function num(cle, def) { const v = parseFloat(PARAMS[cle]); return isNaN(v) ? def : v; }
+function delaiMult(d) { return d === 'express' ? num('coef_express', 1.25) : d === 'urgent' ? num('coef_urgent', 1.15) : 1; }
+function parseLaizes(s) { return String(s || '').split('/').map(x => parseInt(String(x).trim())).filter(n => n > 0); }
+
+// Totalisation unifiee : cout matiere × coefficient + ventes, puis delai, frais, minimum, arrondi, TVA
+function computeTotal(coutMatiere, ventes, delai) {
+    const coefficient = num('coefficient', 2);
+    const venteMat = coutMatiere * coefficient;
+    let sub = venteMat + ventes;
+    const brut = sub;
+    sub *= delaiMult(delai);
+    const frais = num('frais_dossier', 0);
+    sub += frais;
+    const minimum = num('minimum_commande', 0);
+    const minApplique = sub < minimum;
+    if (minApplique) sub = minimum;
+    const arr = num('arrondi', 0);
+    const ht = arr > 0 ? Math.ceil(sub / arr - 0.000001) * arr : sub;
+    const tvaRate = num('tva', 20) / 100;
+    const tva = ht * tvaRate;
+    return { coefficient, venteMat, brut, frais, minApplique, ht, tva, ttc: ht + tva };
+}
+
+function moteurRows(t, delai) {
+    const rows = [];
+    if (delai && delai !== 'normal') rows.push({ label: 'Majoration délai', val: '×' + delaiMult(delai).toFixed(2) });
+    if (t.frais > 0) rows.push({ label: 'Frais de dossier', val: `+${t.frais.toFixed(2)}€` });
+    if (t.minApplique) rows.push({ label: 'Minimum de commande appliqué', val: `${num('minimum_commande', 0).toFixed(2)}€` });
+    return rows;
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
@@ -690,6 +751,9 @@ function selectDropdownItem(item) {
     dd.classList.remove('open');
     
     if (dd.id === 'dd-i-type') loadImpressionFilters();
+    if (dd.id === 'dd-st-vinyle') rebuildLaizes();
+    if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
+    if (dd.id === 'dd-v-pao-mode') document.getElementById('v-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
         document.getElementById('st-ech-temps-group').style.display = mode === 'temps' ? 'block' : 'none';
@@ -703,27 +767,52 @@ function getDropdownValue(id) {
 
 async function loadTarifs() {
     try {
-        const [vinyles, materiaux, poseurs, impressions] = await Promise.all([
-            fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/tarifs/poseurs`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/tarifs/impressions`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        const [vinyles, materiaux, poseurs, impressions, parametres, laminations, tapes, forfaits] = await Promise.all([
+            apiFetch('/tarifs/vinyles'), apiFetch('/tarifs/materiaux'), apiFetch('/tarifs/poseurs'), apiFetch('/tarifs/impressions'),
+            apiFetch('/parametres'), apiFetch('/tarifs/laminations'), apiFetch('/tarifs/tapes'), apiFetch('/tarifs/forfaits')
         ]);
-        
+
         allImpressions = impressions;
-        
-        const vinyleHTML = vinyles.map(v => 
-            `<div class="dropdown-item" data-value="${v.id}" onclick="selectDropdownItem(this)">${v.name} (${v.price}€/m²)</div>`).join('');
-        
+        PARAMS = parametres || {};
+        allVinyles = vinyles; allMateriaux = materiaux; allLaminations = laminations; allTapes = tapes; allPoseurs = poseurs; allForfaits = forfaits;
+
+        const emptyItem = (txt) => `<div class="dropdown-item" data-value="" onclick="selectDropdownItem(this)">${txt}</div>`;
+        const vinyleHTML = vinyles.length ? vinyles.map(v =>
+            `<div class="dropdown-item" data-value="${v.id}" onclick="selectDropdownItem(this)">${v.name} (${parseFloat(v.price).toFixed(2)}€/m² achat)</div>`).join('')
+            : emptyItem('Aucun vinyle — à ajouter dans l\'admin ou via la synchro Sheets');
+
         document.getElementById('list-v-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-st-vinyle').innerHTML = vinyleHTML;
-        
-        document.getElementById('list-s-materiau').innerHTML = materiaux.map(m => 
-            `<div class="dropdown-item" data-value="${m.id}" onclick="selectDropdownItem(this)">${m.support} (${m.price}€/m²)</div>`).join('');
-        
+        document.getElementById('list-s-vinyle').innerHTML = vinyleHTML;
+
+        document.getElementById('list-s-materiau').innerHTML = materiaux.length ? materiaux.map(m =>
+            `<div class="dropdown-item" data-value="${m.id}" onclick="selectDropdownItem(this)">${m.support} (${parseFloat(m.price).toFixed(2)}€/m² achat)</div>`).join('')
+            : emptyItem('Aucun matériau — à ajouter dans l\'admin ou via la synchro Sheets');
+
+        const lamHTML = '<div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div>' +
+            laminations.map(l => `<div class="dropdown-item" data-value="${l.id}" onclick="selectDropdownItem(this)">${l.nom} (${parseFloat(l.prix).toFixed(2)}€/m²)</div>`).join('');
+        document.getElementById('list-v-lam').innerHTML = lamHTML;
+        document.getElementById('list-st-lam').innerHTML = lamHTML;
+        document.getElementById('list-s-lam').innerHTML = lamHTML;
+
         document.getElementById('list-v-poseur').innerHTML = '<div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans pose</div>' +
-            poseurs.map(p => `<div class="dropdown-item" data-value="${p.id}" onclick="selectDropdownItem(this)">${p.nom} (${p.jour}€/j)</div>`).join('');
+            poseurs.map(p => `<div class="dropdown-item" data-value="${p.id}" onclick="selectDropdownItem(this)">${p.nom} (${parseFloat(p.jour).toFixed(2)}€/j${p.type_prix === 'cout' ? ' · sous-traitant' : ''})</div>`).join('');
+
+        document.getElementById('list-v-forfait').innerHTML = allForfaits.length ? allForfaits.map(f =>
+            `<div class="dropdown-item" data-value="${f.id}" onclick="selectDropdownItem(this)">${f.nom} — ${parseFloat(f.prix).toFixed(2)}€</div>`).join('')
+            : emptyItem('Aucun forfait — à créer dans l\'admin (onglet Moteur)');
     } catch (err) { console.error(err); }
+}
+
+function rebuildLaizes() {
+    const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
+    const laizes = parseLaizes(vinyle && vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
+    document.getElementById('list-st-laize').innerHTML =
+        '<div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>' +
+        laizes.map(l => `<div class="dropdown-item" data-value="${l}" onclick="selectDropdownItem(this)">Forcer ${l}mm</div>`).join('');
+    const dd = document.getElementById('dd-st-laize');
+    dd.dataset.value = 'auto';
+    dd.querySelector('.dropdown-label').textContent = 'Optimale (auto)';
 }
 
 function loadImpressionFilters() {
@@ -761,6 +850,9 @@ function toggleEchenillage() {
 function toggleStickerEch() {
     document.getElementById('st-echenillage-cond').classList.toggle('active', document.getElementById('st-echenillage-check').checked);
 }
+function toggleVisuel() {
+    document.getElementById('s-visuel-cond').classList.toggle('active', document.getElementById('s-visuel-check').checked);
+}
 
 // ============ STICKERS - OPTIMISATION ============
 function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6) {
@@ -791,64 +883,50 @@ async function calcStickers() {
     const stickerH = parseFloat(document.getElementById('st-haut').value) || 60;
     const qty = parseInt(document.getElementById('st-qty').value) || 100;
     const forme = getDropdownValue('dd-st-forme') || 'rectangle';
-    const vinyleId = parseInt(getDropdownValue('dd-st-vinyle'));
-    const lam = getDropdownValue('dd-st-lam') || 'non';
+    const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
+    const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-st-lam'));
+    const imprime = document.getElementById('st-imprime-check').checked;
     const laizeChoice = getDropdownValue('dd-st-laize') || 'auto';
     const delai = getDropdownValue('dd-st-delai') || 'normal';
-    
+    const decH = parseFloat(document.getElementById('st-dec-h').value) || 0;
     const echCheck = document.getElementById('st-echenillage-check').checked;
     const echMode = getDropdownValue('dd-st-ech-mode') || 'temps';
     const echTemps = parseFloat(document.getElementById('st-ech-temps').value) || 1.2;
     const echForfait = parseFloat(getDropdownValue('dd-st-ech-forfait')) || 50;
-    
-    if (!vinyleId) {
+
+    if (!vinyle) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
         return;
     }
-    
-    const vinyles = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-    const vinyle = vinyles.find(v => v.id == vinyleId);
-    
-    // Calcul des 3 laizes
-    const laizes = [950, 1270, 1480];
-    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty)).filter(r => r !== null);
-    
+
+    // Optimisation sur les laizes reelles du vinyle
+    const espace = num('espace_stickers', 6);
+    const laizes = parseLaizes(vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
+    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty, espace)).filter(r => r !== null);
     if (results.length === 0) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sticker trop grand pour les laizes disponibles</p></div>';
         return;
     }
-    
-    // Choisir la meilleure laize
     let bestResult;
-    if (laizeChoice === 'auto') {
-        bestResult = results.reduce((a, b) => a.surfaceM2Num < b.surfaceM2Num ? a : b);
-    } else {
-        bestResult = results.find(r => r.laize == laizeChoice) || results[0];
-    }
-    
-    // Coefficient forme
-    const coefForme = { rectangle: 1, carre: 1, rond: 1.28, ovale: 1.28, custom: 1.18 }[forme] || 1;
-    const surfaceAvecForme = bestResult.surfaceM2Num * coefForme;
-    
-    // Calculs prix
-    const vinyleHT = surfaceAvecForme * parseFloat(vinyle.price);
-    const lamHT = lam === 'oui' ? vinyleHT * 0.12 : 0;
-    
+    if (laizeChoice === 'auto') bestResult = results.reduce((a, b) => a.surfaceM2Num < b.surfaceM2Num ? a : b);
+    else bestResult = results.find(r => r.laize == laizeChoice) || results[0];
+
+    const coefForme = { rectangle: 1, carre: 1, rond: num('coef_forme_rond', 1.28), ovale: num('coef_forme_rond', 1.28), custom: num('coef_forme_custom', 1.18) }[forme] || 1;
+    const surface = bestResult.surfaceM2Num * coefForme;
+
+    // Part matiere (× coefficient) : vinyle + impression + lamination
+    const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0);
+    const coutMatiere = surface * coutM2;
+
+    // Part main d'oeuvre (vente directe)
+    const tauxAtelier = num('taux_horaire_atelier', 60);
     let echHT = 0;
-    if (echCheck) {
-        if (echMode === 'temps') {
-            echHT = (qty * echTemps / 60); // €/min à 60€/h
-        } else {
-            echHT = echForfait;
-        }
-    }
-    
-    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
-    const totalHT = (vinyleHT + lamHT + echHT) * delaiMult;
-    const tva = totalHT * 0.2;
-    const totalTTC = totalHT + tva;
-    
-    // Affichage
+    if (echCheck) echHT = echMode === 'temps' ? (qty * echTemps / 3600) * tauxAtelier : echForfait;
+    const decoupeHT = decH * tauxAtelier;
+    const ventes = echHT + decoupeHT;
+
+    const t = computeTotal(coutMatiere, ventes, delai);
+
     const compareHTML = results.map(r => {
         const isBest = r.laize === bestResult.laize;
         const diff = r.surfaceM2Num - bestResult.surfaceM2Num;
@@ -858,24 +936,21 @@ async function calcStickers() {
                 <div class="laize-card-title">${r.laize}mm</div>
                 <div class="laize-card-value">${r.surfaceM2} m²</div>
                 <div class="laize-card-detail">${r.stickersParRangee}/rangée × ${r.nbRangees} rangées</div>
-                ${isBest ? '<div class="laize-card-detail" style="color:var(--success);font-weight:700;">⭐ OPTIMAL</div>' : 
+                ${isBest ? '<div class="laize-card-detail" style="color:var(--success);font-weight:700;">⭐ OPTIMAL</div>' :
                   `<div class="laize-card-detail">+${diffPct}% perte</div>`}
-            </div>
-        `;
+            </div>`;
     }).join('');
-    
+
     const rows = [
-        { label: `Vinyle ${vinyle.name}`, val: `${surfaceAvecForme.toFixed(3)} m²` },
-        { label: `Prix vinyle (${vinyle.price}€/m²)`, val: `${vinyleHT.toFixed(2)} €` },
-        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: `inclus` } : null,
-        lamHT > 0 ? { label: 'Laminage UV (+12%)', val: `+${lamHT.toFixed(2)} €` } : null,
-        echCheck ? { 
-            label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s)` : 'Échenillage forfait', 
-            val: `${echHT.toFixed(2)} €` 
-        } : null,
-        delai !== 'normal' ? { label: `Urgence`, val: '×' + delaiMult.toFixed(2) } : null
+        { label: `Vinyle ${vinyle.name}`, val: `${surface.toFixed(3)} m²` },
+        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : vinyle${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
+        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: 'inclus' } : null,
+        echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€` } : null,
+        decoupeHT > 0 ? { label: `Découpe / calage (${decH}h × ${tauxAtelier}€/h)`, val: `${decoupeHT.toFixed(2)}€` } : null,
+        ...moteurRows(t, delai)
     ].filter(Boolean);
-    
+
     document.getElementById('result').innerHTML = `
         <div class="optimization-box">
             <div class="optimization-title">🎯 Optimisation laize</div>
@@ -890,83 +965,105 @@ async function calcStickers() {
             </div>
             <div class="laize-compare">${compareHTML}</div>
         </div>
-        
         <div class="price-display">
-            <div class="price-label">${qty} stickers ${stickerW}×${stickerH}mm</div>
-            <div class="price-value">${totalTTC.toFixed(2).replace('.', ',')}</div>
+            <div class="price-label">${qty} stickers ${stickerW}×${stickerH}mm — ${(t.ht / qty).toFixed(2)}€/u HT</div>
+            <div class="price-value">${t.ttc.toFixed(2).replace('.', ',')}</div>
             <div class="price-ht">€ TTC</div>
             <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-                HT: ${totalHT.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
+                HT: ${t.ht.toFixed(2).replace('.', ',')}€ • TVA: ${t.tva.toFixed(2).replace('.', ',')}€
             </div>
         </div>
         <div class="breakdown">
             ${rows.map(r => `<div class="breakdown-row"><span class="label">${r.label}</span><span>${r.val}</span></div>`).join('')}
-            <div class="breakdown-row total"><span>TOTAL HT</span><span>${totalHT.toFixed(2).replace('.', ',')} €</span></div>
+            <div class="breakdown-row total"><span>TOTAL HT</span><span>${t.ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
-        <button class="btn-block" onclick="saveDevis('stickers', ${qty}, ${totalHT.toFixed(2)}, ${totalTTC.toFixed(2)})">Sauvegarder le devis</button>
+        <button class="btn-block" onclick="saveDevis('stickers', ${qty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)})">Sauvegarder le devis</button>
     `;
 }
 
 async function calcVehicule() {
     const type = getDropdownValue('dd-v-type');
     const marquage = getDropdownValue('dd-v-marquage');
-    const vinyleId = parseInt(getDropdownValue('dd-v-vinyle'));
+    const mode = getDropdownValue('dd-v-mode') || 'm2';
     const qty = parseInt(document.getElementById('v-qty').value) || 1;
-    const poseurId = parseInt(getDropdownValue('dd-v-poseur')) || 0;
-    const poseDuration = getDropdownValue('dd-v-pose-duration') || 'jour';
-    const lam = getDropdownValue('dd-v-lam') || 'non';
     const delai = getDropdownValue('dd-v-delai') || 'normal';
-    const paoCheck = document.getElementById('v-pao-check').checked;
-    const paoHours = paoCheck ? parseFloat(document.getElementById('v-pao-h').value) || 0 : 0;
-    const echenillageCheck = document.getElementById('v-echenillage-check').checked;
-    const echenillagePrice = echenillageCheck ? parseFloat(getDropdownValue('dd-v-echenillage')) || 0 : 0;
-    
-    if (!type || !marquage || !vinyleId) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
+
+    // Surfaces facturables VALIDEES par l'entreprise (26/08) — HORS chutes (le coef P10 s'ajoute)
+    const surfaces = {
+        'citadine':   { total: 20, partiel: 12, bandes: 1.2, logos: 2,   custome: 3 },
+        'berline':    { total: 25, partiel: 15, bandes: 1.5, logos: 2,   custome: 4 },
+        'suv':        { total: 28, partiel: 17, bandes: 2,   logos: 3.5, custome: 5 },
+        'utilitaire': { total: 25, partiel: 15, bandes: 2.5, logos: 3.5, custome: 6 },
+        'fourgon':    { total: 40, partiel: 25, bandes: 3.5, logos: 5,   custome: 8 },
+        'camion':     { total: 35, partiel: 22, bandes: 6,   logos: 5,   custome: 20 }
+    };
+
+    // ===== MODE FORFAIT : le forfait remplace matiere + pose + PAO =====
+    if (mode === 'forfait') {
+        const forfait = allForfaits.find(f => f.id == getDropdownValue('dd-v-forfait'));
+        if (!forfait) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un forfait</p></div>';
+            return;
+        }
+        const t = computeTotal(0, parseFloat(forfait.prix) * qty, delai);
+        const rows = [
+            { label: `Forfait « ${forfait.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${(parseFloat(forfait.prix) * qty).toFixed(2)}€` },
+            ...moteurRows(t, delai)
+        ];
+        showResult(`Véhicule (forfait) × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty);
         return;
     }
 
-    const surfaces = {
-        'citadine': { total: 5.5, partiel: 2.8, bandes: 1.2, logos: 0.4, custome: 3 },
-        'berline': { total: 7, partiel: 3.5, bandes: 1.5, logos: 0.5, custome: 3.8 },
-        'suv': { total: 9, partiel: 4.5, bandes: 2, logos: 0.6, custome: 5 },
-        'utilitaire': { total: 11, partiel: 5.5, bandes: 2.5, logos: 0.7, custome: 6 },
-        'fourgon': { total: 15, partiel: 7.5, bandes: 3.5, logos: 1, custome: 8 },
-        'camion': { total: 25, partiel: 12.5, bandes: 6, logos: 1.5, custome: 14 }
-    };
-
-    const vinyles = await fetch(`${API_URL}/tarifs/vinyles`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-    const vinyle = vinyles.find(v => v.id == vinyleId);
-    
-    let poseur = null;
-    if (poseurId) {
-        const poseurs = await fetch(`${API_URL}/tarifs/poseurs`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-        poseur = poseurs.find(p => p.id == poseurId);
+    // ===== MODE M2 (avance) =====
+    const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-v-vinyle'));
+    if (!type || !marquage || !vinyle) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
+        return;
     }
+    const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-v-lam'));
+    const imprime = document.getElementById('v-imprime-check').checked;
+    const tape = document.getElementById('v-tape-check').checked;
+    const poseur = allPoseurs.find(pp => pp.id == getDropdownValue('dd-v-poseur'));
+    const poseDuration = getDropdownValue('dd-v-pose-duration') || 'jour';
+    const paoCheck = document.getElementById('v-pao-check').checked;
+    const paoMode = getDropdownValue('dd-v-pao-mode') || 'forfait';
+    const paoHours = parseFloat(document.getElementById('v-pao-h').value) || 0;
+    const echenillageCheck = document.getElementById('v-echenillage-check').checked;
+    const echenillagePrice = echenillageCheck ? parseFloat(getDropdownValue('dd-v-echenillage')) || 0 : 0;
 
-    const m2 = surfaces[type][marquage];
-    const vinyloHT = m2 * vinyle.price * qty;
-    const lamHT = lam === 'oui' ? vinyloHT * 0.12 : 0;
-    const paoHT = paoHours * 60;
-    const poseHT = poseur ? (poseDuration === 'jour' ? parseFloat(poseur.jour) : parseFloat(poseur.demijour)) * qty : 0;
-    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
-    const subHT = (vinyloHT + lamHT + paoHT + poseHT + echenillagePrice) * delaiMult;
-    const qtyDisc = qty >= 3 ? 0.95 : qty >= 2 ? 0.97 : 1;
-    const totalHT = subHT * qtyDisc;
-    const tva = totalHT * 0.2;
-    const totalTTC = totalHT + tva;
+    // Part matiere (× coefficient)
+    const surface = surfaces[type][marquage];
+    const conso = surface * num('chute_vehicule', 1.25);
+    const tapePrix = tape ? (allTapes.length ? parseFloat(allTapes[0].prix) : 1.21) : 0;
+    const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0) + tapePrix;
+    const remise = qty >= 3 ? num('remise_qte3', 5) / 100 : qty >= 2 ? num('remise_qte2', 3) / 100 : 0;
+    const coutMatiere = conso * coutM2 * (1 - remise) * qty;
+
+    // Part main d'oeuvre (vente directe, ou cout sous-traitant × P24)
+    let poseHT = 0, poseLabel = '';
+    if (poseur) {
+        const tarif = poseDuration === 'jour' ? parseFloat(poseur.jour) : parseFloat(poseur.demijour);
+        const st = poseur.type_prix === 'cout';
+        poseHT = tarif * (st ? num('coef_pose_st', 1.3) : 1) * qty;
+        poseLabel = `Pose ${poseur.nom} (${poseDuration === 'jour' ? 'journée' : '½ journée'}${st ? ` · coût × ${num('coef_pose_st', 1.3).toFixed(2)}` : ''})`;
+    }
+    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 75)) : 0;
+    const ventes = poseHT + paoHT + echenillagePrice;
+
+    const t = computeTotal(coutMatiere, ventes, delai);
 
     const rows = [
-        { label: `Vinyle ${vinyle.name} (${m2}m²)`, val: `${vinyloHT.toFixed(2)}€` },
-        lamHT > 0 ? { label: 'Laminage UV (+12%)', val: `+${lamHT.toFixed(2)}€` } : null,
-        paoHT > 0 ? { label: `PAO (${paoHours}h)`, val: `${paoHT.toFixed(2)}€` } : null,
+        { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '' },
+        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : vinyle${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiere.toFixed(2)}€` },
+        remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%` } : null,
+        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+        poseHT > 0 ? { label: poseLabel, val: `${poseHT.toFixed(2)}€` } : null,
+        paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€` } : null,
         echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)}€` } : null,
-        poseHT > 0 ? { label: `Pose ${poseur.nom}`, val: `${poseHT.toFixed(2)}€` } : null,
-        delai !== 'normal' ? { label: `Urgence`, val: '×' + delaiMult.toFixed(2) } : null,
-        qtyDisc < 1 ? { label: `Remise quantité`, val: `-${((1-qtyDisc)*100).toFixed(1)}%` } : null
+        ...moteurRows(t, delai)
     ].filter(Boolean);
 
-    showResult(`Véhicule × ${qty}`, totalTTC, totalHT, tva, rows, 'vehicule', qty);
+    showResult(`Véhicule × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty);
 }
 
 async function calcSignaletique() {
@@ -974,36 +1071,44 @@ async function calcSignaletique() {
     const larg = parseFloat(document.getElementById('s-larg').value) || 100;
     const haut = parseFloat(document.getElementById('s-haut').value) || 100;
     const qty = parseInt(document.getElementById('s-qty').value) || 1;
-    const materiauid = parseInt(getDropdownValue('dd-s-materiau'));
-    const finition = getDropdownValue('dd-s-finition') || 'aucune';
-    const pose = getDropdownValue('dd-s-pose') || 'non';
+    const mat = allMateriaux.find(m => m.id == getDropdownValue('dd-s-materiau'));
+    const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-s-lam'));
+    const visuelCheck = document.getElementById('s-visuel-check').checked;
+    const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
+    const posePoints = parseInt(document.getElementById('s-pose-points').value) || 0;
     const delai = getDropdownValue('dd-s-delai') || 'normal';
 
-    if (!type || !materiauid) {
+    if (!type || !mat) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
         return;
     }
+    if (visuelCheck && !visuelVinyle) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+        return;
+    }
 
-    const materiaux = await fetch(`${API_URL}/tarifs/materiaux`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-    const materiau = materiaux.find(m => m.id == materiauid);
+    // Part matiere (× coefficient) : support + visuel imprime eventuel
+    const m2 = (larg * haut) / 10000 * qty;
+    const conso = m2 * num('chute_signaletique', 1.1);
+    const visuelM2 = visuelVinyle ? parseFloat(visuelVinyle.price) + num('impression_m2', 12) : 0;
+    const lamM2 = lamination ? parseFloat(lamination.prix) : 0;
+    const coutM2 = parseFloat(mat.price) + visuelM2 + lamM2;
+    const coutMatiere = conso * coutM2;
 
-    const m2 = (larg * haut) / 10000;
-    const matPrix = parseFloat(materiau.price) * m2 * qty;
-    const finAdd = finition !== 'aucune' ? matPrix * 0.08 : 0;
-    const poseAdd = pose === 'non' ? 0 : pose === 'oui' ? 180 : 480;
-    const delaiMult = { 'normal': 1, 'urgent': 1.15, 'express': 1.25 }[delai];
-    const totalHT = (matPrix + finAdd + poseAdd) * delaiMult;
-    const tva = totalHT * 0.2;
-    const totalTTC = totalHT + tva;
+    // Pose sur site (vente directe au point)
+    const poseHT = posePoints * num('pose_site_point', 300);
+
+    const t = computeTotal(coutMatiere, poseHT, delai);
 
     const rows = [
-        { label: `${materiau.support} (${m2.toFixed(2)}m²)`, val: `${matPrix.toFixed(2)}€` },
-        finAdd > 0 ? { label: `Laminage`, val: `+${finAdd.toFixed(2)}€` } : null,
-        poseAdd > 0 ? { label: `Pose`, val: `${poseAdd.toFixed(2)}€` } : null,
-        delai !== 'normal' ? { label: `Urgence`, val: '×' + delaiMult.toFixed(2) } : null
+        { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '' },
+        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : ${mat.support}${visuelVinyle ? ' + visuel imprimé' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
+        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+        poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€` } : null,
+        ...moteurRows(t, delai)
     ].filter(Boolean);
 
-    showResult(`Signalétique ${m2.toFixed(2)}m² × ${qty}`, totalTTC, totalHT, tva, rows, 'signaletique', qty);
+    showResult(`Signalétique ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
 }
 
 function calcImpression() {
@@ -1018,9 +1123,9 @@ function calcImpression() {
         return;
     }
 
-    const impression = allImpressions.find(i => 
-        i.type === type && i.format === format && 
-        i.grammage === grammage && i.finition === finition && 
+    const impression = allImpressions.find(i =>
+        i.type === type && i.format === format &&
+        i.grammage === grammage && i.finition === finition &&
         i.quantite === quantite
     );
 
@@ -1030,16 +1135,17 @@ function calcImpression() {
     }
 
     const prixExa = parseFloat(impression.prix_exa);
-    const prixClientHT = prixExa * 2;
-    const tva = prixClientHT * 0.2;
-    const totalTTC = prixClientHT + tva;
+    const coefImp = num('coef_impression', 2);
+    const prixClient = prixExa * coefImp;
+    const t = computeTotal(0, prixClient, 'normal');
 
     const rows = [
-        { label: 'Prix Exaprint HT', val: `${prixExa.toFixed(2)}€` },
-        { label: 'Marge × 2', val: `+${prixExa.toFixed(2)}€` }
+        { label: 'Prix Exaprint HT (achat)', val: `${prixExa.toFixed(2)}€` },
+        { label: `Marge × ${coefImp.toFixed(2)}`, val: `${prixClient.toFixed(2)}€` },
+        ...moteurRows(t, 'normal')
     ];
 
-    showResult(`${type} ${format} × ${quantite}`, totalTTC, prixClientHT, tva, rows, 'impression', quantite);
+    showResult(`${type} ${format} × ${quantite}`, t.ttc, t.ht, t.tva, rows, 'impression', quantite);
 }
 
 function showResult(title, ttc, ht, tva, rows, type, qty) {
