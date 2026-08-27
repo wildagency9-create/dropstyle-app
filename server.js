@@ -33,6 +33,13 @@ async function initDB() {
         // V5 — Moteur de prix : parametres globaux + forfaits vehicule
         await conn.query(`CREATE TABLE IF NOT EXISTS parametres (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, cle VARCHAR(50) NOT NULL, valeur DECIMAL(10, 2) NOT NULL, UNIQUE KEY uniq_user_cle (user_id, cle), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS forfaits (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+
+        // V6 — Moteur unifie : laminations, tapes, colonnes additionnelles
+        await conn.query(`CREATE TABLE IF NOT EXISTS laminations (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+        await conn.query(`CREATE TABLE IF NOT EXISTS tapes (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+        try { await conn.query(`ALTER TABLE vinyles ADD COLUMN laizes VARCHAR(100)`); } catch (e) {}
+        try { await conn.query(`ALTER TABLE materiaux ADD COLUMN format_plaque VARCHAR(50)`); } catch (e) {}
+        try { await conn.query(`ALTER TABLE poseurs ADD COLUMN type_prix VARCHAR(10) DEFAULT 'vente'`); } catch (e) {}
         
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -162,10 +169,10 @@ app.get('/api/tarifs/poseurs', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/poseurs', verifyToken, async (req, res) => {
-    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour) VALUES (?, ?, ?, ?)', [req.userId, nom, jour, demijour]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, jour, demijour, type_prix } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour, type_prix) VALUES (?, ?, ?, ?, ?)', [req.userId, nom, jour, demijour, type_prix || 'vente']); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
-    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE poseurs SET nom = ?, jour = ?, demijour = ? WHERE id = ? AND user_id = ?', [nom, jour, demijour, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE poseurs SET nom = ?, jour = ?, demijour = ?, type_prix = ? WHERE id = ? AND user_id = ?', [nom, jour, demijour, req.body.type_prix || 'vente', req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM poseurs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
@@ -186,17 +193,43 @@ app.delete('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
 });
 
 // V5 — PARAMETRES MOTEUR (cle/valeur)
-const DEFAULT_PARAMS = { coefficient: 2.00, lamination_m2: 12.00, pao_forfait: 350.00, pao_horaire: 75.00 };
+// V6 — Parametres complets du moteur (codes P01-P24 du classeur de validation)
+const DEFAULT_PARAMS = {
+    coefficient: 2.00,           // P01 - multiplicateur du debourse sec matiere
+    tva: 20.00,                  // P02 - en %
+    minimum_commande: 80.00,     // P03 - € HT
+    frais_dossier: 40.00,        // P04 - € HT par devis
+    arrondi: 5.00,               // P05 - arrondi commercial au multiple superieur
+    coef_urgent: 1.15,           // P06
+    coef_express: 1.25,          // P07
+    remise_qte2: 3.00,           // P08 - en %, matiere uniquement
+    remise_qte3: 5.00,           // P09 - en %, matiere uniquement
+    chute_vehicule: 1.25,        // P10 - surfaces hors chutes (valide 26/08)
+    chute_signaletique: 1.10,    // P11
+    lamination_m2: 2.83,         // P12 - prix achat lamination par defaut
+    espace_stickers: 6.00,       // P13 - mm
+    coef_forme_rond: 1.28,       // P14
+    coef_forme_custom: 1.18,     // P15
+    pao_forfait: 350.00,         // P16 - vente directe
+    pao_horaire: 75.00,          // P17 - vente directe
+    pose_atelier_jour: 525.00,   // P18 - vente directe
+    pose_atelier_demi: 300.00,   // P19 - vente directe
+    pose_site_point: 300.00,     // P20 - vente directe
+    taux_horaire_atelier: 60.00, // P21 - echenillage, decoupe, finitions
+    coef_impression: 2.00,       // P22 - marge sur prix Exaprint
+    impression_m2: 12.00,        // P23 - cout encre + machine (valide 10-15 €)
+    coef_pose_st: 1.30           // P24 - majoration cout poseur sous-traitant
+};
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {
         const conn = await pool.getConnection();
-        let [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
-        if (rows.length === 0) {
-            for (const [cle, valeur] of Object.entries(DEFAULT_PARAMS)) {
-                await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [req.userId, cle, valeur]);
-            }
-            [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+let [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+        const have = new Set(rows.map(r => r.cle));
+        let added = false;
+        for (const [cle, valeur] of Object.entries(DEFAULT_PARAMS)) {
+            if (!have.has(cle)) { await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [req.userId, cle, valeur]); added = true; }
         }
+        if (added) [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
         await conn.release();
         const obj = {};
         rows.forEach(r => { obj[r.cle] = parseFloat(r.valeur); });
@@ -230,6 +263,168 @@ app.delete('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
 });
 
 // DEVIS
+// ===== V6 — LAMINATIONS & TAPES =====
+app.get('/api/tarifs/laminations', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM laminations WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/tarifs/tapes', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM tapes WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V6 — SYNCHRONISATION GOOGLE SHEETS =====
+const SHEETS_ID = process.env.SHEETS_ID || '1SzqEGSVwO8PTJSYpt7XGQ0NsibgmBhUcSH0mCmn2rwQ';
+const https = require('https');
+
+function httpGet(url, redirects = 5) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (r) => {
+            if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && redirects > 0) { r.resume(); return resolve(httpGet(r.headers.location, redirects - 1)); }
+            if (r.statusCode !== 200) { r.resume(); return reject(new Error('HTTP ' + r.statusCode)); }
+            let d = ''; r.setEncoding('utf8');
+            r.on('data', c => d += c);
+            r.on('end', () => resolve(d));
+        }).on('error', reject);
+    });
+}
+
+function parseCSV(text) {
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (q) {
+            if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+            else cell += ch;
+        } else {
+            if (ch === '"') q = true;
+            else if (ch === ',') { row.push(cell); cell = ''; }
+            else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+            else if (ch !== '\r') cell += ch;
+        }
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+}
+
+function cleanNum(v) {
+    if (v === undefined || v === null) return null;
+    let s = String(v).trim();
+    if (!s) return null;
+    s = s.replace(/[€%\s\u00A0"]/g, '');
+    if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(',', '.');
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+}
+
+const SHEET_PARAM_MAP = {
+    P01: 'coefficient', P02: 'tva', P03: 'minimum_commande', P04: 'frais_dossier', P05: 'arrondi',
+    P06: 'coef_urgent', P07: 'coef_express', P08: 'remise_qte2', P09: 'remise_qte3',
+    P10: 'chute_vehicule', P11: 'chute_signaletique', P12: 'lamination_m2', P13: 'espace_stickers',
+    P14: 'coef_forme_rond', P15: 'coef_forme_custom', P16: 'pao_forfait', P17: 'pao_horaire',
+    P18: 'pose_atelier_jour', P19: 'pose_atelier_demi', P20: 'pose_site_point', P21: 'taux_horaire_atelier',
+    P22: 'coef_impression', P23: 'impression_m2', P24: 'coef_pose_st'
+};
+
+async function fetchSheetsData() {
+    const base = `https://docs.google.com/spreadsheets/d/${SHEETS_ID}/gviz/tq?tqx=out:csv&sheet=`;
+    const [csvParams, csvTarifs] = await Promise.all([
+        httpGet(base + encodeURIComponent('Paramètres')),
+        httpGet(base + encodeURIComponent('Tarifs matières'))
+    ]);
+    if (csvParams.trimStart().startsWith('<')) throw new Error('ACCES');
+    // Parametres : ligne dont la colonne A = P01..P24, valeur retenue en colonne E (repli D puis C)
+    const parametres = {};
+    for (const row of parseCSV(csvParams)) {
+        const code = (row[0] || '').trim();
+        if (/^P\d{2}$/.test(code) && SHEET_PARAM_MAP[code]) {
+            const val = cleanNum(row[4]) ?? cleanNum(row[3]) ?? cleanNum(row[2]);
+            if (val !== null) parametres[SHEET_PARAM_MAP[code]] = val;
+        }
+    }
+    // Tarifs : sections VINYLES / LAMINATIONS / TAPES / MATERIAUX PANNEAUX
+    const tables = { vinyles: [], laminations: [], tapes: [], materiaux: [] };
+    let current = null, skipHeader = false;
+    for (const row of parseCSV(csvTarifs)) {
+        const a = (row[0] || '').trim();
+        const aU = a.toUpperCase();
+        if (aU.startsWith('VINYLES')) { current = 'vinyles'; skipHeader = true; continue; }
+        if (aU.startsWith('LAMINATION')) { current = 'laminations'; skipHeader = true; continue; }
+        if (aU.startsWith('TAPES')) { current = 'tapes'; skipHeader = true; continue; }
+        if (aU.startsWith('MATÉRIAUX') || aU.startsWith('MATERIAUX')) { current = 'materiaux'; skipHeader = true; continue; }
+        if (aU.startsWith('QUESTION')) { current = null; continue; }
+        if (!current) continue;
+        if (skipHeader) { skipHeader = false; continue; }
+        if (!a || a.startsWith('(')) continue;
+        const prix = cleanNum(row[2]) ?? cleanNum(row[1]);
+        if (prix === null) continue;
+        tables[current].push({ nom: a, prix, laizes: (row[3] || '').trim() });
+    }
+    return { parametres, tables };
+}
+
+app.get('/api/sync-sheets/preview', verifyToken, async (req, res) => {
+    try {
+        const data = await fetchSheetsData();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+        const [vin] = await conn.query('SELECT COUNT(*) AS n FROM vinyles WHERE user_id = ?', [req.userId]);
+        const [lam] = await conn.query('SELECT COUNT(*) AS n FROM laminations WHERE user_id = ?', [req.userId]);
+        const [tap] = await conn.query('SELECT COUNT(*) AS n FROM tapes WHERE user_id = ?', [req.userId]);
+        const [mat] = await conn.query('SELECT COUNT(*) AS n FROM materiaux WHERE user_id = ?', [req.userId]);
+        await conn.release();
+        const actuels = {};
+        rows.forEach(r => actuels[r.cle] = parseFloat(r.valeur));
+        const diffParams = [];
+        for (const [cle, apres] of Object.entries(data.parametres)) {
+            const avant = actuels[cle] ?? DEFAULT_PARAMS[cle] ?? null;
+            if (avant === null || Math.abs(avant - apres) > 0.0001) diffParams.push({ cle, avant, apres });
+        }
+        res.json({
+            parametres: diffParams,
+            tables: {
+                vinyles: { avant: vin[0].n, apres: data.tables.vinyles.length, items: data.tables.vinyles.map(x => x.nom) },
+                laminations: { avant: lam[0].n, apres: data.tables.laminations.length, items: data.tables.laminations.map(x => x.nom) },
+                tapes: { avant: tap[0].n, apres: data.tables.tapes.length, items: data.tables.tapes.map(x => x.nom) },
+                materiaux: { avant: mat[0].n, apres: data.tables.materiaux.length, items: data.tables.materiaux.map(x => x.nom) }
+            }
+        });
+    } catch (err) {
+        if (err.message === 'ACCES' || /^HTTP (401|403|404)/.test(err.message)) return res.status(502).json({ error: 'Accès refusé au Google Sheets — vérifier le partage : « Toute personne disposant du lien : Lecteur ».' });
+        res.status(500).json({ error: 'Synchronisation impossible : ' + err.message });
+    }
+});
+
+app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
+    try {
+        const data = await fetchSheetsData();
+        const conn = await pool.getConnection();
+        for (const [cle, valeur] of Object.entries(data.parametres)) {
+            await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valeur = ?', [req.userId, cle, valeur, valeur]);
+        }
+        if (data.tables.vinyles.length) {
+            await conn.query('DELETE FROM vinyles WHERE user_id = ?', [req.userId]);
+            for (const v of data.tables.vinyles) await conn.query('INSERT INTO vinyles (user_id, name, price, type, laizes) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'sheets', v.laizes]);
+        }
+        if (data.tables.laminations.length) {
+            await conn.query('DELETE FROM laminations WHERE user_id = ?', [req.userId]);
+            for (const v of data.tables.laminations) await conn.query('INSERT INTO laminations (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
+        }
+        if (data.tables.tapes.length) {
+            await conn.query('DELETE FROM tapes WHERE user_id = ?', [req.userId]);
+            for (const v of data.tables.tapes) await conn.query('INSERT INTO tapes (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
+        }
+        if (data.tables.materiaux.length) {
+            await conn.query('DELETE FROM materiaux WHERE user_id = ?', [req.userId]);
+            for (const v of data.tables.materiaux) await conn.query('INSERT INTO materiaux (user_id, support, price, categorie, format_plaque) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'panneau', v.laizes]);
+        }
+        await conn.release();
+        res.json({ message: 'Synchronisation appliquée', parametres: Object.keys(data.parametres).length, vinyles: data.tables.vinyles.length, laminations: data.tables.laminations.length, tapes: data.tables.tapes.length, materiaux: data.tables.materiaux.length });
+    } catch (err) {
+        if (err.message === 'ACCES' || /^HTTP (401|403|404)/.test(err.message)) return res.status(502).json({ error: 'Accès refusé au Google Sheets — vérifier le partage : « Toute personne disposant du lien : Lecteur ».' });
+        res.status(500).json({ error: 'Synchronisation impossible : ' + err.message });
+    }
+});
+
 app.post('/api/devis', verifyToken, async (req, res) => {
     try { const { type, qty, ht, ttc, details } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details)]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
