@@ -21,6 +21,25 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// V6 — creation idempotente des tables/colonnes du moteur unifie.
+// Chaque requete est independante : un echec n'empeche pas les suivantes, et la fonction
+// est rappelee par les endpoints concernes, donc les tables finissent toujours par exister.
+async function ensureV6Tables(existingConn) {
+    const conn = existingConn || await pool.getConnection();
+    const queries = [
+        `CREATE TABLE IF NOT EXISTS laminations (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
+        `CREATE TABLE IF NOT EXISTS tapes (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
+        `ALTER TABLE vinyles ADD COLUMN laizes VARCHAR(100)`,
+        `ALTER TABLE materiaux ADD COLUMN format_plaque VARCHAR(50)`,
+        `ALTER TABLE poseurs ADD COLUMN type_prix VARCHAR(10) DEFAULT 'vente'`
+    ];
+    for (const q of queries) {
+        try { await conn.query(q); }
+        catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V6 init:', e.message); }
+    }
+    if (!existingConn) await conn.release();
+}
+
 async function initDB() {
     try {
         const conn = await pool.getConnection();
@@ -35,11 +54,7 @@ async function initDB() {
         await conn.query(`CREATE TABLE IF NOT EXISTS forfaits (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
 
         // V6 — Moteur unifie : laminations, tapes, colonnes additionnelles
-        await conn.query(`CREATE TABLE IF NOT EXISTS laminations (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
-        await conn.query(`CREATE TABLE IF NOT EXISTS tapes (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
-        try { await conn.query(`ALTER TABLE vinyles ADD COLUMN laizes VARCHAR(100)`); } catch (e) {}
-        try { await conn.query(`ALTER TABLE materiaux ADD COLUMN format_plaque VARCHAR(50)`); } catch (e) {}
-        try { await conn.query(`ALTER TABLE poseurs ADD COLUMN type_prix VARCHAR(10) DEFAULT 'vente'`); } catch (e) {}
+        await ensureV6Tables(conn);
         
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -265,10 +280,10 @@ app.delete('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
 // DEVIS
 // ===== V6 — LAMINATIONS & TAPES =====
 app.get('/api/tarifs/laminations', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM laminations WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV6Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM laminations WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/tarifs/tapes', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM tapes WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV6Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM tapes WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ===== V6 — SYNCHRONISATION GOOGLE SHEETS =====
@@ -364,6 +379,7 @@ async function fetchSheetsData() {
 
 app.get('/api/sync-sheets/preview', verifyToken, async (req, res) => {
     try {
+        await ensureV6Tables();
         const data = await fetchSheetsData();
         const conn = await pool.getConnection();
         const [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
@@ -396,6 +412,7 @@ app.get('/api/sync-sheets/preview', verifyToken, async (req, res) => {
 
 app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
     try {
+        await ensureV6Tables();
         const data = await fetchSheetsData();
         const conn = await pool.getConnection();
         for (const [cle, valeur] of Object.entries(data.parametres)) {
