@@ -3,9 +3,15 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const mysql = require('mysql2/promise');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 const app = express();
+
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+    console.error('⚠️  JWT_SECRET manquant : secret temporaire généré pour ce démarrage (les sessions existantes seront invalidées à chaque redémarrage). Définir JWT_SECRET dans les variables d\'environnement.');
+    return require('crypto').randomBytes(32).toString('hex');
+})();
 
 app.use(cors());
 app.use(express.json());
@@ -40,6 +46,14 @@ async function ensureV6Tables(existingConn) {
     if (!existingConn) await conn.release();
 }
 
+// V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
+async function ensureV7Tables(existingConn) {
+    const conn = existingConn || await pool.getConnection();
+    try { await conn.query(`CREATE TABLE IF NOT EXISTS kits_signaletique (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`); }
+    catch (e) { console.error('V7 init:', e.message); }
+    if (!existingConn) await conn.release();
+}
+
 async function initDB() {
     try {
         const conn = await pool.getConnection();
@@ -55,7 +69,9 @@ async function initDB() {
 
         // V6 — Moteur unifie : laminations, tapes, colonnes additionnelles
         await ensureV6Tables(conn);
-        
+        // V7 — Kits signaletique a prix fixe
+        await ensureV7Tables(conn);
+
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
             const bcrypt = require('bcrypt');
@@ -98,6 +114,10 @@ async function initDB() {
             // V5 — Forfaits vehicule (depuis historique)
             await conn.query('INSERT INTO forfaits (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Petit semi-covering', 1092.00]);
             await conn.query('INSERT INTO forfaits (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Partner Long M (complet)', 3670.00]);
+
+            // V7 — Kits roll-up (prix de vente placeholder — a ajuster dans l'admin)
+            await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Roll-up 85×200 standard', 89.00]);
+            await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Roll-up 85×200 premium (housse rigide)', 129.00]);
         }
         await conn.release();
     } catch (err) {
@@ -110,7 +130,7 @@ const verifyToken = (req, res, next) => {
     if (!token) return res.status(401).json({ error: 'Token manquant' });
     const jwt = require('jsonwebtoken');
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+        const decoded = jwt.verify(token, JWT_SECRET);
         req.userId = decoded.id;
         req.userRole = decoded.role;
         next();
@@ -120,7 +140,14 @@ const verifyToken = (req, res, next) => {
 };
 
 // AUTH
-app.post('/api/auth/register', async (req, res) => {
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Trop de tentatives, réessayez dans 15 minutes' }
+});
+app.post('/api/auth/register', authLimiter, async (req, res) => {
     try {
         const { email, password, nom } = req.body;
         const bcrypt = require('bcrypt');
@@ -134,7 +161,7 @@ app.post('/api/auth/register', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
         const bcrypt = require('bcrypt');
@@ -146,7 +173,7 @@ app.post('/api/auth/login', async (req, res) => {
         const user = rows[0];
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(401).json({ error: 'Identifiants invalides' });
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'secret123', { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
@@ -275,6 +302,20 @@ app.put('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
 });
 app.delete('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM forfaits WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// V7 — KITS ROLL-UP (signaletique) CRUD
+app.get('/api/tarifs/kits-signaletique', verifyToken, async (req, res) => {
+    try { await ensureV7Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM kits_signaletique WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/tarifs/kits-signaletique', verifyToken, async (req, res) => {
+    try { await ensureV7Tables(); const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [req.userId, nom, prix]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/tarifs/kits-signaletique/:id', verifyToken, async (req, res) => {
+    try { const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE kits_signaletique SET nom = ?, prix = ? WHERE id = ? AND user_id = ?', [nom, prix, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tarifs/kits-signaletique/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM kits_signaletique WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // DEVIS
@@ -506,7 +547,13 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
 app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        if (String(req.params.id) === String(req.userId)) return res.status(400).json({ error: 'Impossible de supprimer son propre compte' });
         const conn = await pool.getConnection();
+        const [target] = await conn.query('SELECT role FROM users WHERE id = ?', [req.params.id]);
+        if (target.length && target[0].role === 'admin') {
+            const [[{ count }]] = await conn.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+            if (count <= 1) { await conn.release(); return res.status(400).json({ error: 'Impossible de supprimer le dernier compte admin' }); }
+        }
         await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
         await conn.release();
         res.json({ message: 'OK' });

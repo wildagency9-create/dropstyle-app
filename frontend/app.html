@@ -490,30 +490,61 @@
                     <div class="form-group"><label>Largeur (cm)</label><input type="number" id="s-larg" value="100" min="10"></div>
                     <div class="form-group"><label>Hauteur (cm)</label><input type="number" id="s-haut" value="100" min="10"></div>
                 </div>
-                <div class="form-group"><label>Matériau</label>
-                    <div class="dropdown" id="dd-s-materiau">
-                        <button class="dropdown-btn" onclick="toggleDropdown('dd-s-materiau')"><span class="dropdown-label">— Chargement... —</span></button>
-                        <div class="dropdown-list" id="list-s-materiau"></div>
+
+                <!-- Panneau alu / Bâche PVC : support rigide/souple achete au m2 -->
+                <div class="conditional" id="s-materiau-cond">
+                    <div class="form-group"><label>Matériau</label>
+                        <div class="dropdown" id="dd-s-materiau">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-materiau')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-s-materiau"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="row2">
+
+                <!-- Vitrophanie / Adhesif mural / Lettrage decoupe : pose directe, pas de support -->
+                <div class="conditional" id="s-vinyle-direct-cond">
+                    <div class="form-group"><label>Vinyle</label>
+                        <div class="dropdown" id="dd-s-vinyle-direct">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-vinyle-direct')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-s-vinyle-direct"></div>
+                        </div>
+                    </div>
+                    <div class="checkbox-row"><input type="checkbox" id="s-direct-imprime-check" checked><label for="s-direct-imprime-check">Vinyle imprimé (ajoute le coût d'impression)</label></div>
+                </div>
+
+                <!-- Roll-up / Totem : kit a prix fixe, pas de support ni de dimensions -->
+                <div class="conditional" id="s-kit-cond">
+                    <div class="form-group"><label>Kit roll-up</label>
+                        <div class="dropdown" id="dd-s-kit">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-kit')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-s-kit"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="conditional" id="s-lam-cond">
                     <div class="form-group"><label>Lamination</label>
                         <div class="dropdown" id="dd-s-lam">
                             <button class="dropdown-btn" onclick="toggleDropdown('dd-s-lam')"><span class="dropdown-label">Sans</span></button>
                             <div class="dropdown-list" id="list-s-lam"><div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div></div>
                         </div>
                     </div>
-                    <div class="form-group"><label>Quantité</label><input type="number" id="s-qty" value="1" min="1"></div>
                 </div>
-                <div class="checkbox-row"><input type="checkbox" id="s-visuel-check" onchange="toggleVisuel()"><label for="s-visuel-check">Visuel imprimé contrecollé</label></div>
-                <div class="conditional" id="s-visuel-cond">
-                    <div class="form-group"><label>Vinyle du visuel</label>
-                        <div class="dropdown" id="dd-s-vinyle">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
-                            <div class="dropdown-list" id="list-s-vinyle"></div>
+                <div class="form-group"><label>Quantité</label><input type="number" id="s-qty" value="1" min="1"></div>
+
+                <!-- Visuel imprime contrecolle : panneau/bache/rollup (les 3 autres ont deja leur propre case "vinyle imprimé") -->
+                <div class="conditional" id="s-visueloverlay-cond">
+                    <div class="checkbox-row"><input type="checkbox" id="s-visuel-check" onchange="toggleVisuel()"><label for="s-visuel-check">Visuel imprimé contrecollé</label></div>
+                    <div class="conditional" id="s-visuel-cond">
+                        <div class="form-group"><label>Vinyle du visuel</label>
+                            <div class="dropdown" id="dd-s-vinyle">
+                                <button class="dropdown-btn" onclick="toggleDropdown('dd-s-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
+                                <div class="dropdown-list" id="list-s-vinyle"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
                 <div class="form-group"><label>Pose sur site (nb de points, 0 = sans pose)</label><input type="number" id="s-pose-points" value="0" min="0" step="1"></div>
                 <div class="form-group"><label>Délai</label>
                     <div class="dropdown" id="dd-s-delai">
@@ -687,7 +718,7 @@ let user = null, token = null;
 let allImpressions = [];
 // V6 — moteur unifie : parametres + tarifs charges au demarrage
 let PARAMS = {};
-let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [];
+let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [], allKits = [];
 
 async function apiFetch(path) {
     const r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -759,6 +790,7 @@ function selectDropdownItem(item) {
     
     if (dd.id === 'dd-i-type') loadImpressionFilters();
     if (dd.id === 'dd-st-vinyle') rebuildLaizes();
+    if (dd.id === 'dd-s-type') updateSignaletiqueFields(item.dataset.value);
     if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
     if (dd.id === 'dd-v-pao-mode') document.getElementById('v-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
     if (dd.id === 'dd-st-ech-mode') {
@@ -774,14 +806,14 @@ function getDropdownValue(id) {
 
 async function loadTarifs() {
     try {
-        const [vinyles, materiaux, poseurs, impressions, parametres, laminations, tapes, forfaits] = await Promise.all([
+        const [vinyles, materiaux, poseurs, impressions, parametres, laminations, tapes, forfaits, kits] = await Promise.all([
             apiFetch('/tarifs/vinyles'), apiFetch('/tarifs/materiaux'), apiFetch('/tarifs/poseurs'), apiFetch('/tarifs/impressions'),
-            apiFetch('/parametres'), apiFetch('/tarifs/laminations'), apiFetch('/tarifs/tapes'), apiFetch('/tarifs/forfaits')
+            apiFetch('/parametres'), apiFetch('/tarifs/laminations'), apiFetch('/tarifs/tapes'), apiFetch('/tarifs/forfaits'), apiFetch('/tarifs/kits-signaletique')
         ]);
 
         allImpressions = impressions;
         PARAMS = parametres || {};
-        allVinyles = vinyles; allMateriaux = materiaux; allLaminations = laminations; allTapes = tapes; allPoseurs = poseurs; allForfaits = forfaits;
+        allVinyles = vinyles; allMateriaux = materiaux; allLaminations = laminations; allTapes = tapes; allPoseurs = poseurs; allForfaits = forfaits; allKits = kits;
 
         const emptyItem = (txt) => `<div class="dropdown-item" data-value="" onclick="selectDropdownItem(this)">${txt}</div>`;
         const vinyleHTML = vinyles.length ? vinyles.map(v =>
@@ -791,6 +823,11 @@ async function loadTarifs() {
         document.getElementById('list-v-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-st-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-s-vinyle').innerHTML = vinyleHTML;
+        document.getElementById('list-s-vinyle-direct').innerHTML = vinyleHTML;
+
+        document.getElementById('list-s-kit').innerHTML = allKits.length ? allKits.map(k =>
+            `<div class="dropdown-item" data-value="${k.id}" onclick="selectDropdownItem(this)">${k.nom} (${parseFloat(k.prix).toFixed(2)}€)</div>`).join('')
+            : emptyItem('Aucun kit — à ajouter dans l\'admin');
 
         document.getElementById('list-s-materiau').innerHTML = materiaux.length ? materiaux.map(m =>
             `<div class="dropdown-item" data-value="${m.id}" onclick="selectDropdownItem(this)">${m.support} (${parseFloat(m.price).toFixed(2)}€/m² achat)</div>`).join('')
@@ -869,6 +906,7 @@ function renderTarifs() {
     html += section('Tapes de transfert (€/m² achat)', allTapes.map(t => row(`${t.nom}${t.laizes ? ` <span style="color:var(--text-light);">· ${t.laizes}mm</span>` : ''}`, eur(t.prix) + '/m²')).join(''));
     html += section('Panneaux (€/m² achat)', allMateriaux.map(m => row(`${m.support}${m.format_plaque ? ` <span style="color:var(--text-light);">· plaque ${m.format_plaque}</span>` : ''}`, eur(m.price) + '/m²')).join(''));
     html += section('Forfaits véhicule (prix de vente)', allForfaits.map(f => row(f.nom, eur(f.prix))).join(''));
+    html += section('Kits roll-up (prix de vente)', allKits.map(k => row(k.nom, eur(k.prix))).join(''));
     html += section('Poseurs', allPoseurs.map(pp => row(`${pp.nom}${pp.type_prix === 'cout' ? ' <span style="color:var(--text-light);">· coût × P24</span>' : ' <span style="color:var(--text-light);">· vente directe</span>'}`, `${eur(pp.jour)}/j · ${eur(pp.demijour)}/½j`)).join(''));
 
     const P = [
@@ -895,6 +933,24 @@ function renderTarifs() {
 
 function toggleVisuel() {
     document.getElementById('s-visuel-cond').classList.toggle('active', document.getElementById('s-visuel-check').checked);
+}
+
+// Le "Type de support" determine reellement les champs affiches : un panneau a besoin
+// d'un materiau, un roll-up d'un kit a prix fixe, et vitrophanie/adhesif/lettrage n'ont
+// ni l'un ni l'autre puisqu'ils se posent directement sur une surface existante.
+function updateSignaletiqueFields(type) {
+    const isPanneau = type === 'panneau' || type === 'bache';
+    const isDirect = type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage';
+    const isRollup = type === 'rollup';
+    document.getElementById('s-materiau-cond').classList.toggle('active', isPanneau);
+    document.getElementById('s-vinyle-direct-cond').classList.toggle('active', isDirect);
+    document.getElementById('s-kit-cond').classList.toggle('active', isRollup);
+    document.getElementById('s-lam-cond').classList.toggle('active', !isRollup);
+    document.getElementById('s-visueloverlay-cond').classList.toggle('active', isPanneau || isRollup);
+    if (!(isPanneau || isRollup)) {
+        document.getElementById('s-visuel-check').checked = false;
+        toggleVisuel();
+    }
 }
 
 // ============ STICKERS - OPTIMISATION ============
@@ -1109,19 +1165,99 @@ async function calcVehicule() {
     showResult(`Véhicule × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty);
 }
 
+const SIGNALETIQUE_LABELS = { panneau: 'Panneau alu', bache: 'Bâche PVC', vitrophanie: 'Vitrophanie', adhesif: 'Adhésif mural', lettrage: 'Lettrage découpé', rollup: 'Roll-up / Totem' };
+
 async function calcSignaletique() {
     const type = getDropdownValue('dd-s-type');
+    const delai = getDropdownValue('dd-s-delai') || 'normal';
+    const posePoints = parseInt(document.getElementById('s-pose-points').value) || 0;
+    const poseHT = posePoints * num('pose_site_point', 300);
+    const poseRow = poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€` } : null;
+
+    if (!type) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un type de support</p></div>';
+        return;
+    }
+
+    // ===== ROLL-UP / TOTEM : kit a prix fixe (vente directe) + visuel imprime optionnel =====
+    if (type === 'rollup') {
+        const kit = allKits.find(k => k.id == getDropdownValue('dd-s-kit'));
+        if (!kit) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un kit roll-up</p></div>';
+            return;
+        }
+        const qty = parseInt(document.getElementById('s-qty').value) || 1;
+        const visuelCheck = document.getElementById('s-visuel-check').checked;
+        const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
+        if (visuelCheck && !visuelVinyle) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+            return;
+        }
+
+        const kitVenteHT = parseFloat(kit.prix) * qty;
+        let coutMatiere = 0, m2 = 0, conso = 0, visuelM2 = 0;
+        if (visuelCheck) {
+            const larg = parseFloat(document.getElementById('s-larg').value) || 100;
+            const haut = parseFloat(document.getElementById('s-haut').value) || 100;
+            m2 = (larg * haut) / 10000 * qty;
+            conso = m2 * num('chute_signaletique', 1.1);
+            visuelM2 = parseFloat(visuelVinyle.price) + num('impression_m2', 12);
+            coutMatiere = conso * visuelM2;
+        }
+
+        const t = computeTotal(coutMatiere, kitVenteHT + poseHT, delai);
+
+        const rows = [
+            { label: `Kit « ${kit.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${kitVenteHT.toFixed(2)}€` },
+            visuelCheck ? { label: `Visuel imprimé (${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m² × ${visuelM2.toFixed(2)}€/m²)`, val: `${coutMatiere.toFixed(2)}€` } : null,
+            visuelCheck ? { label: `Vente visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` } : null,
+            poseRow,
+            ...moteurRows(t, delai)
+        ].filter(Boolean);
+
+        showResult(`${SIGNALETIQUE_LABELS[type]} × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+        return;
+    }
+
     const larg = parseFloat(document.getElementById('s-larg').value) || 100;
     const haut = parseFloat(document.getElementById('s-haut').value) || 100;
     const qty = parseInt(document.getElementById('s-qty').value) || 1;
-    const mat = allMateriaux.find(m => m.id == getDropdownValue('dd-s-materiau'));
     const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-s-lam'));
+
+    // ===== VITROPHANIE / ADHESIF MURAL / LETTRAGE DECOUPE : pose directe, pas de support =====
+    if (type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage') {
+        const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle-direct'));
+        if (!vinyle) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
+            return;
+        }
+        const imprime = document.getElementById('s-direct-imprime-check').checked;
+
+        const m2 = (larg * haut) / 10000 * qty;
+        const conso = m2 * num('chute_signaletique', 1.1);
+        const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0);
+        const coutMatiere = conso * coutM2;
+
+        const t = computeTotal(coutMatiere, poseHT, delai);
+
+        const rows = [
+            { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '' },
+            { label: `Coût matière (${coutM2.toFixed(2)}€/m² : ${vinyle.name}${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
+            { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+            poseRow,
+            ...moteurRows(t, delai)
+        ].filter(Boolean);
+
+        showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+        return;
+    }
+
+    // ===== PANNEAU ALU / BACHE PVC : support achete au m2 + visuel imprime contrecolle optionnel =====
+    const mat = allMateriaux.find(m => m.id == getDropdownValue('dd-s-materiau'));
     const visuelCheck = document.getElementById('s-visuel-check').checked;
     const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
-    const posePoints = parseInt(document.getElementById('s-pose-points').value) || 0;
-    const delai = getDropdownValue('dd-s-delai') || 'normal';
 
-    if (!type || !mat) {
+    if (!mat) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
         return;
     }
@@ -1130,7 +1266,6 @@ async function calcSignaletique() {
         return;
     }
 
-    // Part matiere (× coefficient) : support + visuel imprime eventuel
     const m2 = (larg * haut) / 10000 * qty;
     const conso = m2 * num('chute_signaletique', 1.1);
     const visuelM2 = visuelVinyle ? parseFloat(visuelVinyle.price) + num('impression_m2', 12) : 0;
@@ -1138,20 +1273,17 @@ async function calcSignaletique() {
     const coutM2 = parseFloat(mat.price) + visuelM2 + lamM2;
     const coutMatiere = conso * coutM2;
 
-    // Pose sur site (vente directe au point)
-    const poseHT = posePoints * num('pose_site_point', 300);
-
     const t = computeTotal(coutMatiere, poseHT, delai);
 
     const rows = [
         { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '' },
         { label: `Coût matière (${coutM2.toFixed(2)}€/m² : ${mat.support}${visuelVinyle ? ' + visuel imprimé' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
         { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
-        poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€` } : null,
+        poseRow,
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
-    showResult(`Signalétique ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+    showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
 }
 
 function calcImpression() {

@@ -300,6 +300,12 @@
             <tbody id="forfaits-list"></tbody>
         </table></div>
 
+        <div class="section-header" style="margin-top:24px;"><div class="section-title">Kits roll-up / totem</div><button onclick="openModal('modal-kit')">+ Ajouter</button></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Nom</th><th>Prix (€)</th><th>Action</th></tr></thead>
+            <tbody id="kits-list"></tbody>
+        </table></div>
+
         <div class="section-header" style="margin-top:28px;"><div class="section-title">Test du moteur (live)</div></div>
         <div class="table-wrap" style="padding:20px;">
             <div class="row2">
@@ -501,9 +507,29 @@
     </div>
 </div>
 
+<!-- MODAL KIT ROLL-UP (V7) -->
+<div class="modal" id="modal-kit">
+    <div class="modal-content">
+        <div class="modal-header" id="kit-title">Ajouter un kit roll-up</div>
+        <form onsubmit="saveKit(event)">
+            <input type="hidden" id="kit-id">
+            <div class="form-group"><label>Nom du kit</label><input type="text" id="kit-nom" required placeholder="Roll-up 85×200 standard"></div>
+            <div class="form-group"><label>Prix de vente (€)</label><input type="number" id="kit-prix" required step="0.01" placeholder="89.00"></div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-kit')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 const API_URL = window.location.origin + '/api';
 let token = null, user = null, coef = 2;
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
@@ -514,7 +540,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function loadAll() {
     await loadParametres();
-    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadLaminations()]);
+    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadKits(), loadLaminations()]);
     await populateTestSelects();
     testMoteur();
 }
@@ -535,8 +561,8 @@ async function loadUsers() {
         return;
     }
     document.getElementById('users-list').innerHTML = users.map(u => `
-        <tr><td>${u.email}</td><td>${u.nom}</td>
-        <td><span class="badge ${u.role}">${u.role}</span></td>
+        <tr><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.nom)}</td>
+        <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
         <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
         <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td></tr>`).join('');
 }
@@ -632,6 +658,12 @@ function openModal(id) {
         document.getElementById('forfait-nom').value = '';
         document.getElementById('forfait-prix').value = '';
         document.getElementById('forfait-title').textContent = 'Ajouter un forfait';
+    }
+    if (id === 'modal-kit') {
+        document.getElementById('kit-id').value = '';
+        document.getElementById('kit-nom').value = '';
+        document.getElementById('kit-prix').value = '';
+        document.getElementById('kit-title').textContent = 'Ajouter un kit roll-up';
     }
     document.getElementById(id).classList.add('active');
 }
@@ -920,6 +952,42 @@ async function deleteForfait(id) {
     if (!confirm('Supprimer ?')) return;
     await fetch(`${API_URL}/tarifs/forfaits/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
     showMessage('Supprimé', 'success'); await loadForfaits(); await populateTestSelects(); testMoteur();
+}
+
+async function loadKits() {
+    const items = await fetch(`${API_URL}/tarifs/kits-signaletique`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+    if (!items.length) { document.getElementById('kits-list').innerHTML = '<tr><td colspan="3" class="empty-state">Aucun kit</td></tr>'; return; }
+    document.getElementById('kits-list').innerHTML = items.map(k => `
+        <tr><td>${escapeHtml(k.nom)}</td><td>${parseFloat(k.prix).toFixed(2)} €</td>
+        <td><button class="small" onclick='editKit(${JSON.stringify(k)})'>Modif</button>
+        <button class="danger small" onclick="deleteKit(${k.id})">Suppr</button></td></tr>`).join('');
+}
+
+async function saveKit(event) {
+    event.preventDefault();
+    const id = document.getElementById('kit-id').value;
+    const data = { nom: document.getElementById('kit-nom').value, prix: parseFloat(document.getElementById('kit-prix').value) };
+    const url = id ? `${API_URL}/tarifs/kits-signaletique/${id}` : `${API_URL}/tarifs/kits-signaletique`;
+    const resp = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) { showMessage(id ? 'Modifié' : 'Créé', 'success'); closeModal('modal-kit'); await loadKits(); await populateTestSelects(); }
+}
+
+function editKit(k) {
+    document.getElementById('kit-id').value = k.id;
+    document.getElementById('kit-nom').value = k.nom;
+    document.getElementById('kit-prix').value = k.prix;
+    document.getElementById('kit-title').textContent = 'Modifier le kit';
+    document.getElementById('modal-kit').classList.add('active');
+}
+
+async function deleteKit(id) {
+    if (!confirm('Supprimer ?')) return;
+    await fetch(`${API_URL}/tarifs/kits-signaletique/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    showMessage('Supprimé', 'success'); await loadKits(); await populateTestSelects();
 }
 
 async function populateTestSelects() {
