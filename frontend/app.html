@@ -542,6 +542,21 @@
                     </div>
                 </div>
 
+                <div class="checkbox-row"><input type="checkbox" id="s-pao-check" onchange="toggleSPAO()"><label for="s-pao-check">PAO / Design</label></div>
+                <div class="conditional" id="s-pao-cond">
+                    <div class="row2">
+                        <div class="form-group"><label>Mode PAO</label>
+                            <div class="dropdown" id="dd-s-pao-mode">
+                                <button class="dropdown-btn" onclick="toggleDropdown('dd-s-pao-mode')"><span class="dropdown-label">Forfait</span></button>
+                                <div class="dropdown-list">
+                                    <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait</div>
+                                    <div class="dropdown-item" data-value="horaire" onclick="selectDropdownItem(this)">À l'heure</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group" id="s-pao-h-group" style="display:none;"><label>Heures PAO</label><input type="number" id="s-pao-h" value="2" min="0.5" step="0.5"></div>
+                    </div>
+                </div>
                 <div class="form-group"><label>Pose sur site (nb de points, 0 = sans pose)</label><input type="number" id="s-pose-points" value="0" min="0" step="1"></div>
                 <div class="form-group"><label>Délai</label>
                     <div class="dropdown" id="dd-s-delai">
@@ -777,6 +792,7 @@ function selectDropdownItem(item) {
     if (dd.id === 'dd-s-type') updateSignaletiqueFields(item.dataset.value);
     if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
     if (dd.id === 'dd-v-pao-mode') document.getElementById('v-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
+    if (dd.id === 'dd-s-pao-mode') document.getElementById('s-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
         document.getElementById('st-ech-temps-group').style.display = mode === 'temps' ? 'block' : 'none';
@@ -874,6 +890,9 @@ function switchTab(tab, btn) {
 
 function togglePAO() {
     document.getElementById('v-pao-cond').classList.toggle('active', document.getElementById('v-pao-check').checked);
+}
+function toggleSPAO() {
+    document.getElementById('s-pao-cond').classList.toggle('active', document.getElementById('s-pao-check').checked);
 }
 function toggleEchenillage() {
     document.getElementById('v-echenillage-cond').classList.toggle('active', document.getElementById('v-echenillage-check').checked);
@@ -1229,6 +1248,17 @@ async function calcVehicule() {
 let sMatLineCounter = 0, sDirectLineCounter = 0, sRollupLineCounter = 0;
 let materiauOptionsHTML = '', kitOptionsHTML = '';
 
+// Recalcule la surface (m²) suggeree a partir des dimensions ; le champ reste modifiable
+// ensuite a la main (ex: chute reelle connue, forme non rectangulaire) — c'est cette valeur,
+// pas largeur x hauteur, qui est utilisee pour le calcul.
+function updateLineM2(el) {
+    const row = el.closest('.line-row');
+    const larg = parseFloat(row.querySelector('.s-line-larg').value) || 0;
+    const haut = parseFloat(row.querySelector('.s-line-haut').value) || 0;
+    const qty = parseInt(row.querySelector('.s-line-qty').value) || 1;
+    row.querySelector('.s-line-m2').value = ((larg * haut) / 1000000 * qty).toFixed(3);
+}
+
 function panneauLineHTML(idx) {
     return `
     <div class="line-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
@@ -1239,10 +1269,13 @@ function panneauLineHTML(idx) {
             </div>
         </div>
         <div class="row2">
-            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50"></div>
-            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50"></div>
+            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50" oninput="updateLineM2(this)"></div>
+            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50" oninput="updateLineM2(this)"></div>
         </div>
-        <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1"></div>
+        <div class="row2">
+            <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1" oninput="updateLineM2(this)"></div>
+            <div class="form-group"><label>Surface (m²)</label><input type="number" class="s-line-m2" value="1.000" min="0.01" step="0.01"></div>
+        </div>
         ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
     </div>`;
 }
@@ -1256,7 +1289,8 @@ function getPanneauLines() {
         matId: row.querySelector('.s-mat-line').dataset.value || '',
         larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
         haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
-        qty: parseInt(row.querySelector('.s-line-qty').value) || 1
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1,
+        m2: parseFloat(row.querySelector('.s-line-m2').value) || 0
     }));
 }
 
@@ -1264,10 +1298,13 @@ function directLineHTML(idx) {
     return `
     <div class="line-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
         <div class="row2">
-            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50"></div>
-            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50"></div>
+            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50" oninput="updateLineM2(this)"></div>
+            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50" oninput="updateLineM2(this)"></div>
         </div>
-        <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1"></div>
+        <div class="row2">
+            <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1" oninput="updateLineM2(this)"></div>
+            <div class="form-group"><label>Surface (m²)</label><input type="number" class="s-line-m2" value="1.000" min="0.01" step="0.01"></div>
+        </div>
         ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
     </div>`;
 }
@@ -1280,7 +1317,8 @@ function getDirectLines() {
     return [...document.querySelectorAll('#s-direct-lines .line-row')].map(row => ({
         larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
         haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
-        qty: parseInt(row.querySelector('.s-line-qty').value) || 1
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1,
+        m2: parseFloat(row.querySelector('.s-line-m2').value) || 0
     }));
 }
 
@@ -1322,6 +1360,11 @@ async function calcSignaletique() {
     const posePoints = parseInt(document.getElementById('s-pose-points').value) || 0;
     const poseHT = posePoints * num('pose_site_point', 300);
     const poseRow = poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€`, stage: 4 } : null;
+    const paoCheck = document.getElementById('s-pao-check').checked;
+    const paoMode = getDropdownValue('dd-s-pao-mode') || 'forfait';
+    const paoHours = parseFloat(document.getElementById('s-pao-h').value) || 0;
+    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 75)) : 0;
+    const paoRow = paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null;
 
     if (!type) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un type de support</p></div>';
@@ -1360,7 +1403,7 @@ async function calcSignaletique() {
         }
         const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
-        const t = computeTotal(coutMatiere, kitVenteHT + poseHT, delai);
+        const t = computeTotal(coutMatiere, kitVenteHT + poseHT + paoHT, delai);
         const venteSupport = coutMatiereSupport * t.coefficient;
         const venteImpression = coutMatiereImpression * t.coefficient;
 
@@ -1368,6 +1411,7 @@ async function calcSignaletique() {
             ...lignes.map(l => ({ label: `Kit « ${l.kit.nom} »${l.qty > 1 ? ` × ${l.qty}` : ''}`, val: `${(parseFloat(l.kit.prix) * l.qty).toFixed(2)}€`, stage: 1 })),
             visuelCheck ? { label: `Visuel : vinyle (${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m² × ${visuelSupportM2.toFixed(2)}€/m²)`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 } : null,
             visuelCheck ? { label: `Vente visuel support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
+            paoRow,
             visuelCheck ? { label: `Coût impression visuel (${visuelImpressionM2.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
             visuelCheck ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
@@ -1394,7 +1438,7 @@ async function calcSignaletique() {
         const imprime = document.getElementById('s-direct-imprime-check').checked;
 
         const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
-        const totalM2 = lignes.reduce((s, l) => s + (l.larg * l.haut) / 1000000 * l.qty, 0);
+        const totalM2 = lignes.reduce((s, l) => s + l.m2, 0);
         const conso = totalM2 * num('chute_signaletique', 1.1);
         const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
         const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
@@ -1402,7 +1446,7 @@ async function calcSignaletique() {
         const coutMatiereImpression = conso * coutM2Impression;
         const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
-        const t = computeTotal(coutMatiere, poseHT, delai);
+        const t = computeTotal(coutMatiere, poseHT + paoHT, delai);
         const venteSupport = coutMatiereSupport * t.coefficient;
         const venteImpression = coutMatiereImpression * t.coefficient;
 
@@ -1410,6 +1454,7 @@ async function calcSignaletique() {
             { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
             { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : ${vinyle.name}${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
             { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+            paoRow,
             imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
             imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
@@ -1438,7 +1483,7 @@ async function calcSignaletique() {
     let totalM2 = 0, totalConso = 0, coutMatiereSupport = 0, coutMatiereImpression = 0;
     const matStock = new Map(); // id materiau -> { mat, conso } — pour alerter le stock par materiau utilise
     lignes.forEach(l => {
-        const m2Ligne = (l.larg * l.haut) / 1000000 * l.qty;
+        const m2Ligne = l.m2;
         const consoLigne = m2Ligne * num('chute_signaletique', 1.1);
         totalM2 += m2Ligne; totalConso += consoLigne;
         coutMatiereSupport += consoLigne * (parseFloat(l.mat.price) + visuelSupportM2 + lamM2);
@@ -1450,7 +1495,7 @@ async function calcSignaletique() {
     const coutMatiere = coutMatiereSupport + coutMatiereImpression;
     const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
 
-    const t = computeTotal(coutMatiere, poseHT, delai);
+    const t = computeTotal(coutMatiere, poseHT + paoHT, delai);
     const venteSupport = coutMatiereSupport * t.coefficient;
     const venteImpression = coutMatiereImpression * t.coefficient;
 
@@ -1458,6 +1503,7 @@ async function calcSignaletique() {
         { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${totalConso.toFixed(2)}m²`, val: '', stage: 1 },
         { label: `Coût matière support${visuelVinyle ? ' (+ visuel)' : ''}${lamination ? ' (+ lamination)' : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+        paoRow,
         visuelVinyle ? { label: `Coût impression visuel (${coutM2Impression.toFixed(2)}€/m² × ${totalConso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
         visuelVinyle ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         poseRow,
