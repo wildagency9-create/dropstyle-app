@@ -46,6 +46,31 @@ async function ensureV6Tables(existingConn) {
     if (!existingConn) await conn.release();
 }
 
+// V8 — suivi de stock (m²) sur les tables matiere, independant du moteur de prix.
+// stock_m2 NULL = article non suivi. seuil_alerte NULL = utilise le seuil par defaut (parametres).
+async function ensureV8Tables(existingConn) {
+    const conn = existingConn || await pool.getConnection();
+    const queries = [
+        `ALTER TABLE vinyles ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE vinyles ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE vinyles ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+        `ALTER TABLE materiaux ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE materiaux ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE materiaux ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+        `ALTER TABLE laminations ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE laminations ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE laminations ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+        `ALTER TABLE tapes ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE tapes ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE tapes ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`
+    ];
+    for (const q of queries) {
+        try { await conn.query(q); }
+        catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V8 init:', e.message); }
+    }
+    if (!existingConn) await conn.release();
+}
+
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
     const conn = existingConn || await pool.getConnection();
@@ -71,6 +96,8 @@ async function initDB() {
         await ensureV6Tables(conn);
         // V7 — Kits signaletique a prix fixe
         await ensureV7Tables(conn);
+        // V8 — Suivi de stock
+        await ensureV8Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -260,7 +287,8 @@ const DEFAULT_PARAMS = {
     taux_horaire_atelier: 60.00, // P21 - echenillage, decoupe, finitions
     coef_impression: 2.00,       // P22 - marge sur prix Exaprint
     impression_m2: 12.00,        // P23 - cout encre + machine (valide 10-15 €)
-    coef_pose_st: 1.30           // P24 - majoration cout poseur sous-traitant
+    coef_pose_st: 1.30,          // P24 - majoration cout poseur sous-traitant
+    seuil_stock_defaut: 2.00     // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {
@@ -520,6 +548,96 @@ app.post('/api/devis', verifyToken, async (req, res) => {
 });
 app.get('/api/devis', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V8 — STOCK (module independant du moteur de prix) =====
+const STOCK_TABLES = {
+    vinyles: { table: 'vinyles', nameCol: 'name' },
+    materiaux: { table: 'materiaux', nameCol: 'support' },
+    laminations: { table: 'laminations', nameCol: 'nom' },
+    tapes: { table: 'tapes', nameCol: 'nom' }
+};
+
+function sendBrevoEmail(to, subject, text) {
+    return new Promise((resolve) => {
+        const apiKey = process.env.BREVO_API_KEY;
+        if (!apiKey) { console.log('BREVO_API_KEY non configurée — alerte stock non envoyée par email.'); return resolve(); }
+        const payload = JSON.stringify({
+            sender: { email: process.env.BREVO_FROM_EMAIL || 'contact@dropstyle.fr', name: 'DropStyle Stock' },
+            to: to.map(email => ({ email })),
+            subject,
+            textContent: text
+        });
+        const request = https.request('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: { 'api-key': apiKey, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+        }, (r) => {
+            let d = ''; r.on('data', c => d += c);
+            r.on('end', () => { if (r.statusCode >= 400) console.error('Brevo HTTP ' + r.statusCode + ': ' + d); resolve(); });
+        });
+        request.on('error', (e) => { console.error('Brevo:', e.message); resolve(); });
+        request.write(payload);
+        request.end();
+    });
+}
+
+async function sendStockAlertEmail(nom, stock, seuil) {
+    const conn = await pool.getConnection();
+    const [admins] = await conn.query("SELECT email FROM users WHERE role = 'admin'");
+    await conn.release();
+    if (!admins.length) return;
+    await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
+        `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`);
+}
+
+app.get('/api/stock', verifyToken, async (req, res) => {
+    try {
+        await ensureV8Tables();
+        const conn = await pool.getConnection();
+        const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
+        const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
+        const items = [];
+        for (const [type, cfg] of Object.entries(STOCK_TABLES)) {
+            const [rows] = await conn.query(`SELECT id, ${cfg.nameCol} AS nom, stock_m2, seuil_alerte FROM ${cfg.table} WHERE user_id = ?`, [req.userId]);
+            rows.forEach(r => {
+                const seuil = r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : seuilDefaut;
+                const stock = r.stock_m2 !== null ? parseFloat(r.stock_m2) : null;
+                items.push({ type, id: r.id, nom: r.nom, stock_m2: stock, seuil_alerte: r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : null, seuil_effectif: seuil, low: stock !== null && stock <= seuil });
+            });
+        }
+        await conn.release();
+        res.json(items);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/stock/:type/:id', verifyToken, async (req, res) => {
+    try {
+        const cfg = STOCK_TABLES[req.params.type];
+        if (!cfg) return res.status(400).json({ error: 'Type invalide' });
+        await ensureV8Tables();
+        const stockVal = req.body.stock_m2 === '' || req.body.stock_m2 === undefined ? null : parseFloat(req.body.stock_m2);
+        const seuilVal = req.body.seuil_alerte === '' || req.body.seuil_alerte === undefined ? null : parseFloat(req.body.seuil_alerte);
+        const conn = await pool.getConnection();
+        const [before] = await conn.query(`SELECT alerte_envoyee, ${cfg.nameCol} AS nom FROM ${cfg.table} WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+        if (!before.length) { await conn.release(); return res.status(404).json({ error: 'Introuvable' }); }
+        await conn.query(`UPDATE ${cfg.table} SET stock_m2 = ?, seuil_alerte = ? WHERE id = ? AND user_id = ?`, [stockVal, seuilVal, req.params.id, req.userId]);
+
+        const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
+        const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
+        const seuilEffectif = seuilVal !== null ? seuilVal : seuilDefaut;
+        const etaitBas = before[0].alerte_envoyee === 1;
+        const estBas = stockVal !== null && stockVal <= seuilEffectif;
+
+        if (estBas && !etaitBas) {
+            await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+            sendStockAlertEmail(before[0].nom, stockVal, seuilEffectif).catch(e => console.error('Email stock:', e.message));
+        } else if (!estBas && etaitBas) {
+            await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 0 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+        }
+
+        await conn.release();
+        res.json({ message: 'OK', low: estBas });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ADMIN

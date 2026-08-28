@@ -184,6 +184,7 @@
         <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
         <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
         <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenu Total</div><div class="stat-value" id="stat-revenue">0€</div></div>
+        <div class="stat-card" id="stat-stock-card"><div class="stat-icon">📦</div><div class="stat-label">Stock faible</div><div class="stat-value" id="stat-stock-low">0</div></div>
     </div>
 
     <div class="message" id="message"></div>
@@ -194,6 +195,7 @@
         <button class="tab-btn" onclick="switchTab('materiaux', this)">📋 Matériaux</button>
         <button class="tab-btn" onclick="switchTab('poseurs', this)">👷 Poseurs</button>
         <button class="tab-btn" onclick="switchTab('impressions', this)">🖨️ Impressions</button>
+        <button class="tab-btn" onclick="switchTab('stock', this)">📦 Stock</button>
         <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
     </div>
 
@@ -239,6 +241,21 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Type</th><th>Format</th><th>Grammage</th><th>Finition</th><th>Qté</th><th>Prix Exa (€)</th><th>Prix Client</th><th>Action</th></tr></thead>
             <tbody id="impressions-list"></tbody>
+        </table></div>
+    </div>
+
+    <!-- STOCK (V8) — module independant du moteur de prix -->
+    <div class="tab-content" id="tab-stock">
+        <div class="section-header"><div class="section-title">Inventaire matière</div></div>
+        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <div class="row2">
+                <div class="form-group"><label>Seuil d'alerte par défaut (m²)</label><input type="number" step="0.1" id="param-seuil_stock_defaut" onchange="saveParametres()"></div>
+            </div>
+            <p style="color:var(--text-secondary);font-size:12px;">Utilisé pour tout article dont le champ "Seuil" ci-dessous est laissé vide. Un email est envoyé aux comptes admin quand un article passe sous son seuil (une seule fois, jusqu'à réapprovisionnement au-dessus du seuil).</p>
+        </div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Type</th><th>Nom</th><th>Stock (m²)</th><th>Seuil (m²)</th><th>Statut</th></tr></thead>
+            <tbody id="stock-list"><tr><td colspan="5" class="empty-state">Chargement...</td></tr></tbody>
         </table></div>
     </div>
 
@@ -540,7 +557,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function loadAll() {
     await loadParametres();
-    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadKits(), loadLaminations()]);
+    await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadKits(), loadLaminations(), loadStock()]);
     await populateTestSelects();
     testMoteur();
 }
@@ -840,7 +857,7 @@ async function deleteImpression(id) {
 function mtNum(id) { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
 function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
 
-const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression'];
+const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut'];
 
 async function loadParametres() {
     try {
@@ -988,6 +1005,40 @@ async function deleteKit(id) {
     if (!confirm('Supprimer ?')) return;
     await fetch(`${API_URL}/tarifs/kits-signaletique/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
     showMessage('Supprimé', 'success'); await loadKits(); await populateTestSelects();
+}
+
+// ===== V8 — STOCK (module independant du moteur de prix) =====
+const STOCK_TYPE_LABELS = { vinyles: 'Vinyle', materiaux: 'Matériau', laminations: 'Lamination', tapes: 'Tape' };
+
+async function loadStock() {
+    try {
+        const items = await fetch(`${API_URL}/stock`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        if (!Array.isArray(items)) throw new Error('reponse invalide');
+        const lowCount = items.filter(i => i.low).length;
+        document.getElementById('stat-stock-low').textContent = lowCount;
+        document.getElementById('stat-stock-card').style.color = lowCount > 0 ? 'var(--danger)' : '';
+        if (!items.length) { document.getElementById('stock-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun article</td></tr>'; return; }
+        document.getElementById('stock-list').innerHTML = items.map(i => `
+            <tr style="${i.low ? 'background:rgba(220,53,69,0.08);' : ''}">
+                <td>${STOCK_TYPE_LABELS[i.type] || i.type}</td>
+                <td>${escapeHtml(i.nom)}</td>
+                <td><input type="number" step="0.1" value="${i.stock_m2 ?? ''}" placeholder="non suivi" style="width:100px;" id="stock-val-${i.type}-${i.id}" onchange="saveStockItem('${i.type}', ${i.id})"></td>
+                <td><input type="number" step="0.1" value="${i.seuil_alerte ?? ''}" placeholder="${i.seuil_effectif}" style="width:90px;" id="stock-seuil-${i.type}-${i.id}" onchange="saveStockItem('${i.type}', ${i.id})"></td>
+                <td>${i.stock_m2 === null ? '<span style="color:var(--text-light);">—</span>' : i.low ? '<span class="badge" style="background:var(--danger);color:#fff;">Faible</span>' : '<span class="badge user">OK</span>'}</td>
+            </tr>`).join('');
+    } catch (err) { console.error(err); }
+}
+
+async function saveStockItem(type, id) {
+    const stockEl = document.getElementById(`stock-val-${type}-${id}`);
+    const seuilEl = document.getElementById(`stock-seuil-${type}-${id}`);
+    const resp = await fetch(`${API_URL}/stock/${type}/${id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock_m2: stockEl.value, seuil_alerte: seuilEl.value })
+    });
+    if (resp.ok) { showMessage('Stock enregistré', 'success'); await loadStock(); }
+    else showMessage('Erreur', 'error');
 }
 
 async function populateTestSelects() {
