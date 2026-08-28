@@ -288,7 +288,8 @@ const DEFAULT_PARAMS = {
     coef_impression: 2.00,       // P22 - marge sur prix Exaprint
     impression_m2: 12.00,        // P23 - cout encre + machine (valide 10-15 €)
     coef_pose_st: 1.30,          // P24 - majoration cout poseur sous-traitant
-    seuil_stock_defaut: 2.00     // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
+    seuil_stock_defaut: 2.00,    // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
+    marge_plotteur_mm: 50        // marge technique du plotteur de decoupe (mm, de chaque cote) — plotteur laize 1600 remplace, 1500mm reellement utilisables
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {

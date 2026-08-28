@@ -221,6 +221,8 @@
             margin-top: 6px;
         }
         .breakdown-row .label { color: var(--text-secondary); }
+        .breakdown-stage { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--primary); letter-spacing: 0.5px; padding: 10px 0 4px; }
+        .breakdown-stage:first-child { padding-top: 0; }
 
         .optimization-box {
             background: rgba(76,175,80,0.1);
@@ -851,9 +853,10 @@ async function loadTarifs() {
 function rebuildLaizes() {
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
     const laizes = parseLaizes(vinyle && vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
+    const margePlotteur = num('marge_plotteur_mm', 50);
     document.getElementById('list-st-laize').innerHTML =
         '<div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>' +
-        laizes.map(l => `<div class="dropdown-item" data-value="${l}" onclick="selectDropdownItem(this)">Forcer ${l}mm</div>`).join('');
+        laizes.map(l => `<div class="dropdown-item" data-value="${l}" onclick="selectDropdownItem(this)">Forcer ${l}mm (${l - 2 * margePlotteur}mm utile)</div>`).join('');
     const dd = document.getElementById('dd-st-laize');
     dd.dataset.value = 'auto';
     dd.querySelector('.dropdown-label').textContent = 'Optimale (auto)';
@@ -954,10 +957,14 @@ function updateSignaletiqueFields(type) {
 }
 
 // ============ STICKERS - OPTIMISATION ============
-function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6) {
-    const stickersParRangee = Math.floor(laize / (stickerW + espace));
+function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6, margePlotteur = 0) {
+    // Marge technique du plotteur de decoupe (zone de prehension de chaque cote, non decoupable) :
+    // les stickers ne peuvent etre places que dans la largeur utile, mais la matiere consommee
+    // (et donc facturee) reste la laize complete — la marge est une perte matiere, pas une economie.
+    const laizeUtile = laize - 2 * margePlotteur;
+    const stickersParRangee = Math.floor(laizeUtile / (stickerW + espace));
     if (stickersParRangee === 0) return null;
-    
+
     const nbRangees = Math.ceil(qty / stickersParRangee);
     const longueurMm = nbRangees * (stickerH + espace);
     const surfaceM2 = (laize * longueurMm) / 1000000;
@@ -1000,8 +1007,9 @@ async function calcStickers() {
 
     // Optimisation sur les laizes reelles du vinyle
     const espace = num('espace_stickers', 6);
+    const margePlotteur = num('marge_plotteur_mm', 50);
     const laizes = parseLaizes(vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
-    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty, espace)).filter(r => r !== null);
+    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty, espace, margePlotteur)).filter(r => r !== null);
     if (results.length === 0) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sticker trop grand pour les laizes disponibles</p></div>';
         return;
@@ -1013,9 +1021,12 @@ async function calcStickers() {
     const coefForme = { rectangle: 1, carre: 1, rond: num('coef_forme_rond', 1.28), ovale: num('coef_forme_rond', 1.28), custom: num('coef_forme_custom', 1.18) }[forme] || 1;
     const surface = bestResult.surfaceM2Num * coefForme;
 
-    // Part matiere (× coefficient) : vinyle + impression + lamination
-    const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0);
-    const coutMatiere = surface * coutM2;
+    // Part matiere (× coefficient) : support (vinyle+lamination) et impression separes pour l'affichage par etape
+    const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
+    const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
+    const coutMatiereSupport = surface * coutM2Support;
+    const coutMatiereImpression = surface * coutM2Impression;
+    const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
     // Part main d'oeuvre (vente directe)
     const tauxAtelier = num('taux_horaire_atelier', 60);
@@ -1025,6 +1036,8 @@ async function calcStickers() {
     const ventes = echHT + decoupeHT;
 
     const t = computeTotal(coutMatiere, ventes, delai);
+    const venteSupport = coutMatiereSupport * t.coefficient;
+    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const compareHTML = results.map(r => {
         const isBest = r.laize === bestResult.laize;
@@ -1041,12 +1054,14 @@ async function calcStickers() {
     }).join('');
 
     const rows = [
-        { label: `Vinyle ${vinyle.name}`, val: `${surface.toFixed(3)} m²` },
-        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : vinyle${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
-        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
-        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: 'inclus' } : null,
-        echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€` } : null,
-        decoupeHT > 0 ? { label: `Découpe / calage (${decH}h × ${tauxAtelier}€/h)`, val: `${decoupeHT.toFixed(2)}€` } : null,
+        { label: `Vinyle ${vinyle.name}`, val: `${surface.toFixed(3)} m²`, stage: 1 },
+        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+        { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: 'inclus', stage: 1 } : null,
+        imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${surface.toFixed(3)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+        imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+        echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€`, stage: 3 } : null,
+        decoupeHT > 0 ? { label: `Découpe / calage (${decH}h × ${tauxAtelier}€/h)`, val: `${decoupeHT.toFixed(2)}€`, stage: 3 } : null,
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
@@ -1079,7 +1094,7 @@ async function calcStickers() {
             </div>
         </div>
         <div class="breakdown">
-            ${rows.map(r => `<div class="breakdown-row"><span class="label">${r.label}</span><span>${r.val}</span></div>`).join('')}
+            ${renderBreakdownRows(rows)}
             <div class="breakdown-row total"><span>TOTAL HT</span><span>${t.ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
         <button class="btn-block" onclick="saveDevis('stickers', ${qty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)})">Sauvegarder le devis</button>
@@ -1112,7 +1127,7 @@ async function calcVehicule() {
         }
         const t = computeTotal(0, parseFloat(forfait.prix) * qty, delai);
         const rows = [
-            { label: `Forfait « ${forfait.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${(parseFloat(forfait.prix) * qty).toFixed(2)}€` },
+            { label: `Forfait « ${forfait.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${(parseFloat(forfait.prix) * qty).toFixed(2)}€`, stage: 1 },
             ...moteurRows(t, delai)
         ];
         showResult(`Véhicule (forfait) × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty);
@@ -1136,13 +1151,16 @@ async function calcVehicule() {
     const echenillageCheck = document.getElementById('v-echenillage-check').checked;
     const echenillagePrice = echenillageCheck ? parseFloat(getDropdownValue('dd-v-echenillage')) || 0 : 0;
 
-    // Part matiere (× coefficient)
+    // Part matiere (× coefficient) — support (vinyle+lamination+tape) et impression separes pour l'affichage par etape
     const surface = surfaces[type][marquage];
     const conso = surface * num('chute_vehicule', 1.25);
     const tapePrix = tape ? (allTapes.length ? parseFloat(allTapes[0].prix) : 1.21) : 0;
-    const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0) + tapePrix;
+    const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0) + tapePrix;
+    const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
     const remise = qty >= 3 ? num('remise_qte3', 5) / 100 : qty >= 2 ? num('remise_qte2', 3) / 100 : 0;
-    const coutMatiere = conso * coutM2 * (1 - remise) * qty;
+    const coutMatiereSupport = conso * coutM2Support * (1 - remise) * qty;
+    const coutMatiereImpression = conso * coutM2Impression * (1 - remise) * qty;
+    const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
     // Part main d'oeuvre (vente directe, ou cout sous-traitant × P24)
     let poseHT = 0, poseLabel = '';
@@ -1156,15 +1174,19 @@ async function calcVehicule() {
     const ventes = poseHT + paoHT + echenillagePrice;
 
     const t = computeTotal(coutMatiere, ventes, delai);
+    const venteSupport = coutMatiereSupport * t.coefficient;
+    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const rows = [
-        { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '' },
-        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : vinyle${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiere.toFixed(2)}€` },
-        remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%` } : null,
-        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
-        poseHT > 0 ? { label: poseLabel, val: `${poseHT.toFixed(2)}€` } : null,
-        paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€` } : null,
-        echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)}€` } : null,
+        { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
+        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ' + lamination' : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+        remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%`, stage: 1 } : null,
+        { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+        paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null,
+        imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²${qty > 1 ? ` × ${qty} véh.` : ''})`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+        imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+        echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)}€`, stage: 3 } : null,
+        poseHT > 0 ? { label: poseLabel, val: `${poseHT.toFixed(2)}€`, stage: 4 } : null,
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
@@ -1185,7 +1207,7 @@ async function calcSignaletique() {
     const delai = getDropdownValue('dd-s-delai') || 'normal';
     const posePoints = parseInt(document.getElementById('s-pose-points').value) || 0;
     const poseHT = posePoints * num('pose_site_point', 300);
-    const poseRow = poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€` } : null;
+    const poseRow = poseHT > 0 ? { label: `Pose sur site (${posePoints} point${posePoints > 1 ? 's' : ''} × ${num('pose_site_point', 300)}€)`, val: `${poseHT.toFixed(2)}€`, stage: 4 } : null;
 
     if (!type) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un type de support</p></div>';
@@ -1208,22 +1230,29 @@ async function calcSignaletique() {
         }
 
         const kitVenteHT = parseFloat(kit.prix) * qty;
-        let coutMatiere = 0, m2 = 0, conso = 0, visuelM2 = 0;
+        let coutMatiereSupport = 0, coutMatiereImpression = 0, m2 = 0, conso = 0, visuelSupportM2 = 0, visuelImpressionM2 = 0;
         if (visuelCheck) {
             const larg = parseFloat(document.getElementById('s-larg').value) || 100;
             const haut = parseFloat(document.getElementById('s-haut').value) || 100;
             m2 = (larg * haut) / 10000 * qty;
             conso = m2 * num('chute_signaletique', 1.1);
-            visuelM2 = parseFloat(visuelVinyle.price) + num('impression_m2', 12);
-            coutMatiere = conso * visuelM2;
+            visuelSupportM2 = parseFloat(visuelVinyle.price);
+            visuelImpressionM2 = num('impression_m2', 12);
+            coutMatiereSupport = conso * visuelSupportM2;
+            coutMatiereImpression = conso * visuelImpressionM2;
         }
+        const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
         const t = computeTotal(coutMatiere, kitVenteHT + poseHT, delai);
+        const venteSupport = coutMatiereSupport * t.coefficient;
+        const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
-            { label: `Kit « ${kit.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${kitVenteHT.toFixed(2)}€` },
-            visuelCheck ? { label: `Visuel imprimé (${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m² × ${visuelM2.toFixed(2)}€/m²)`, val: `${coutMatiere.toFixed(2)}€` } : null,
-            visuelCheck ? { label: `Vente visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` } : null,
+            { label: `Kit « ${kit.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${kitVenteHT.toFixed(2)}€`, stage: 1 },
+            visuelCheck ? { label: `Visuel : vinyle (${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m² × ${visuelSupportM2.toFixed(2)}€/m²)`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 } : null,
+            visuelCheck ? { label: `Vente visuel support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
+            visuelCheck ? { label: `Coût impression visuel (${visuelImpressionM2.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+            visuelCheck ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
             ...moteurRows(t, delai)
         ].filter(Boolean);
@@ -1249,15 +1278,22 @@ async function calcSignaletique() {
 
         const m2 = (larg * haut) / 10000 * qty;
         const conso = m2 * num('chute_signaletique', 1.1);
-        const coutM2 = parseFloat(vinyle.price) + (imprime ? num('impression_m2', 12) : 0) + (lamination ? parseFloat(lamination.prix) : 0);
-        const coutMatiere = conso * coutM2;
+        const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
+        const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
+        const coutMatiereSupport = conso * coutM2Support;
+        const coutMatiereImpression = conso * coutM2Impression;
+        const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
         const t = computeTotal(coutMatiere, poseHT, delai);
+        const venteSupport = coutMatiereSupport * t.coefficient;
+        const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
-            { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '' },
-            { label: `Coût matière (${coutM2.toFixed(2)}€/m² : ${vinyle.name}${imprime ? ' + impression' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
-            { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+            { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
+            { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : ${vinyle.name}${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+            { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+            imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+            imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
             ...moteurRows(t, delai)
         ].filter(Boolean);
@@ -1286,17 +1322,23 @@ async function calcSignaletique() {
 
     const m2 = (larg * haut) / 10000 * qty;
     const conso = m2 * num('chute_signaletique', 1.1);
-    const visuelM2 = visuelVinyle ? parseFloat(visuelVinyle.price) + num('impression_m2', 12) : 0;
     const lamM2 = lamination ? parseFloat(lamination.prix) : 0;
-    const coutM2 = parseFloat(mat.price) + visuelM2 + lamM2;
-    const coutMatiere = conso * coutM2;
+    const coutM2Support = parseFloat(mat.price) + (visuelVinyle ? parseFloat(visuelVinyle.price) : 0) + lamM2;
+    const coutM2Impression = visuelVinyle ? num('impression_m2', 12) : 0;
+    const coutMatiereSupport = conso * coutM2Support;
+    const coutMatiereImpression = conso * coutM2Impression;
+    const coutMatiere = coutMatiereSupport + coutMatiereImpression;
 
     const t = computeTotal(coutMatiere, poseHT, delai);
+    const venteSupport = coutMatiereSupport * t.coefficient;
+    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const rows = [
-        { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '' },
-        { label: `Coût matière (${coutM2.toFixed(2)}€/m² : ${mat.support}${visuelVinyle ? ' + visuel imprimé' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiere.toFixed(2)}€` },
-        { label: `Vente matière (déboursé × ${t.coefficient.toFixed(2)})`, val: `${t.venteMat.toFixed(2)}€` },
+        { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
+        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : ${mat.support}${visuelVinyle ? ' + visuel' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+        { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+        visuelVinyle ? { label: `Coût impression visuel (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+        visuelVinyle ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         poseRow,
         ...moteurRows(t, delai)
     ].filter(Boolean);
@@ -1361,6 +1403,18 @@ function stockWarningsHTML(warnings) {
     return warnings.length ? `<div class="empty-state" style="text-align:left;padding:10px 14px;border:1px solid var(--danger);border-radius:8px;margin-bottom:12px;">${warnings.map(w => `<p style="color:var(--danger);font-size:12px;margin:4px 0;">${w}</p>`).join('')}</div>` : '';
 }
 
+// Etapes du devis : 1 Descriptif, 2 Impression, 3 Faconnage, 4 Pose. Les lignes du moteur
+// (delai/frais/minimum/arrondi, via moteurRows) restent sans etape, ajoutees a la fin comme avant.
+const STAGE_LABELS = { 1: '1 · Descriptif', 2: '2 · Impression', 3: '3 · Façonnage', 4: '4 · Pose' };
+function renderBreakdownRows(rows) {
+    let html = '', lastStage = null;
+    rows.forEach(r => {
+        if (r.stage && r.stage !== lastStage) { html += `<div class="breakdown-stage">${STAGE_LABELS[r.stage]}</div>`; lastStage = r.stage; }
+        html += `<div class="breakdown-row"><span class="label">${r.label}</span><span>${r.val}</span></div>`;
+    });
+    return html;
+}
+
 function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
     document.getElementById('result').innerHTML = `
         ${stockWarningsHTML(warnings)}
@@ -1373,7 +1427,7 @@ function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
             </div>
         </div>
         <div class="breakdown">
-            ${rows.map(r => `<div class="breakdown-row"><span class="label">${r.label}</span><span>${r.val}</span></div>`).join('')}
+            ${renderBreakdownRows(rows)}
             <div class="breakdown-row total"><span>TOTAL HT</span><span>${ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
         <button class="btn-block" onclick="saveDevis('${type}', ${qty}, ${ht.toFixed(2)}, ${ttc.toFixed(2)})">Sauvegarder le devis</button>

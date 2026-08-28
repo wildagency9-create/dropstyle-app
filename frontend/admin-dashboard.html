@@ -283,6 +283,7 @@
                 <div class="form-group"><label>P12 · Lamination défaut (€/m² achat)</label><input type="number" step="0.01" id="param-lamination_m2" oninput="testMoteur()"></div>
                 <div class="form-group"><label>P23 · Impression numérique (€/m² coût)</label><input type="number" step="0.5" id="param-impression_m2"></div>
                 <div class="form-group"><label>P13 · Espace stickers (mm)</label><input type="number" step="1" id="param-espace_stickers"></div>
+                <div class="form-group"><label>Marge plotteur découpe (mm/côté)</label><input type="number" step="1" id="param-marge_plotteur_mm"></div>
                 <div class="form-group"><label>P14 · Coef forme ronde (×)</label><input type="number" step="0.01" id="param-coef_forme_rond"></div>
                 <div class="form-group"><label>P15 · Coef forme custom (×)</label><input type="number" step="0.01" id="param-coef_forme_custom"></div>
             </div>
@@ -857,7 +858,7 @@ async function deleteImpression(id) {
 function mtNum(id) { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
 function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
 
-const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut'];
+const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','marge_plotteur_mm','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut'];
 
 async function loadParametres() {
     try {
