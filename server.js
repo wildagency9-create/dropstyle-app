@@ -264,7 +264,7 @@ app.delete('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
 // V5 — PARAMETRES MOTEUR (cle/valeur)
 // V6 — Parametres complets du moteur (codes P01-P24 du classeur de validation)
 const DEFAULT_PARAMS = {
-    coefficient: 2.00,           // P01 - multiplicateur du debourse sec matiere
+    coefficient: 2.00,           // P01 - multiplicateur du debourse sec matiere (vinyle/lamination/impression, production interne)
     tva: 20.00,                  // P02 - en %
     minimum_commande: 80.00,     // P03 - € HT
     frais_dossier: 40.00,        // P04 - € HT par devis
@@ -289,7 +289,8 @@ const DEFAULT_PARAMS = {
     impression_m2: 12.00,        // P23 - cout encre + machine (valide 10-15 €)
     coef_pose_st: 1.30,          // P24 - majoration cout poseur sous-traitant
     seuil_stock_defaut: 2.00,    // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
-    marge_plotteur_mm: 50        // marge technique du plotteur de decoupe (mm, de chaque cote) — plotteur laize 1600 remplace, 1500mm reellement utilisables
+    marge_plotteur_mm: 50,       // marge technique du plotteur de decoupe (mm, de chaque cote) — plotteur laize 1600 remplace, 1500mm reellement utilisables
+    coef_materiaux: 1.50         // coefficient distinct pour les materiaux panneaux (achat-revente pur, pas de production interne) — a ajuster, hors codes P01-P24
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {
