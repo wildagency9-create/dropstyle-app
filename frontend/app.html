@@ -1112,10 +1112,10 @@ async function calcStickers() {
         </div>
         <div class="price-display">
             <div class="price-label">${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''}) — ${(t.ht / totalQty).toFixed(2)}€/u HT</div>
-            <div class="price-value">${t.ttc.toFixed(2).replace('.', ',')}</div>
-            <div class="price-ht">€ TTC</div>
+            <div class="price-value">${t.ht.toFixed(2).replace('.', ',')}</div>
+            <div class="price-ht">€ HT</div>
             <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-                HT: ${t.ht.toFixed(2).replace('.', ',')}€ • TVA: ${t.tva.toFixed(2).replace('.', ',')}€
+                TTC: ${t.ttc.toFixed(2).replace('.', ',')}€ • TVA: ${t.tva.toFixed(2).replace('.', ',')}€
             </div>
         </div>
         <div class="breakdown">
@@ -1445,10 +1445,10 @@ function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
         ${stockWarningsHTML(warnings)}
         <div class="price-display">
             <div class="price-label">${title}</div>
-            <div class="price-value">${ttc.toFixed(2).replace('.', ',')}</div>
-            <div class="price-ht">€ TTC</div>
+            <div class="price-value">${ht.toFixed(2).replace('.', ',')}</div>
+            <div class="price-ht">€ HT</div>
             <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-                HT: ${ht.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
+                TTC: ${ttc.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
             </div>
         </div>
         <div class="breakdown">
