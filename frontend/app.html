@@ -1050,7 +1050,13 @@ async function calcStickers() {
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
+    const stickersWarnings = [
+        checkStockWarning(vinyle.name, vinyle, surface),
+        lamination ? checkStockWarning(lamination.nom, lamination, surface) : null
+    ].filter(Boolean);
+
     document.getElementById('result').innerHTML = `
+        ${stockWarningsHTML(stickersWarnings)}
         <div class="optimization-box">
             <div class="optimization-title">🎯 Optimisation laize</div>
             <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px;">
@@ -1162,7 +1168,14 @@ async function calcVehicule() {
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
-    showResult(`Véhicule × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty);
+    const consoTotal = conso * qty;
+    const warnings = [
+        checkStockWarning(vinyle.name, vinyle, consoTotal),
+        lamination ? checkStockWarning(lamination.nom, lamination, consoTotal) : null,
+        tape && allTapes.length ? checkStockWarning(allTapes[0].nom, allTapes[0], consoTotal) : null
+    ].filter(Boolean);
+
+    showResult(`Véhicule × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty, warnings);
 }
 
 const SIGNALETIQUE_LABELS = { panneau: 'Panneau alu', bache: 'Bâche PVC', vitrophanie: 'Vitrophanie', adhesif: 'Adhésif mural', lettrage: 'Lettrage découpé', rollup: 'Roll-up / Totem' };
@@ -1215,7 +1228,8 @@ async function calcSignaletique() {
             ...moteurRows(t, delai)
         ].filter(Boolean);
 
-        showResult(`${SIGNALETIQUE_LABELS[type]} × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+        const warningsRollup = visuelCheck ? [checkStockWarning(visuelVinyle.name, visuelVinyle, conso)].filter(Boolean) : [];
+        showResult(`${SIGNALETIQUE_LABELS[type]} × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsRollup);
         return;
     }
 
@@ -1248,7 +1262,11 @@ async function calcSignaletique() {
             ...moteurRows(t, delai)
         ].filter(Boolean);
 
-        showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+        const warningsDirect = [
+            checkStockWarning(vinyle.name, vinyle, conso),
+            lamination ? checkStockWarning(lamination.nom, lamination, conso) : null
+        ].filter(Boolean);
+        showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsDirect);
         return;
     }
 
@@ -1283,7 +1301,12 @@ async function calcSignaletique() {
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
-    showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty);
+    const warningsPanneau = [
+        checkStockWarning(mat.support, mat, conso),
+        visuelVinyle ? checkStockWarning(visuelVinyle.name, visuelVinyle, conso) : null,
+        lamination ? checkStockWarning(lamination.nom, lamination, conso) : null
+    ].filter(Boolean);
+    showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsPanneau);
 }
 
 function calcImpression() {
@@ -1323,8 +1346,24 @@ function calcImpression() {
     showResult(`${type} ${format} × ${quantite}`, t.ttc, t.ht, t.tva, rows, 'impression', quantite);
 }
 
-function showResult(title, ttc, ht, tva, rows, type, qty) {
+// Avertit si un article suivi en stock (stock_m2 non nul) est insuffisant ou passera sous son seuil.
+// Ne bloque pas le devis — c'est une simple alerte, le module stock reste independant du moteur de prix.
+function checkStockWarning(nom, item, consoM2) {
+    if (!item || item.stock_m2 === null || item.stock_m2 === undefined) return null;
+    const stock = parseFloat(item.stock_m2);
+    const seuil = item.seuil_alerte !== null && item.seuil_alerte !== undefined ? parseFloat(item.seuil_alerte) : num('seuil_stock_defaut', 2);
+    const restant = stock - consoM2;
+    if (restant < 0) return `⚠️ Stock insuffisant : il reste ${stock.toFixed(2)}m² de « ${nom} », cette commande en nécessite ${consoM2.toFixed(2)}m².`;
+    if (restant <= seuil) return `⚠️ Il ne restera que ${restant.toFixed(2)}m² de « ${nom} » après cette commande (seuil d'alerte : ${seuil.toFixed(2)}m²).`;
+    return null;
+}
+function stockWarningsHTML(warnings) {
+    return warnings.length ? `<div class="empty-state" style="text-align:left;padding:10px 14px;border:1px solid var(--danger);border-radius:8px;margin-bottom:12px;">${warnings.map(w => `<p style="color:var(--danger);font-size:12px;margin:4px 0;">${w}</p>`).join('')}</div>` : '';
+}
+
+function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
     document.getElementById('result').innerHTML = `
+        ${stockWarningsHTML(warnings)}
         <div class="price-display">
             <div class="price-label">${title}</div>
             <div class="price-value">${ttc.toFixed(2).replace('.', ',')}</div>
