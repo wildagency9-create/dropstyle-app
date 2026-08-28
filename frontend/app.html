@@ -479,7 +479,7 @@
                     <div class="dropdown" id="dd-s-type">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-s-type')"><span class="dropdown-label">— Sélectionner —</span></button>
                         <div class="dropdown-list">
-                            <div class="dropdown-item" data-value="panneau" onclick="selectDropdownItem(this)">Panneau alu</div>
+                            <div class="dropdown-item" data-value="panneau" onclick="selectDropdownItem(this)">Panneau</div>
                             <div class="dropdown-item" data-value="vitrophanie" onclick="selectDropdownItem(this)">Vitrophanie</div>
                             <div class="dropdown-item" data-value="adhesif" onclick="selectDropdownItem(this)">Adhésif mural</div>
                             <div class="dropdown-item" data-value="bache" onclick="selectDropdownItem(this)">Bâche PVC</div>
@@ -488,22 +488,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="row2">
-                    <div class="form-group"><label>Largeur (cm)</label><input type="number" id="s-larg" value="100" min="10"></div>
-                    <div class="form-group"><label>Hauteur (cm)</label><input type="number" id="s-haut" value="100" min="10"></div>
-                </div>
-
-                <!-- Panneau alu / Bâche PVC : support rigide/souple achete au m2 -->
+                <!-- Panneau / Bâche PVC : plusieurs lignes (materiau + dimensions + quantite) -->
                 <div class="conditional" id="s-materiau-cond">
-                    <div class="form-group"><label>Matériau</label>
-                        <div class="dropdown" id="dd-s-materiau">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-materiau')"><span class="dropdown-label">— Chargement... —</span></button>
-                            <div class="dropdown-list" id="list-s-materiau"></div>
-                        </div>
-                    </div>
+                    <div id="s-panneau-lines"></div>
+                    <button type="button" onclick="addPanneauLine()" style="width:100%;margin-bottom:16px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une ligne</button>
                 </div>
 
-                <!-- Vitrophanie / Adhesif mural / Lettrage decoupe : pose directe, pas de support -->
+                <!-- Vitrophanie / Adhesif mural / Lettrage decoupe : pose directe, pas de support, plusieurs lignes -->
                 <div class="conditional" id="s-vinyle-direct-cond">
                     <div class="form-group"><label>Vinyle</label>
                         <div class="dropdown" id="dd-s-vinyle-direct">
@@ -512,16 +503,14 @@
                         </div>
                     </div>
                     <div class="checkbox-row"><input type="checkbox" id="s-direct-imprime-check" checked><label for="s-direct-imprime-check">Vinyle imprimé (ajoute le coût d'impression)</label></div>
+                    <div id="s-direct-lines"></div>
+                    <button type="button" onclick="addDirectLine()" style="width:100%;margin-bottom:16px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une ligne</button>
                 </div>
 
-                <!-- Roll-up / Totem : kit a prix fixe, pas de support ni de dimensions -->
+                <!-- Roll-up / Totem : plusieurs lignes de kits a prix fixe -->
                 <div class="conditional" id="s-kit-cond">
-                    <div class="form-group"><label>Kit roll-up</label>
-                        <div class="dropdown" id="dd-s-kit">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-kit')"><span class="dropdown-label">— Chargement... —</span></button>
-                            <div class="dropdown-list" id="list-s-kit"></div>
-                        </div>
-                    </div>
+                    <div id="s-rollup-lines"></div>
+                    <button type="button" onclick="addRollupLine()" style="width:100%;margin-bottom:16px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une ligne</button>
                 </div>
 
                 <div class="conditional" id="s-lam-cond">
@@ -532,7 +521,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="form-group"><label>Quantité</label><input type="number" id="s-qty" value="1" min="1"></div>
 
                 <!-- Visuel imprime contrecolle : panneau/bache/rollup (les 3 autres ont deja leur propre case "vinyle imprimé") -->
                 <div class="conditional" id="s-visueloverlay-cond">
@@ -542,6 +530,13 @@
                             <div class="dropdown" id="dd-s-vinyle">
                                 <button class="dropdown-btn" onclick="toggleDropdown('dd-s-vinyle')"><span class="dropdown-label">— Chargement... —</span></button>
                                 <div class="dropdown-list" id="list-s-vinyle"></div>
+                            </div>
+                        </div>
+                        <!-- Roll-up uniquement : le kit n'a pas de dimensions propres, il en faut pour le visuel insere -->
+                        <div class="conditional" id="s-visuel-dims-cond">
+                            <div class="row2">
+                                <div class="form-group"><label>Largeur visuel (mm)</label><input type="number" id="s-visuel-larg" value="850" min="50"></div>
+                                <div class="form-group"><label>Hauteur visuel (mm)</label><input type="number" id="s-visuel-haut" value="2000" min="50"></div>
                             </div>
                         </div>
                     </div>
@@ -750,6 +745,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (user.role === 'admin') document.getElementById('admin-btn').style.display = 'block';
     setupDropdownListeners();
     addShapeRow();
+    addPanneauLine();
+    addDirectLine();
+    addRollupLine();
     loadTarifs();
 });
 
@@ -812,13 +810,14 @@ async function loadTarifs() {
         document.getElementById('list-s-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-s-vinyle-direct').innerHTML = vinyleHTML;
 
-        document.getElementById('list-s-kit').innerHTML = allKits.length ? allKits.map(k =>
+        kitOptionsHTML = allKits.length ? allKits.map(k =>
             `<div class="dropdown-item" data-value="${k.id}" onclick="selectDropdownItem(this)">${k.nom} (${parseFloat(k.prix).toFixed(2)}€)</div>`).join('')
             : emptyItem('Aucun kit — à ajouter dans l\'admin');
 
-        document.getElementById('list-s-materiau').innerHTML = materiaux.length ? materiaux.map(m =>
+        materiauOptionsHTML = materiaux.length ? materiaux.map(m =>
             `<div class="dropdown-item" data-value="${m.id}" onclick="selectDropdownItem(this)">${m.support} (${parseFloat(m.price).toFixed(2)}€/m² achat)</div>`).join('')
             : emptyItem('Aucun matériau — à ajouter dans l\'admin ou via la synchro Sheets');
+        refreshLineDropdowns();
 
         const lamHTML = '<div class="dropdown-item" data-value="0" onclick="selectDropdownItem(this)">Sans</div>' +
             laminations.map(l => `<div class="dropdown-item" data-value="${l.id}" onclick="selectDropdownItem(this)">${l.nom} (${parseFloat(l.prix).toFixed(2)}€/m²)</div>`).join('');
@@ -935,6 +934,7 @@ function updateSignaletiqueFields(type) {
     document.getElementById('s-kit-cond').classList.toggle('active', isRollup);
     document.getElementById('s-lam-cond').classList.toggle('active', !isRollup);
     document.getElementById('s-visueloverlay-cond').classList.toggle('active', isPanneau || isRollup);
+    document.getElementById('s-visuel-dims-cond').classList.toggle('active', isRollup);
     if (!(isPanneau || isRollup)) {
         document.getElementById('s-visuel-check').checked = false;
         toggleVisuel();
@@ -1225,7 +1225,96 @@ async function calcVehicule() {
     showResult(`Véhicule × ${qty}`, t.ttc, t.ht, t.tva, rows, 'vehicule', qty, warnings);
 }
 
-const SIGNALETIQUE_LABELS = { panneau: 'Panneau alu', bache: 'Bâche PVC', vitrophanie: 'Vitrophanie', adhesif: 'Adhésif mural', lettrage: 'Lettrage découpé', rollup: 'Roll-up / Totem' };
+// ===== SIGNALETIQUE — plusieurs lignes par sous-type (meme principe que Stickers) =====
+let sMatLineCounter = 0, sDirectLineCounter = 0, sRollupLineCounter = 0;
+let materiauOptionsHTML = '', kitOptionsHTML = '';
+
+function panneauLineHTML(idx) {
+    return `
+    <div class="line-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
+        <div class="form-group"><label>Matériau</label>
+            <div class="dropdown s-mat-line" id="dd-s-mat-line-${idx}">
+                <button type="button" class="dropdown-btn" onclick="toggleDropdown('dd-s-mat-line-${idx}')"><span class="dropdown-label">— Chargement... —</span></button>
+                <div class="dropdown-list">${materiauOptionsHTML}</div>
+            </div>
+        </div>
+        <div class="row2">
+            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50"></div>
+            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50"></div>
+        </div>
+        <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1"></div>
+        ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
+    </div>`;
+}
+function addPanneauLine() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = panneauLineHTML(sMatLineCounter++);
+    document.getElementById('s-panneau-lines').appendChild(wrap.firstElementChild);
+}
+function getPanneauLines() {
+    return [...document.querySelectorAll('#s-panneau-lines .line-row')].map(row => ({
+        matId: row.querySelector('.s-mat-line').dataset.value || '',
+        larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
+        haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1
+    }));
+}
+
+function directLineHTML(idx) {
+    return `
+    <div class="line-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
+        <div class="row2">
+            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="s-line-larg" value="1000" min="50"></div>
+            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="s-line-haut" value="1000" min="50"></div>
+        </div>
+        <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1"></div>
+        ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
+    </div>`;
+}
+function addDirectLine() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = directLineHTML(sDirectLineCounter++);
+    document.getElementById('s-direct-lines').appendChild(wrap.firstElementChild);
+}
+function getDirectLines() {
+    return [...document.querySelectorAll('#s-direct-lines .line-row')].map(row => ({
+        larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
+        haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1
+    }));
+}
+
+function rollupLineHTML(idx) {
+    return `
+    <div class="line-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
+        <div class="form-group"><label>Kit roll-up</label>
+            <div class="dropdown s-kit-line" id="dd-s-kit-line-${idx}">
+                <button type="button" class="dropdown-btn" onclick="toggleDropdown('dd-s-kit-line-${idx}')"><span class="dropdown-label">— Chargement... —</span></button>
+                <div class="dropdown-list">${kitOptionsHTML}</div>
+            </div>
+        </div>
+        <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1"></div>
+        ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
+    </div>`;
+}
+function addRollupLine() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = rollupLineHTML(sRollupLineCounter++);
+    document.getElementById('s-rollup-lines').appendChild(wrap.firstElementChild);
+}
+function getRollupLines() {
+    return [...document.querySelectorAll('#s-rollup-lines .line-row')].map(row => ({
+        kitId: row.querySelector('.s-kit-line').dataset.value || '',
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1
+    }));
+}
+
+function refreshLineDropdowns() {
+    document.querySelectorAll('.s-mat-line .dropdown-list').forEach(el => el.innerHTML = materiauOptionsHTML);
+    document.querySelectorAll('.s-kit-line .dropdown-list').forEach(el => el.innerHTML = kitOptionsHTML);
+}
+
+const SIGNALETIQUE_LABELS = { panneau: 'Panneau', bache: 'Bâche PVC', vitrophanie: 'Vitrophanie', adhesif: 'Adhésif mural', lettrage: 'Lettrage découpé', rollup: 'Roll-up / Totem' };
 
 async function calcSignaletique() {
     const type = getDropdownValue('dd-s-type');
@@ -1239,27 +1328,30 @@ async function calcSignaletique() {
         return;
     }
 
-    // ===== ROLL-UP / TOTEM : kit a prix fixe (vente directe) + visuel imprime optionnel =====
+    const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-s-lam'));
+    const visuelCheck = document.getElementById('s-visuel-check').checked;
+    const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
+    if (visuelCheck && !visuelVinyle) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+        return;
+    }
+
+    // ===== ROLL-UP / TOTEM : plusieurs kits a prix fixe (vente directe) + visuel imprime optionnel partage =====
     if (type === 'rollup') {
-        const kit = allKits.find(k => k.id == getDropdownValue('dd-s-kit'));
-        if (!kit) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un kit roll-up</p></div>';
-            return;
-        }
-        const qty = parseInt(document.getElementById('s-qty').value) || 1;
-        const visuelCheck = document.getElementById('s-visuel-check').checked;
-        const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
-        if (visuelCheck && !visuelVinyle) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+        const lignes = getRollupLines().map(l => ({ ...l, kit: allKits.find(k => k.id == l.kitId) }));
+        if (!lignes.length || lignes.some(l => !l.kit)) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un kit roll-up pour chaque ligne</p></div>';
             return;
         }
 
-        const kitVenteHT = parseFloat(kit.prix) * qty;
+        const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
+        const kitVenteHT = lignes.reduce((s, l) => s + parseFloat(l.kit.prix) * l.qty, 0);
+
         let coutMatiereSupport = 0, coutMatiereImpression = 0, m2 = 0, conso = 0, visuelSupportM2 = 0, visuelImpressionM2 = 0;
         if (visuelCheck) {
-            const larg = parseFloat(document.getElementById('s-larg').value) || 100;
-            const haut = parseFloat(document.getElementById('s-haut').value) || 100;
-            m2 = (larg * haut) / 10000 * qty;
+            const larg = parseFloat(document.getElementById('s-visuel-larg').value) || 850;
+            const haut = parseFloat(document.getElementById('s-visuel-haut').value) || 2000;
+            m2 = (larg * haut) / 1000000 * totalQty;
             conso = m2 * num('chute_signaletique', 1.1);
             visuelSupportM2 = parseFloat(visuelVinyle.price);
             visuelImpressionM2 = num('impression_m2', 12);
@@ -1273,7 +1365,7 @@ async function calcSignaletique() {
         const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
-            { label: `Kit « ${kit.nom} »${qty > 1 ? ` × ${qty}` : ''}`, val: `${kitVenteHT.toFixed(2)}€`, stage: 1 },
+            ...lignes.map(l => ({ label: `Kit « ${l.kit.nom} »${l.qty > 1 ? ` × ${l.qty}` : ''}`, val: `${(parseFloat(l.kit.prix) * l.qty).toFixed(2)}€`, stage: 1 })),
             visuelCheck ? { label: `Visuel : vinyle (${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m² × ${visuelSupportM2.toFixed(2)}€/m²)`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 } : null,
             visuelCheck ? { label: `Vente visuel support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
             visuelCheck ? { label: `Coût impression visuel (${visuelImpressionM2.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
@@ -1283,26 +1375,27 @@ async function calcSignaletique() {
         ].filter(Boolean);
 
         const warningsRollup = visuelCheck ? [checkStockWarning(visuelVinyle.name, visuelVinyle, conso)].filter(Boolean) : [];
-        showResult(`${SIGNALETIQUE_LABELS[type]} × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsRollup);
+        showResult(`${SIGNALETIQUE_LABELS[type]} × ${totalQty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', totalQty, warningsRollup);
         return;
     }
 
-    const larg = parseFloat(document.getElementById('s-larg').value) || 100;
-    const haut = parseFloat(document.getElementById('s-haut').value) || 100;
-    const qty = parseInt(document.getElementById('s-qty').value) || 1;
-    const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-s-lam'));
-
-    // ===== VITROPHANIE / ADHESIF MURAL / LETTRAGE DECOUPE : pose directe, pas de support =====
+    // ===== VITROPHANIE / ADHESIF MURAL / LETTRAGE DECOUPE : pose directe, pas de support, plusieurs lignes =====
     if (type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage') {
         const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle-direct'));
         if (!vinyle) {
             document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
             return;
         }
+        const lignes = getDirectLines();
+        if (!lignes.length) {
+            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Ajoute au moins une ligne</p></div>';
+            return;
+        }
         const imprime = document.getElementById('s-direct-imprime-check').checked;
 
-        const m2 = (larg * haut) / 10000 * qty;
-        const conso = m2 * num('chute_signaletique', 1.1);
+        const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
+        const totalM2 = lignes.reduce((s, l) => s + (l.larg * l.haut) / 1000000 * l.qty, 0);
+        const conso = totalM2 * num('chute_signaletique', 1.1);
         const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
         const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
         const coutMatiereSupport = conso * coutM2Support;
@@ -1314,7 +1407,7 @@ async function calcSignaletique() {
         const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
-            { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
+            { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
             { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : ${vinyle.name}${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
             { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
             imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
@@ -1327,53 +1420,56 @@ async function calcSignaletique() {
             checkStockWarning(vinyle.name, vinyle, conso),
             lamination ? checkStockWarning(lamination.nom, lamination, conso) : null
         ].filter(Boolean);
-        showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsDirect);
+        showResult(`${SIGNALETIQUE_LABELS[type]} ${totalM2.toFixed(2)}m² × ${totalQty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', totalQty, warningsDirect);
         return;
     }
 
-    // ===== PANNEAU ALU / BACHE PVC : support achete au m2 + visuel imprime contrecolle optionnel =====
-    const mat = allMateriaux.find(m => m.id == getDropdownValue('dd-s-materiau'));
-    const visuelCheck = document.getElementById('s-visuel-check').checked;
-    const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
-
-    if (!mat) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
-        return;
-    }
-    if (visuelCheck && !visuelVinyle) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+    // ===== PANNEAU / BACHE PVC : plusieurs lignes matiere+dimensions + visuel imprime contrecolle optionnel partage =====
+    const lignes = getPanneauLines().map(l => ({ ...l, mat: allMateriaux.find(m => m.id == l.matId) }));
+    if (!lignes.length || lignes.some(l => !l.mat)) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un matériau pour chaque ligne</p></div>';
         return;
     }
 
-    const m2 = (larg * haut) / 10000 * qty;
-    const conso = m2 * num('chute_signaletique', 1.1);
     const lamM2 = lamination ? parseFloat(lamination.prix) : 0;
-    const coutM2Support = parseFloat(mat.price) + (visuelVinyle ? parseFloat(visuelVinyle.price) : 0) + lamM2;
+    const visuelSupportM2 = visuelVinyle ? parseFloat(visuelVinyle.price) : 0;
     const coutM2Impression = visuelVinyle ? num('impression_m2', 12) : 0;
-    const coutMatiereSupport = conso * coutM2Support;
-    const coutMatiereImpression = conso * coutM2Impression;
+
+    let totalM2 = 0, totalConso = 0, coutMatiereSupport = 0, coutMatiereImpression = 0;
+    const matStock = new Map(); // id materiau -> { mat, conso } — pour alerter le stock par materiau utilise
+    lignes.forEach(l => {
+        const m2Ligne = (l.larg * l.haut) / 1000000 * l.qty;
+        const consoLigne = m2Ligne * num('chute_signaletique', 1.1);
+        totalM2 += m2Ligne; totalConso += consoLigne;
+        coutMatiereSupport += consoLigne * (parseFloat(l.mat.price) + visuelSupportM2 + lamM2);
+        coutMatiereImpression += consoLigne * coutM2Impression;
+        const entry = matStock.get(l.mat.id) || { mat: l.mat, conso: 0 };
+        entry.conso += consoLigne;
+        matStock.set(l.mat.id, entry);
+    });
     const coutMatiere = coutMatiereSupport + coutMatiereImpression;
+    const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
 
     const t = computeTotal(coutMatiere, poseHT, delai);
     const venteSupport = coutMatiereSupport * t.coefficient;
     const venteImpression = coutMatiereImpression * t.coefficient;
 
     const rows = [
-        { label: `Surface ${m2.toFixed(2)}m² × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
-        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : ${mat.support}${visuelVinyle ? ' + visuel' : ''}${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+        { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${totalConso.toFixed(2)}m²`, val: '', stage: 1 },
+        { label: `Coût matière support${visuelVinyle ? ' (+ visuel)' : ''}${lamination ? ' (+ lamination)' : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
-        visuelVinyle ? { label: `Coût impression visuel (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+        visuelVinyle ? { label: `Coût impression visuel (${coutM2Impression.toFixed(2)}€/m² × ${totalConso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
         visuelVinyle ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         poseRow,
         ...moteurRows(t, delai)
     ].filter(Boolean);
 
     const warningsPanneau = [
-        checkStockWarning(mat.support, mat, conso),
-        visuelVinyle ? checkStockWarning(visuelVinyle.name, visuelVinyle, conso) : null,
-        lamination ? checkStockWarning(lamination.nom, lamination, conso) : null
+        ...[...matStock.values()].map(({ mat, conso }) => checkStockWarning(mat.support, mat, conso)),
+        visuelVinyle ? checkStockWarning(visuelVinyle.name, visuelVinyle, totalConso) : null,
+        lamination ? checkStockWarning(lamination.nom, lamination, totalConso) : null
     ].filter(Boolean);
-    showResult(`${SIGNALETIQUE_LABELS[type]} ${m2.toFixed(2)}m² × ${qty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', qty, warningsPanneau);
+    showResult(`${SIGNALETIQUE_LABELS[type]} ${totalM2.toFixed(2)}m² × ${totalQty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', totalQty, warningsPanneau);
 }
 
 function calcImpression() {
