@@ -602,26 +602,8 @@
 
             <!-- STICKERS -->
             <div class="tab-content" id="tab-stickers">
-                <div class="row2">
-                    <div class="form-group"><label>Largeur sticker (mm)</label><input type="number" id="st-larg" value="80" min="5"></div>
-                    <div class="form-group"><label>Hauteur sticker (mm)</label><input type="number" id="st-haut" value="60" min="5"></div>
-                </div>
-
-                <div class="row2">
-                    <div class="form-group"><label>Forme</label>
-                        <div class="dropdown" id="dd-st-forme">
-                            <button class="dropdown-btn" onclick="toggleDropdown('dd-st-forme')"><span class="dropdown-label">Rectangulaire</span></button>
-                            <div class="dropdown-list">
-                                <div class="dropdown-item" data-value="rectangle" onclick="selectDropdownItem(this)">Rectangulaire (100%)</div>
-                                <div class="dropdown-item" data-value="carre" onclick="selectDropdownItem(this)">Carré (100%)</div>
-                                <div class="dropdown-item" data-value="rond" onclick="selectDropdownItem(this)">Rond (78%)</div>
-                                <div class="dropdown-item" data-value="ovale" onclick="selectDropdownItem(this)">Ovale (78%)</div>
-                                <div class="dropdown-item" data-value="custom" onclick="selectDropdownItem(this)">Custom (85%)</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group"><label>Quantité</label><input type="number" id="st-qty" value="100" min="1"></div>
-                </div>
+                <div id="st-shapes"></div>
+                <button type="button" onclick="addShapeRow()" style="width:100%;margin-bottom:16px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une autre forme</button>
 
                 <div class="form-group"><label>Vinyle</label>
                     <div class="dropdown" id="dd-st-vinyle">
@@ -766,6 +748,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-email').textContent = user.email;
     if (user.role === 'admin') document.getElementById('admin-btn').style.display = 'block';
     setupDropdownListeners();
+    addShapeRow();
     loadTarifs();
 });
 
@@ -957,6 +940,51 @@ function updateSignaletiqueFields(type) {
 }
 
 // ============ STICKERS - OPTIMISATION ============
+// ===== STICKERS — plusieurs formes dans une meme demande =====
+let stShapeCounter = 0;
+function shapeRowHTML(idx) {
+    return `
+    <div class="shape-row" data-idx="${idx}" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;">
+        <div class="row2">
+            <div class="form-group"><label>Largeur (mm)</label><input type="number" class="st-shape-larg" value="80" min="5"></div>
+            <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="st-shape-haut" value="60" min="5"></div>
+        </div>
+        <div class="row2">
+            <div class="form-group"><label>Forme</label>
+                <div class="dropdown st-shape-forme" id="dd-st-forme-${idx}">
+                    <button type="button" class="dropdown-btn" onclick="toggleDropdown('dd-st-forme-${idx}')"><span class="dropdown-label">Rectangulaire</span></button>
+                    <div class="dropdown-list">
+                        <div class="dropdown-item" data-value="rectangle" onclick="selectDropdownItem(this)">Rectangulaire (100%)</div>
+                        <div class="dropdown-item" data-value="carre" onclick="selectDropdownItem(this)">Carré (100%)</div>
+                        <div class="dropdown-item" data-value="rond" onclick="selectDropdownItem(this)">Rond (78%)</div>
+                        <div class="dropdown-item" data-value="ovale" onclick="selectDropdownItem(this)">Ovale (78%)</div>
+                        <div class="dropdown-item" data-value="custom" onclick="selectDropdownItem(this)">Custom (85%)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group"><label>Quantité</label><input type="number" class="st-shape-qty" value="100" min="1"></div>
+        </div>
+        ${idx > 0 ? `<button type="button" onclick="removeShapeRow(this)" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
+    </div>`;
+}
+function addShapeRow() {
+    const container = document.getElementById('st-shapes');
+    const wrap = document.createElement('div');
+    wrap.innerHTML = shapeRowHTML(stShapeCounter++);
+    container.appendChild(wrap.firstElementChild);
+}
+function removeShapeRow(btn) {
+    btn.closest('.shape-row').remove();
+}
+function getShapes() {
+    return [...document.querySelectorAll('#st-shapes .shape-row')].map(row => ({
+        larg: parseFloat(row.querySelector('.st-shape-larg').value) || 80,
+        haut: parseFloat(row.querySelector('.st-shape-haut').value) || 60,
+        forme: row.querySelector('.st-shape-forme').dataset.value || 'rectangle',
+        qty: parseInt(row.querySelector('.st-shape-qty').value) || 100
+    }));
+}
+
 function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6, margePlotteur = 0) {
     // Marge technique du plotteur de decoupe (zone de prehension de chaque cote, non decoupable) :
     // les stickers ne peuvent etre places que dans la largeur utile, mais la matiere consommee
@@ -985,10 +1013,7 @@ function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6, margePl
 }
 
 async function calcStickers() {
-    const stickerW = parseFloat(document.getElementById('st-larg').value) || 80;
-    const stickerH = parseFloat(document.getElementById('st-haut').value) || 60;
-    const qty = parseInt(document.getElementById('st-qty').value) || 100;
-    const forme = getDropdownValue('dd-st-forme') || 'rectangle';
+    const shapes = getShapes();
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
     const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-st-lam'));
     const imprime = document.getElementById('st-imprime-check').checked;
@@ -1005,21 +1030,35 @@ async function calcStickers() {
         return;
     }
 
-    // Optimisation sur les laizes reelles du vinyle
+    // Optimisation sur les laizes reelles du vinyle — une seule laize retenue pour TOUTES les
+    // formes de la demande (c'est le meme rouleau qui sert a tout couper), pas une par forme.
     const espace = num('espace_stickers', 6);
     const margePlotteur = num('marge_plotteur_mm', 50);
     const laizes = parseLaizes(vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
-    const results = laizes.map(l => calculateLaizeUsage(l, stickerW, stickerH, qty, espace, margePlotteur)).filter(r => r !== null);
-    if (results.length === 0) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sticker trop grand pour les laizes disponibles</p></div>';
+    const coefFormeMap = { rectangle: 1, carre: 1, rond: num('coef_forme_rond', 1.28), ovale: num('coef_forme_rond', 1.28), custom: num('coef_forme_custom', 1.18) };
+
+    const candidats = laizes.map(l => {
+        const perShape = shapes.map(s => {
+            const r = calculateLaizeUsage(l, s.larg, s.haut, s.qty, espace, margePlotteur);
+            if (!r) return null;
+            const coefForme = coefFormeMap[s.forme] || 1;
+            return { ...r, shape: s, coefForme, surfaceEffective: r.surfaceM2Num * coefForme };
+        });
+        if (perShape.some(r => r === null)) return null;
+        const totalSurface = perShape.reduce((sum, r) => sum + r.surfaceEffective, 0);
+        return { laize: l, perShape, totalSurface };
+    }).filter(c => c !== null);
+
+    if (candidats.length === 0) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Une des formes est trop grande pour les laizes disponibles</p></div>';
         return;
     }
-    let bestResult;
-    if (laizeChoice === 'auto') bestResult = results.reduce((a, b) => a.surfaceM2Num < b.surfaceM2Num ? a : b);
-    else bestResult = results.find(r => r.laize == laizeChoice) || results[0];
+    let best;
+    if (laizeChoice === 'auto') best = candidats.reduce((a, b) => a.totalSurface < b.totalSurface ? a : b);
+    else best = candidats.find(c => c.laize == laizeChoice) || candidats[0];
 
-    const coefForme = { rectangle: 1, carre: 1, rond: num('coef_forme_rond', 1.28), ovale: num('coef_forme_rond', 1.28), custom: num('coef_forme_custom', 1.18) }[forme] || 1;
-    const surface = bestResult.surfaceM2Num * coefForme;
+    const surface = best.totalSurface;
+    const totalQty = shapes.reduce((sum, s) => sum + s.qty, 0);
 
     // Part matiere (× coefficient) : support (vinyle+lamination) et impression separes pour l'affichage par etape
     const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
@@ -1031,7 +1070,7 @@ async function calcStickers() {
     // Part main d'oeuvre (vente directe)
     const tauxAtelier = num('taux_horaire_atelier', 60);
     let echHT = 0;
-    if (echCheck) echHT = echMode === 'temps' ? (qty * echTemps / 3600) * tauxAtelier : echForfait;
+    if (echCheck) echHT = echMode === 'temps' ? (totalQty * echTemps / 3600) * tauxAtelier : echForfait;
     const decoupeHT = decH * tauxAtelier;
     const ventes = echHT + decoupeHT;
 
@@ -1039,28 +1078,33 @@ async function calcStickers() {
     const venteSupport = coutMatiereSupport * t.coefficient;
     const venteImpression = coutMatiereImpression * t.coefficient;
 
-    const compareHTML = results.map(r => {
-        const isBest = r.laize === bestResult.laize;
-        const diff = r.surfaceM2Num - bestResult.surfaceM2Num;
-        const diffPct = bestResult.surfaceM2Num > 0 ? (diff / bestResult.surfaceM2Num * 100).toFixed(1) : 0;
+    const compareHTML = candidats.map(c => {
+        const isBest = c.laize === best.laize;
+        const diff = c.totalSurface - best.totalSurface;
+        const diffPct = best.totalSurface > 0 ? (diff / best.totalSurface * 100).toFixed(1) : 0;
         return `
             <div class="laize-card ${isBest ? 'best' : ''}">
-                <div class="laize-card-title">${r.laize}mm</div>
-                <div class="laize-card-value">${r.surfaceM2} m²</div>
-                <div class="laize-card-detail">${r.stickersParRangee}/rangée × ${r.nbRangees} rangées</div>
+                <div class="laize-card-title">${c.laize}mm</div>
+                <div class="laize-card-value">${c.totalSurface.toFixed(3)} m²</div>
+                <div class="laize-card-detail">${shapes.length} forme${shapes.length > 1 ? 's' : ''}</div>
                 ${isBest ? '<div class="laize-card-detail" style="color:var(--success);font-weight:700;">⭐ OPTIMAL</div>' :
                   `<div class="laize-card-detail">+${diffPct}% perte</div>`}
             </div>`;
     }).join('');
 
+    const shapeBreakdownHTML = best.perShape.map((r, i) => `
+        <div style="font-size:11px;color:var(--text-secondary);padding:4px 0;${i > 0 ? 'border-top:1px solid var(--border);' : ''}">
+            Forme ${i + 1} (${r.shape.larg}×${r.shape.haut}mm, ${r.shape.forme}, ×${r.shape.qty}) :
+            ${r.stickersParRangee}/rangée × ${r.nbRangees} rangées = ${r.surfaceEffective.toFixed(3)}m²
+        </div>`).join('');
+
     const rows = [
         { label: `Vinyle ${vinyle.name}`, val: `${surface.toFixed(3)} m²`, stage: 1 },
         { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
-        coefForme > 1 ? { label: `Coef forme ${forme} (×${coefForme})`, val: 'inclus', stage: 1 } : null,
         imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${surface.toFixed(3)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
         imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
-        echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${qty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€`, stage: 3 } : null,
+        echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${totalQty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€`, stage: 3 } : null,
         decoupeHT > 0 ? { label: `Découpe / calage (${decH}h × ${tauxAtelier}€/h)`, val: `${decoupeHT.toFixed(2)}€`, stage: 3 } : null,
         ...moteurRows(t, delai)
     ].filter(Boolean);
@@ -1075,18 +1119,13 @@ async function calcStickers() {
         <div class="optimization-box">
             <div class="optimization-title">🎯 Optimisation laize</div>
             <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px;">
-                Recommandée : ${bestResult.laize}mm
+                Recommandée : ${best.laize}mm — ${surface.toFixed(3)} m² au total
             </div>
-            <div style="font-size:11px;color:var(--text-secondary);">
-                ${bestResult.stickersParRangee} stickers/rangée × ${bestResult.nbRangees} rangées<br>
-                Longueur vinyle : ${bestResult.longueurCm} cm<br>
-                Surface utilisée : ${bestResult.surfaceM2} m²<br>
-                Pertes : ${bestResult.pertes} emplacement(s)
-            </div>
+            <div>${shapeBreakdownHTML}</div>
             <div class="laize-compare">${compareHTML}</div>
         </div>
         <div class="price-display">
-            <div class="price-label">${qty} stickers ${stickerW}×${stickerH}mm — ${(t.ht / qty).toFixed(2)}€/u HT</div>
+            <div class="price-label">${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''}) — ${(t.ht / totalQty).toFixed(2)}€/u HT</div>
             <div class="price-value">${t.ttc.toFixed(2).replace('.', ',')}</div>
             <div class="price-ht">€ TTC</div>
             <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
@@ -1097,7 +1136,7 @@ async function calcStickers() {
             ${renderBreakdownRows(rows)}
             <div class="breakdown-row total"><span>TOTAL HT</span><span>${t.ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
-        <button class="btn-block" onclick="saveDevis('stickers', ${qty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)})">Sauvegarder le devis</button>
+        <button class="btn-block" onclick="saveDevis('stickers', ${totalQty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)})">Sauvegarder le devis</button>
     `;
 }
 
