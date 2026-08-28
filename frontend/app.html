@@ -630,6 +630,7 @@
                         </div>
                     </div>
                 </div>
+                <div class="form-group"><label>Marge plotteur découpe (mm/côté)</label><input type="number" id="st-marge-plotteur" value="50" min="0" step="1" onchange="rebuildLaizes()"></div>
 
                 <div class="checkbox-row"><input type="checkbox" id="st-echenillage-check" onchange="toggleStickerEch()"><label for="st-echenillage-check">Échenillage requis</label></div>
                 <div class="conditional" id="st-echenillage-cond">
@@ -799,6 +800,7 @@ async function loadTarifs() {
         allImpressions = impressions;
         PARAMS = parametres || {};
         allVinyles = vinyles; allMateriaux = materiaux; allLaminations = laminations; allTapes = tapes; allPoseurs = poseurs; allForfaits = forfaits; allKits = kits;
+        document.getElementById('st-marge-plotteur').value = num('marge_plotteur_mm', 50);
 
         const emptyItem = (txt) => `<div class="dropdown-item" data-value="" onclick="selectDropdownItem(this)">${txt}</div>`;
         const vinyleHTML = vinyles.length ? vinyles.map(v =>
@@ -836,7 +838,7 @@ async function loadTarifs() {
 function rebuildLaizes() {
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
     const laizes = parseLaizes(vinyle && vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
-    const margePlotteur = num('marge_plotteur_mm', 50);
+    const margePlotteur = parseFloat(document.getElementById('st-marge-plotteur').value) || num('marge_plotteur_mm', 50);
     document.getElementById('list-st-laize').innerHTML =
         '<div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>' +
         laizes.map(l => `<div class="dropdown-item" data-value="${l}" onclick="selectDropdownItem(this)">Forcer ${l}mm (${l - 2 * margePlotteur}mm utile)</div>`).join('');
@@ -949,21 +951,7 @@ function shapeRowHTML(idx) {
             <div class="form-group"><label>Largeur (mm)</label><input type="number" class="st-shape-larg" value="80" min="5"></div>
             <div class="form-group"><label>Hauteur (mm)</label><input type="number" class="st-shape-haut" value="60" min="5"></div>
         </div>
-        <div class="row2">
-            <div class="form-group"><label>Forme</label>
-                <div class="dropdown st-shape-forme" id="dd-st-forme-${idx}">
-                    <button type="button" class="dropdown-btn" onclick="toggleDropdown('dd-st-forme-${idx}')"><span class="dropdown-label">Rectangulaire</span></button>
-                    <div class="dropdown-list">
-                        <div class="dropdown-item" data-value="rectangle" onclick="selectDropdownItem(this)">Rectangulaire (100%)</div>
-                        <div class="dropdown-item" data-value="carre" onclick="selectDropdownItem(this)">Carré (100%)</div>
-                        <div class="dropdown-item" data-value="rond" onclick="selectDropdownItem(this)">Rond (78%)</div>
-                        <div class="dropdown-item" data-value="ovale" onclick="selectDropdownItem(this)">Ovale (78%)</div>
-                        <div class="dropdown-item" data-value="custom" onclick="selectDropdownItem(this)">Custom (85%)</div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group"><label>Quantité</label><input type="number" class="st-shape-qty" value="100" min="1"></div>
-        </div>
+        <div class="form-group"><label>Quantité</label><input type="number" class="st-shape-qty" value="100" min="1"></div>
         ${idx > 0 ? `<button type="button" onclick="removeShapeRow(this)" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
     </div>`;
 }
@@ -980,7 +968,6 @@ function getShapes() {
     return [...document.querySelectorAll('#st-shapes .shape-row')].map(row => ({
         larg: parseFloat(row.querySelector('.st-shape-larg').value) || 80,
         haut: parseFloat(row.querySelector('.st-shape-haut').value) || 60,
-        forme: row.querySelector('.st-shape-forme').dataset.value || 'rectangle',
         qty: parseInt(row.querySelector('.st-shape-qty').value) || 100
     }));
 }
@@ -1032,20 +1019,19 @@ async function calcStickers() {
 
     // Optimisation sur les laizes reelles du vinyle — une seule laize retenue pour TOUTES les
     // formes de la demande (c'est le meme rouleau qui sert a tout couper), pas une par forme.
+    // Pas de coefficient de forme : la perte matiere d'une forme ronde/custom est rattrapee
+    // sur le temps d'echenillage, pas sur la matiere.
     const espace = num('espace_stickers', 6);
-    const margePlotteur = num('marge_plotteur_mm', 50);
+    const margePlotteur = parseFloat(document.getElementById('st-marge-plotteur').value) || num('marge_plotteur_mm', 50);
     const laizes = parseLaizes(vinyle.laizes).length ? parseLaizes(vinyle.laizes) : [1050, 1370, 1600];
-    const coefFormeMap = { rectangle: 1, carre: 1, rond: num('coef_forme_rond', 1.28), ovale: num('coef_forme_rond', 1.28), custom: num('coef_forme_custom', 1.18) };
 
     const candidats = laizes.map(l => {
         const perShape = shapes.map(s => {
             const r = calculateLaizeUsage(l, s.larg, s.haut, s.qty, espace, margePlotteur);
-            if (!r) return null;
-            const coefForme = coefFormeMap[s.forme] || 1;
-            return { ...r, shape: s, coefForme, surfaceEffective: r.surfaceM2Num * coefForme };
+            return r ? { ...r, shape: s } : null;
         });
         if (perShape.some(r => r === null)) return null;
-        const totalSurface = perShape.reduce((sum, r) => sum + r.surfaceEffective, 0);
+        const totalSurface = perShape.reduce((sum, r) => sum + r.surfaceM2Num, 0);
         return { laize: l, perShape, totalSurface };
     }).filter(c => c !== null);
 
@@ -1094,8 +1080,8 @@ async function calcStickers() {
 
     const shapeBreakdownHTML = best.perShape.map((r, i) => `
         <div style="font-size:11px;color:var(--text-secondary);padding:4px 0;${i > 0 ? 'border-top:1px solid var(--border);' : ''}">
-            Forme ${i + 1} (${r.shape.larg}×${r.shape.haut}mm, ${r.shape.forme}, ×${r.shape.qty}) :
-            ${r.stickersParRangee}/rangée × ${r.nbRangees} rangées = ${r.surfaceEffective.toFixed(3)}m²
+            Forme ${i + 1} (${r.shape.larg}×${r.shape.haut}mm, ×${r.shape.qty}) :
+            ${r.stickersParRangee}/rangée × ${r.nbRangees} rangées = ${r.surfaceM2Num.toFixed(3)}m²
         </div>`).join('');
 
     const rows = [
