@@ -71,6 +71,15 @@ async function ensureV8Tables(existingConn) {
     if (!existingConn) await conn.release();
 }
 
+// V9 — nom du client sur les devis (saisi au moment de l'enregistrement), pour retrouver
+// un devis dans l'historique autrement que par son montant.
+async function ensureV9Tables(existingConn) {
+    const conn = existingConn || await pool.getConnection();
+    try { await conn.query(`ALTER TABLE devis ADD COLUMN client VARCHAR(255) DEFAULT NULL`); }
+    catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V9 init:', e.message); }
+    if (!existingConn) await conn.release();
+}
+
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
     const conn = existingConn || await pool.getConnection();
@@ -98,6 +107,8 @@ async function initDB() {
         await ensureV7Tables(conn);
         // V8 — Suivi de stock
         await ensureV8Tables(conn);
+        // V9 — Nom du client sur les devis
+        await ensureV9Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -547,10 +558,13 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
 });
 
 app.post('/api/devis', verifyToken, async (req, res) => {
-    try { const { type, qty, ht, ttc, details } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details)]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV9Tables(); const { type, qty, ht, ttc, details, client } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/devis', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV9Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/devis/:id', verifyToken, async (req, res) => {
+    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ===== V8 — STOCK (module independant du moteur de prix) =====

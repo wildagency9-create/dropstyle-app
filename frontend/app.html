@@ -70,6 +70,8 @@
         button.logout-btn { background: rgba(255,82,82,0.2); color: #ff5252; border: 1px solid #ff5252; }
         button.admin-btn { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
         button.btn-block { width: 100%; padding: 12px; margin-top: 12px; }
+        button.danger { background: rgba(255,82,82,0.2); color: #ff5252; border: 1px solid #ff5252; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
         .main-grid {
             display: grid;
@@ -308,6 +310,27 @@
             background: var(--primary);
             margin: 2px;
             box-shadow: 0 0 0 1px var(--bg-card);
+        }
+
+        /* ===== Mobile / tablette : une seule colonne, le resultat passe SOUS le formulaire.
+           Sans ca, le formulaire etait comprime sur ~la moitie d'un ecran de telephone. ===== */
+        @media (max-width: 820px) {
+            body { overflow: auto; }
+            .app { height: auto; min-height: 100vh; }
+            header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+            .logo-icon { width: 34px; height: 34px; font-size: 16px; }
+            h1 { font-size: 17px; }
+            .user-info { display: none; } /* on garde les boutons, on enleve l'email */
+            .main-grid {
+                grid-template-columns: 1fr;   /* formulaire puis resultat, empiles */
+                overflow: visible;
+            }
+            .panel { overflow-y: visible; padding: 16px; }
+            .panel-left { border-right: none; border-bottom: 1px solid var(--border); }
+            .row2, .row3 { grid-template-columns: 1fr; }  /* champs pleine largeur, plus de texte tronque */
+            .tab-btn { padding: 10px 12px; font-size: 12px; }
+            input, .dropdown-btn { font-size: 16px; }  /* >=16px : evite le zoom auto iOS a la saisie */
+            .price-value { font-size: 38px; }
         }
     </style>
 </head>
@@ -718,6 +741,10 @@ let allImpressions = [];
 let PARAMS = {};
 let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [], allKits = [];
 let lastDevisDetails = null; // detail du dernier calcul affiche (titre + lignes), sauvegarde avec le devis pour l'historique
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 async function apiFetch(path) {
     const r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -1161,7 +1188,7 @@ async function calcStickers() {
             ${renderBreakdownRows(rows)}
             <div class="breakdown-row total"><span>TOTAL HT</span><span>${t.ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
-        <button class="btn-block" onclick="saveDevis('stickers', ${totalQty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)})">Sauvegarder le devis</button>
+        <button class="btn-block" onclick="saveDevis('stickers', ${totalQty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)}, this)">Sauvegarder le devis</button>
     `;
 }
 
@@ -1205,6 +1232,9 @@ async function calcVehicule() {
         return;
     }
     const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-v-lam'));
+    // La finition (brillant/mat) ne change pas le prix mais figure sur le devis client :
+    // on la reporte dans le libelle de la lamination pour qu'elle suive jusqu'a l'historique.
+    const finition = getDropdownValue('dd-v-finition') || 'brillant';
     const imprime = document.getElementById('v-imprime-check').checked;
     const tape = document.getElementById('v-tape-check').checked;
     const poseur = allPoseurs.find(pp => pp.id == getDropdownValue('dd-v-poseur'));
@@ -1243,7 +1273,7 @@ async function calcVehicule() {
 
     const rows = [
         { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
-        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ' + lamination' : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+        { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ` + lamination ${finition}` : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%`, stage: 1 } : null,
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
         paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null,
@@ -1696,19 +1726,28 @@ function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
             ${renderBreakdownRows(rows)}
             <div class="breakdown-row total"><span>TOTAL HT</span><span>${ht.toFixed(2).replace('.', ',')} €</span></div>
         </div>
-        <button class="btn-block" onclick="saveDevis('${type}', ${qty}, ${ht.toFixed(2)}, ${ttc.toFixed(2)})">Sauvegarder le devis</button>
+        <button class="btn-block" onclick="saveDevis('${type}', ${qty}, ${ht.toFixed(2)}, ${ttc.toFixed(2)}, this)">Sauvegarder le devis</button>
     `;
 }
 
-async function saveDevis(type, qty, ht, ttc) {
+async function saveDevis(type, qty, ht, ttc, btn) {
+    // Le nom du client est demande ici (et pas dans le formulaire) : il ne sert qu'a retrouver
+    // le devis dans l'historique, il n'entre pas dans le calcul.
+    const client = prompt('Nom du client / référence du devis :', '');
+    if (client === null) return; // annule
+    if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
     try {
         await fetch(`${API_URL}/devis`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, qty, ht, ttc, details: lastDevisDetails || {} })
+            body: JSON.stringify({ type, qty, ht, ttc, details: lastDevisDetails || {}, client })
         });
         showNotification('Devis sauvegardé ✓', 'success');
-    } catch (err) { showNotification('Erreur', 'error'); }
+        if (btn) btn.textContent = 'Devis enregistré ✓'; // reste desactive : evite les doublons
+    } catch (err) {
+        showNotification('Erreur', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Sauvegarder le devis'; } // reactive pour reessayer
+    }
 }
 
 async function renderHistorique() {
@@ -1724,12 +1763,13 @@ async function renderHistorique() {
             const details = typeof d.details === 'string' ? JSON.parse(d.details || '{}') : (d.details || {});
             const hasRows = details.rows && details.rows.length;
             return `<div class="breakdown" style="margin-bottom:8px;cursor:pointer;" onclick="toggleHistoriqueDetail(${i})">
-                <div class="breakdown-row"><span>${icon} ${details.title || d.type}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
-                <div class="breakdown-row"><span class="label">Qté: ${d.qty}</span><span style="color:var(--primary);font-weight:600;">${parseFloat(d.ttc).toFixed(2)}€ TTC</span></div>
+                <div class="breakdown-row"><span style="font-weight:700;">${icon} ${escapeHtml(d.client) || '<span style="font-weight:400;color:var(--text-light);">Sans nom</span>'}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
+                <div class="breakdown-row"><span class="label">${escapeHtml(details.title || d.type)} — Qté: ${d.qty}</span><span style="color:var(--primary);font-weight:600;">${parseFloat(d.ht).toFixed(2)}€ HT</span></div>
                 <div id="historique-detail-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);" onclick="event.stopPropagation()">
                     ${hasRows
                         ? renderBreakdownRows(details.rows) + `<div class="breakdown-row total"><span>TOTAL HT</span><span>${parseFloat(d.ht).toFixed(2)} €</span></div>`
                         : '<p style="font-size:11px;color:var(--text-light);">Détail non disponible pour ce devis (sauvegardé avant cette fonctionnalité)</p>'}
+                    <button class="danger" style="margin-top:10px;width:100%;" onclick="deleteDevis(${d.id})">Supprimer ce devis</button>
                 </div>
             </div>`;
         }).join('');
@@ -1739,6 +1779,15 @@ async function renderHistorique() {
 function toggleHistoriqueDetail(i) {
     const el = document.getElementById('historique-detail-' + i);
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function deleteDevis(id) {
+    if (!confirm('Supprimer définitivement ce devis ?')) return;
+    try {
+        await fetch(`${API_URL}/devis/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        showNotification('Devis supprimé', 'success');
+        renderHistorique();
+    } catch (err) { showNotification('Erreur', 'error'); }
 }
 
 function showNotification(msg, type) {
