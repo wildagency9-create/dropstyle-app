@@ -524,7 +524,10 @@
 
                 <!-- Visuel imprime contrecolle : panneau/bache/rollup (les 3 autres ont deja leur propre case "vinyle imprimé") -->
                 <div class="conditional" id="s-visueloverlay-cond">
-                    <div class="checkbox-row"><input type="checkbox" id="s-visuel-check" onchange="toggleVisuel()"><label for="s-visuel-check">Visuel imprimé contrecollé</label></div>
+                    <div class="checkbox-row" style="background:rgba(216,90,48,0.12);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
+                        <input type="checkbox" id="s-visuel-check" checked onchange="toggleVisuel()" style="width:18px;height:18px;">
+                        <label for="s-visuel-check" style="font-weight:700;">Visuel imprimé contrecollé <span style="font-weight:400;color:var(--text-secondary);">(coché par défaut — la plupart des visuels le sont)</span></label>
+                    </div>
                     <div class="conditional" id="s-visuel-cond">
                         <div class="form-group"><label>Vinyle du visuel</label>
                             <div class="dropdown" id="dd-s-vinyle">
@@ -714,6 +717,7 @@ let allImpressions = [];
 // V6 — moteur unifie : parametres + tarifs charges au demarrage
 let PARAMS = {};
 let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [], allKits = [];
+let lastDevisDetails = null; // detail du dernier calcul affiche (titre + lignes), sauvegarde avec le devis pour l'historique
 
 async function apiFetch(path) {
     const r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -790,6 +794,8 @@ function selectDropdownItem(item) {
     if (dd.id === 'dd-i-type') loadImpressionFilters();
     if (dd.id === 'dd-st-vinyle') rebuildLaizes();
     if (dd.id === 'dd-s-type') updateSignaletiqueFields(item.dataset.value);
+    if (dd.id.startsWith('dd-s-mat-line-')) refreshPlaqueSuggestion(dd.closest('.line-row'));
+    if (dd.id.startsWith('dd-s-plaque-line-')) updatePlaqueSummary(dd.closest('.line-row'));
     if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
     if (dd.id === 'dd-v-pao-mode') document.getElementById('v-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
     if (dd.id === 'dd-s-pao-mode') document.getElementById('s-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
@@ -957,6 +963,11 @@ function updateSignaletiqueFields(type) {
     if (!(isPanneau || isRollup)) {
         document.getElementById('s-visuel-check').checked = false;
         toggleVisuel();
+    } else if (!document.getElementById('s-visuel-check').checked) {
+        // La quasi-totalite des visuels panneau/roll-up sont imprimes : coche par defaut,
+        // l'utilisateur peut toujours decocher pour un support brut sans impression.
+        document.getElementById('s-visuel-check').checked = true;
+        toggleVisuel();
     }
 }
 
@@ -1120,6 +1131,7 @@ async function calcStickers() {
         lamination ? checkStockWarning(lamination.nom, lamination, surface) : null
     ].filter(Boolean);
 
+    lastDevisDetails = { title: `${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''})`, rows };
     document.getElementById('result').innerHTML = `
         ${stockWarningsHTML(stickersWarnings)}
         <div class="optimization-box">
@@ -1258,6 +1270,62 @@ function updateLineM2(el) {
     const haut = parseFloat(row.querySelector('.s-line-haut').value) || 0;
     const qty = parseInt(row.querySelector('.s-line-qty').value) || 1;
     row.querySelector('.s-line-m2').value = ((larg * haut) / 1000000 * qty).toFixed(3);
+    if (row.querySelector('.s-plaque-info')) refreshPlaqueSuggestion(row);
+}
+
+// ===== Suggestion de plaque (format de matiére première) pour les lignes Panneau =====
+// materiau.format_plaque peut contenir plusieurs formats separes par "/" (ex: "3050x1500/2000x1000"),
+// meme principe que les laizes vinyle. Purement informatif : n'affecte pas le prix (base sur la
+// surface decoupee), aide juste a savoir combien de plaques commander/decouper.
+function parseFormats(s) {
+    return String(s || '').split('/').map(x => {
+        const m = String(x).trim().match(/(\d+)\s*[x×]\s*(\d+)/i);
+        return m ? { w: parseInt(m[1]), h: parseInt(m[2]), label: `${m[1]}×${m[2]}mm` } : null;
+    }).filter(Boolean);
+}
+function piecesPerSheet(sheetW, sheetH, pieceW, pieceH) {
+    const normal = Math.floor(sheetW / pieceW) * Math.floor(sheetH / pieceH);
+    const rotated = Math.floor(sheetW / pieceH) * Math.floor(sheetH / pieceW);
+    return Math.max(normal, rotated);
+}
+function suggestPlaqueOptions(materiau, pieceW, pieceH, qty) {
+    const formats = parseFormats(materiau && materiau.format_plaque);
+    if (!formats.length || pieceW <= 0 || pieceH <= 0) return [];
+    return formats.map(f => {
+        const perSheet = piecesPerSheet(f.w, f.h, pieceW, pieceH);
+        if (perSheet === 0) return null; // la piece ne rentre pas du tout sur cette plaque
+        const sheetsNeeded = Math.ceil(qty / perSheet);
+        const wasteArea = sheetsNeeded * f.w * f.h - qty * pieceW * pieceH;
+        return { ...f, perSheet, sheetsNeeded, wasteArea };
+    }).filter(Boolean).sort((a, b) => a.sheetsNeeded - b.sheetsNeeded || a.wasteArea - b.wasteArea);
+}
+function getPlaqueOptionsForRow(row) {
+    const matId = row.querySelector('.s-mat-line').dataset.value;
+    const materiau = allMateriaux.find(m => m.id == matId);
+    const larg = parseFloat(row.querySelector('.s-line-larg').value) || 0;
+    const haut = parseFloat(row.querySelector('.s-line-haut').value) || 0;
+    const qty = parseInt(row.querySelector('.s-line-qty').value) || 1;
+    return materiau ? suggestPlaqueOptions(materiau, larg, haut, qty) : [];
+}
+function refreshPlaqueSuggestion(row) {
+    const infoBlock = row.querySelector('.s-plaque-info');
+    const options = getPlaqueOptionsForRow(row);
+    if (!options.length) { infoBlock.style.display = 'none'; return; }
+    infoBlock.style.display = 'block';
+    const dd = row.querySelector('.s-plaque-select');
+    dd.dataset.value = 'auto';
+    dd.querySelector('.dropdown-label').textContent = `Optimale : ${options[0].label}`;
+    dd.querySelector('.dropdown-list').innerHTML =
+        `<div class="dropdown-item" data-value="auto" onclick="selectDropdownItem(this)">Optimale (auto)</div>` +
+        options.map(o => `<div class="dropdown-item" data-value="${o.w}x${o.h}" onclick="selectDropdownItem(this)">${o.label} — ${o.sheetsNeeded} plaque${o.sheetsNeeded > 1 ? 's' : ''}</div>`).join('');
+    updatePlaqueSummary(row);
+}
+function updatePlaqueSummary(row) {
+    const options = getPlaqueOptionsForRow(row);
+    if (!options.length) return;
+    const dd = row.querySelector('.s-plaque-select');
+    const choice = dd.dataset.value === 'auto' ? options[0] : (options.find(o => `${o.w}x${o.h}` === dd.dataset.value) || options[0]);
+    row.querySelector('.s-plaque-summary').textContent = `→ ${choice.sheetsNeeded} plaque${choice.sheetsNeeded > 1 ? 's' : ''} de ${choice.label} nécessaire${choice.sheetsNeeded > 1 ? 's' : ''}`;
 }
 
 function panneauLineHTML(idx) {
@@ -1277,6 +1345,14 @@ function panneauLineHTML(idx) {
             <div class="form-group"><label>Quantité</label><input type="number" class="s-line-qty" value="1" min="1" oninput="updateLineM2(this)"></div>
             <div class="form-group"><label>Surface (m²)</label><input type="number" class="s-line-m2" value="1.000" min="0.01" step="0.01"></div>
         </div>
+        <div class="form-group s-plaque-info" style="display:none;">
+            <label>Plaque à découper</label>
+            <div class="dropdown s-plaque-select" id="dd-s-plaque-line-${idx}">
+                <button type="button" class="dropdown-btn" onclick="toggleDropdown('dd-s-plaque-line-${idx}')"><span class="dropdown-label">Optimale (auto)</span></button>
+                <div class="dropdown-list"></div>
+            </div>
+            <p class="s-plaque-summary" style="font-size:10px;color:var(--text-light);margin-top:4px;"></p>
+        </div>
         ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
     </div>`;
 }
@@ -1286,13 +1362,18 @@ function addPanneauLine() {
     document.getElementById('s-panneau-lines').appendChild(wrap.firstElementChild);
 }
 function getPanneauLines() {
-    return [...document.querySelectorAll('#s-panneau-lines .line-row')].map(row => ({
-        matId: row.querySelector('.s-mat-line').dataset.value || '',
-        larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
-        haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
-        qty: parseInt(row.querySelector('.s-line-qty').value) || 1,
-        m2: parseFloat(row.querySelector('.s-line-m2').value) || 0
-    }));
+    return [...document.querySelectorAll('#s-panneau-lines .line-row')].map(row => {
+        const plaqueInfo = row.querySelector('.s-plaque-info');
+        const plaqueSummary = plaqueInfo && plaqueInfo.style.display !== 'none' ? row.querySelector('.s-plaque-summary').textContent : '';
+        return {
+            matId: row.querySelector('.s-mat-line').dataset.value || '',
+            larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
+            haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
+            qty: parseInt(row.querySelector('.s-line-qty').value) || 1,
+            m2: parseFloat(row.querySelector('.s-line-m2').value) || 0,
+            plaqueSummary
+        };
+    });
 }
 
 function directLineHTML(idx) {
@@ -1505,8 +1586,11 @@ async function calcSignaletique() {
     const t = computeTotal(coutMatiereVinyleLam, poseHT + paoHT + venteAchatPanneau + venteImpression, delai);
     const venteSupport = coutMatiereVinyleLam * t.coefficient;
 
+    const plaqueRows = lignes.filter(l => l.plaqueSummary).map(l => ({ label: `${l.mat.support} (${l.larg}×${l.haut}mm × ${l.qty}) ${l.plaqueSummary}`, val: '', stage: 1 }));
+
     const rows = [
         { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${totalConso.toFixed(2)}m²`, val: '', stage: 1 },
+        ...plaqueRows,
         { label: `Achat matériaux panneaux (× coef achat-revente ${coefMateriaux.toFixed(2)})`, val: `${coutAchatPanneau.toFixed(2)}€ → ${venteAchatPanneau.toFixed(2)}€`, stage: 1 },
         coutMatiereVinyleLam > 0 ? { label: `Coût matière vinyle/lamination${visuelVinyle ? ' (visuel)' : ''}${lamination ? ' (+ lamination)' : ''}`, val: `${coutMatiereVinyleLam.toFixed(2)}€`, stage: 1 } : null,
         coutMatiereVinyleLam > 0 ? { label: `Vente matière vinyle/lamination (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
@@ -1590,6 +1674,7 @@ function renderBreakdownRows(rows) {
 }
 
 function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
+    lastDevisDetails = { title, rows };
     document.getElementById('result').innerHTML = `
         ${stockWarningsHTML(warnings)}
         <div class="price-display">
@@ -1613,7 +1698,7 @@ async function saveDevis(type, qty, ht, ttc) {
         await fetch(`${API_URL}/devis`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, qty, ht, ttc, details: {} })
+            body: JSON.stringify({ type, qty, ht, ttc, details: lastDevisDetails || {} })
         });
         showNotification('Devis sauvegardé ✓', 'success');
     } catch (err) { showNotification('Erreur', 'error'); }
@@ -1627,14 +1712,26 @@ async function renderHistorique() {
             return;
         }
         const icons = { vehicule: '🚗', signaletique: '📋', impression: '🖨️', stickers: '🏷️' };
-        document.getElementById('historique-list').innerHTML = devis.map(d => {
+        document.getElementById('historique-list').innerHTML = devis.map((d, i) => {
             const icon = icons[d.type] || '📄';
-            return `<div class="breakdown" style="margin-bottom:8px;">
-                <div class="breakdown-row"><span>${icon} ${d.type}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
+            const details = typeof d.details === 'string' ? JSON.parse(d.details || '{}') : (d.details || {});
+            const hasRows = details.rows && details.rows.length;
+            return `<div class="breakdown" style="margin-bottom:8px;cursor:pointer;" onclick="toggleHistoriqueDetail(${i})">
+                <div class="breakdown-row"><span>${icon} ${details.title || d.type}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
                 <div class="breakdown-row"><span class="label">Qté: ${d.qty}</span><span style="color:var(--primary);font-weight:600;">${parseFloat(d.ttc).toFixed(2)}€ TTC</span></div>
+                <div id="historique-detail-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);" onclick="event.stopPropagation()">
+                    ${hasRows
+                        ? renderBreakdownRows(details.rows) + `<div class="breakdown-row total"><span>TOTAL HT</span><span>${parseFloat(d.ht).toFixed(2)} €</span></div>`
+                        : '<p style="font-size:11px;color:var(--text-light);">Détail non disponible pour ce devis (sauvegardé avant cette fonctionnalité)</p>'}
+                </div>
             </div>`;
         }).join('');
     } catch (err) { console.error(err); }
+}
+
+function toggleHistoriqueDetail(i) {
+    const el = document.getElementById('historique-detail-' + i);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function showNotification(msg, type) {
