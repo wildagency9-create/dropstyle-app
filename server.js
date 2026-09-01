@@ -290,7 +290,8 @@ const DEFAULT_PARAMS = {
     coef_pose_st: 1.30,          // P24 - majoration cout poseur sous-traitant
     seuil_stock_defaut: 2.00,    // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
     marge_plotteur_mm: 50,       // marge technique du plotteur de decoupe (mm, de chaque cote) — plotteur laize 1600 remplace, 1500mm reellement utilisables
-    coef_materiaux: 1.50         // coefficient distinct pour les materiaux panneaux (achat-revente pur, pas de production interne) — a ajuster, hors codes P01-P24
+    coef_materiaux: 2.00,        // coefficient distinct pour les materiaux panneaux (achat-revente pur) — calibre sur facture reelle DE06433, hors codes P01-P24
+    coef_impression_interne: 3.75 // coefficient sur l'impression numerique interne (P23), distinct de P01 (vinyle/lamination) et P22 (Exaprint sous-traite) — calibre sur facture reelle, hors codes P01-P24
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {

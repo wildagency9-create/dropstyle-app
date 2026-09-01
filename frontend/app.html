@@ -1065,23 +1065,24 @@ async function calcStickers() {
     const surface = best.totalSurface;
     const totalQty = shapes.reduce((sum, s) => sum + s.qty, 0);
 
-    // Part matiere (× coefficient) : support (vinyle+lamination) et impression separes pour l'affichage par etape
+    // Part matiere (× coefficient P01) : support (vinyle+lamination). L'impression a son propre
+    // coefficient (coef_impression_interne), distinct de P01, ajoute directement en vente.
     const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0);
     const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
     const coutMatiereSupport = surface * coutM2Support;
     const coutMatiereImpression = surface * coutM2Impression;
-    const coutMatiere = coutMatiereSupport + coutMatiereImpression;
+    const coefImpressionInterne = num('coef_impression_interne', 3.75);
+    const venteImpression = coutMatiereImpression * coefImpressionInterne;
 
     // Part main d'oeuvre (vente directe)
     const tauxAtelier = num('taux_horaire_atelier', 60);
     let echHT = 0;
     if (echCheck) echHT = echMode === 'temps' ? (totalQty * echTemps / 3600) * tauxAtelier : echForfait;
     const decoupeHT = decH * tauxAtelier;
-    const ventes = echHT + decoupeHT;
+    const ventes = echHT + decoupeHT + venteImpression;
 
-    const t = computeTotal(coutMatiere, ventes, delai);
+    const t = computeTotal(coutMatiereSupport, ventes, delai);
     const venteSupport = coutMatiereSupport * t.coefficient;
-    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const compareHTML = candidats.map(c => {
         const isBest = c.laize === best.laize;
@@ -1108,7 +1109,7 @@ async function calcStickers() {
         { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ' + lamination' : ''})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
         imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${surface.toFixed(3)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
-        imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+        imprime ? { label: `Vente impression (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         echHT > 0 ? { label: echMode === 'temps' ? `Échenillage (${totalQty} × ${echTemps}s × ${tauxAtelier}€/h)` : 'Échenillage forfait', val: `${echHT.toFixed(2)}€`, stage: 3 } : null,
         decoupeHT > 0 ? { label: `Découpe / calage (${decH}h × ${tauxAtelier}€/h)`, val: `${decoupeHT.toFixed(2)}€`, stage: 3 } : null,
         ...moteurRows(t, delai)
@@ -1204,7 +1205,8 @@ async function calcVehicule() {
     const remise = qty >= 3 ? num('remise_qte3', 5) / 100 : qty >= 2 ? num('remise_qte2', 3) / 100 : 0;
     const coutMatiereSupport = conso * coutM2Support * (1 - remise) * qty;
     const coutMatiereImpression = conso * coutM2Impression * (1 - remise) * qty;
-    const coutMatiere = coutMatiereSupport + coutMatiereImpression;
+    const coefImpressionInterne = num('coef_impression_interne', 3.75);
+    const venteImpression = coutMatiereImpression * coefImpressionInterne;
 
     // Part main d'oeuvre (vente directe, ou cout sous-traitant × P24)
     let poseHT = 0, poseLabel = '';
@@ -1215,11 +1217,10 @@ async function calcVehicule() {
         poseLabel = `Pose ${poseur.nom} (${poseDuration === 'jour' ? 'journée' : '½ journée'}${st ? ` · coût × ${num('coef_pose_st', 1.3).toFixed(2)}` : ''})`;
     }
     const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 75)) : 0;
-    const ventes = poseHT + paoHT + echenillagePrice;
+    const ventes = poseHT + paoHT + echenillagePrice + venteImpression;
 
-    const t = computeTotal(coutMatiere, ventes, delai);
+    const t = computeTotal(coutMatiereSupport, ventes, delai);
     const venteSupport = coutMatiereSupport * t.coefficient;
-    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const rows = [
         { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
@@ -1228,7 +1229,7 @@ async function calcVehicule() {
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
         paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null,
         imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²${qty > 1 ? ` × ${qty} véh.` : ''})`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
-        imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+        imprime ? { label: `Vente impression (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)}€`, stage: 3 } : null,
         poseHT > 0 ? { label: poseLabel, val: `${poseHT.toFixed(2)}€`, stage: 4 } : null,
         ...moteurRows(t, delai)
@@ -1401,11 +1402,11 @@ async function calcSignaletique() {
             coutMatiereSupport = conso * visuelSupportM2;
             coutMatiereImpression = conso * visuelImpressionM2;
         }
-        const coutMatiere = coutMatiereSupport + coutMatiereImpression;
+        const coefImpressionInterne = num('coef_impression_interne', 3.75);
+        const venteImpression = coutMatiereImpression * coefImpressionInterne;
 
-        const t = computeTotal(coutMatiere, kitVenteHT + poseHT + paoHT, delai);
+        const t = computeTotal(coutMatiereSupport, kitVenteHT + poseHT + paoHT + venteImpression, delai);
         const venteSupport = coutMatiereSupport * t.coefficient;
-        const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
             ...lignes.map(l => ({ label: `Kit « ${l.kit.nom} »${l.qty > 1 ? ` × ${l.qty}` : ''}`, val: `${(parseFloat(l.kit.prix) * l.qty).toFixed(2)}€`, stage: 1 })),
@@ -1413,7 +1414,7 @@ async function calcSignaletique() {
             visuelCheck ? { label: `Vente visuel support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
             paoRow,
             visuelCheck ? { label: `Coût impression visuel (${visuelImpressionM2.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
-            visuelCheck ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+            visuelCheck ? { label: `Vente impression visuel (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
             ...moteurRows(t, delai)
         ].filter(Boolean);
@@ -1444,11 +1445,11 @@ async function calcSignaletique() {
         const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
         const coutMatiereSupport = conso * coutM2Support;
         const coutMatiereImpression = conso * coutM2Impression;
-        const coutMatiere = coutMatiereSupport + coutMatiereImpression;
+        const coefImpressionInterne = num('coef_impression_interne', 3.75);
+        const venteImpression = coutMatiereImpression * coefImpressionInterne;
 
-        const t = computeTotal(coutMatiere, poseHT + paoHT, delai);
+        const t = computeTotal(coutMatiereSupport, poseHT + paoHT + venteImpression, delai);
         const venteSupport = coutMatiereSupport * t.coefficient;
-        const venteImpression = coutMatiereImpression * t.coefficient;
 
         const rows = [
             { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
@@ -1456,7 +1457,7 @@ async function calcSignaletique() {
             { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
             paoRow,
             imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
-            imprime ? { label: `Vente impression (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+            imprime ? { label: `Vente impression (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
             poseRow,
             ...moteurRows(t, delai)
         ].filter(Boolean);
@@ -1497,12 +1498,12 @@ async function calcSignaletique() {
         matStock.set(l.mat.id, entry);
     });
     const venteAchatPanneau = coutAchatPanneau * coefMateriaux;
-    const coutMatiere = coutMatiereVinyleLam + coutMatiereImpression;
+    const coefImpressionInterne = num('coef_impression_interne', 3.75);
+    const venteImpression = coutMatiereImpression * coefImpressionInterne;
     const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
 
-    const t = computeTotal(coutMatiere, poseHT + paoHT + venteAchatPanneau, delai);
+    const t = computeTotal(coutMatiereVinyleLam, poseHT + paoHT + venteAchatPanneau + venteImpression, delai);
     const venteSupport = coutMatiereVinyleLam * t.coefficient;
-    const venteImpression = coutMatiereImpression * t.coefficient;
 
     const rows = [
         { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${totalConso.toFixed(2)}m²`, val: '', stage: 1 },
@@ -1511,7 +1512,7 @@ async function calcSignaletique() {
         coutMatiereVinyleLam > 0 ? { label: `Vente matière vinyle/lamination (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 } : null,
         paoRow,
         visuelVinyle ? { label: `Coût impression visuel (${coutM2Impression.toFixed(2)}€/m² × ${totalConso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
-        visuelVinyle ? { label: `Vente impression visuel (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+        visuelVinyle ? { label: `Vente impression visuel (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         poseRow,
         ...moteurRows(t, delai)
     ].filter(Boolean);
