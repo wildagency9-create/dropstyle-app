@@ -944,7 +944,15 @@ function renderTarifs() {
 }
 
 function toggleVisuel() {
-    document.getElementById('s-visuel-cond').classList.toggle('active', document.getElementById('s-visuel-check').checked);
+    const checked = document.getElementById('s-visuel-check').checked;
+    document.getElementById('s-visuel-cond').classList.toggle('active', checked);
+    if (checked) {
+        // Ouvre directement la liste des vinyles : la case est cochee par defaut, autant
+        // eviter un clic en plus pour voir les choix disponibles.
+        const dd = document.getElementById('dd-s-vinyle');
+        document.querySelectorAll('.dropdown.open').forEach(d => { if (d !== dd) d.classList.remove('open'); });
+        dd.classList.add('open');
+    }
 }
 
 // Le "Type de support" determine reellement les champs affiches : un panneau a besoin
@@ -962,13 +970,12 @@ function updateSignaletiqueFields(type) {
     document.getElementById('s-visuel-dims-cond').classList.toggle('active', isRollup);
     if (!(isPanneau || isRollup)) {
         document.getElementById('s-visuel-check').checked = false;
-        toggleVisuel();
     } else if (!document.getElementById('s-visuel-check').checked) {
         // La quasi-totalite des visuels panneau/roll-up sont imprimes : coche par defaut,
         // l'utilisateur peut toujours decocher pour un support brut sans impression.
         document.getElementById('s-visuel-check').checked = true;
-        toggleVisuel();
     }
+    toggleVisuel(); // synchronise l'affichage (et ouvre la liste vinyle) avec l'etat actuel de la case
 }
 
 // ============ STICKERS - OPTIMISATION ============
