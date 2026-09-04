@@ -567,6 +567,133 @@ app.delete('/api/devis/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===== V10 — ASSISTANT (Claude) =====
+// Deux usages : chiffrer a partir d'une phrase, et repondre sur les devis enregistres.
+// L'IA ne calcule JAMAIS de prix : elle remplit le formulaire, c'est computeTotal() cote
+// navigateur qui chiffre avec les coefficients calibres. La cle API reste cote serveur.
+const Anthropic = require('@anthropic-ai/sdk');
+
+// Schema strict : l'IA ne peut renvoyer que des champs que le frontend sait appliquer.
+const OUTIL_DEVIS = {
+    name: 'remplir_devis',
+    description: "Remplit le formulaire de devis a partir de la demande. N'utiliser QUE si l'utilisateur decrit un travail a chiffrer. Ne pas utiliser pour une question sur les devis passes.",
+    strict: true,
+    input_schema: {
+        type: 'object',
+        properties: {
+            onglet: { type: 'string', enum: ['vehicule', 'signaletique', 'stickers'], description: 'Calculateur a utiliser' },
+            type_support: { type: ['string', 'null'], enum: ['panneau', 'bache', 'vitrophanie', 'adhesif', 'lettrage', 'rollup', null], description: 'Signaletique uniquement' },
+            type_vehicule: { type: ['string', 'null'], enum: ['citadine', 'berline', 'suv', 'utilitaire', 'fourgon', 'camion', null] },
+            type_marquage: { type: ['string', 'null'], enum: ['total', 'partiel', 'bandes', 'logos', 'custome', null] },
+            lignes: {
+                type: ['array', 'null'],
+                description: 'Une entree par format demande (signaletique et stickers). Dimensions en millimetres.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        largeur_mm: { type: 'number' },
+                        hauteur_mm: { type: 'number' },
+                        quantite: { type: 'integer' },
+                        materiau_id: { type: ['integer', 'null'], description: 'Id du materiau panneau, uniquement pour type_support panneau ou bache' }
+                    },
+                    required: ['largeur_mm', 'hauteur_mm', 'quantite', 'materiau_id'],
+                    additionalProperties: false
+                }
+            },
+            vinyle_id: { type: ['integer', 'null'] },
+            lamination_id: { type: ['integer', 'null'], description: 'null = sans lamination' },
+            kit_id: { type: ['integer', 'null'], description: 'Roll-up uniquement' },
+            quantite_kit: { type: ['integer', 'null'], description: 'Roll-up uniquement' },
+            imprime: { type: ['boolean', 'null'], description: 'Visuel imprime (vrai par defaut sauf mention contraire)' },
+            pose_points: { type: ['integer', 'null'], description: 'Nombre de points de pose sur site, 0 si sans pose' },
+            pao: { type: ['boolean', 'null'] },
+            delai: { type: ['string', 'null'], enum: ['normal', 'urgent', 'express', null] },
+            manque: { type: 'string', description: "Ce qui manque ou a ete suppose, en une phrase. Chaine vide si tout etait precise." }
+        },
+        required: ['onglet', 'type_support', 'type_vehicule', 'type_marquage', 'lignes', 'vinyle_id', 'lamination_id', 'kit_id', 'quantite_kit', 'imprime', 'pose_points', 'pao', 'delai', 'manque'],
+        additionalProperties: false
+    }
+};
+
+async function contexteAssistant(userId) {
+    const conn = await pool.getConnection();
+    const [vinyles] = await conn.query('SELECT id, name, price FROM vinyles WHERE user_id = ?', [userId]);
+    const [materiaux] = await conn.query('SELECT id, support, price, format_plaque FROM materiaux WHERE user_id = ?', [userId]);
+    const [laminations] = await conn.query('SELECT id, nom, prix FROM laminations WHERE user_id = ?', [userId]);
+    const [kits] = await conn.query('SELECT id, nom, prix FROM kits_signaletique WHERE user_id = ?', [userId]);
+    const [devis] = await conn.query('SELECT id, client, type, qty, ht, ttc, created_at FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [userId]);
+    await conn.release();
+    return { vinyles, materiaux, laminations, kits, devis };
+}
+
+app.post('/api/chat', verifyToken, async (req, res) => {
+    if (!process.env.ANTHROPIC_API_KEY) {
+        return res.status(503).json({ error: "Assistant non configuré : la clé ANTHROPIC_API_KEY n'est pas définie sur le serveur." });
+    }
+    try {
+        const { message, historique } = req.body;
+        if (!message || !String(message).trim()) return res.status(400).json({ error: 'Message vide' });
+
+        const ctx = await contexteAssistant(req.userId);
+        const client = new Anthropic();
+
+        const system = `Tu es l'assistant de DropStyle, une entreprise de signalétique et de covering de véhicules. Tu aides à préparer des devis et à retrouver des informations sur les devis déjà enregistrés.
+
+RÈGLE ABSOLUE : tu ne calcules JAMAIS de prix toi-même et tu n'en inventes jamais. Le moteur de prix de l'application est calibré sur les factures réelles de l'entreprise. Ton rôle est de remplir le formulaire (outil remplir_devis) ; l'application fait le calcul.
+
+Deux cas :
+1. L'utilisateur décrit un travail à chiffrer → appelle l'outil remplir_devis. Choisis les identifiants dans le catalogue ci-dessous. Si une information manque, prends l'option la plus courante et signale-le dans le champ "manque".
+2. L'utilisateur pose une question (sur ses devis passés, sur le catalogue, sur le fonctionnement) → réponds directement en texte, sans appeler l'outil.
+
+Conventions : dimensions en millimètres. Les visuels sont imprimés par défaut. Réponds toujours en français, brièvement.
+
+CATALOGUE VINYLES (id | nom | prix achat €/m²) :
+${ctx.vinyles.map(v => `${v.id} | ${v.name} | ${v.price}`).join('\n') || '(aucun)'}
+
+CATALOGUE MATÉRIAUX PANNEAUX (id | nom | prix achat €/m² | formats de plaque) :
+${ctx.materiaux.map(m => `${m.id} | ${m.support} | ${m.price} | ${m.format_plaque || '-'}`).join('\n') || '(aucun)'}
+
+LAMINATIONS (id | nom | prix achat €/m²) :
+${ctx.laminations.map(l => `${l.id} | ${l.nom} | ${l.prix}`).join('\n') || '(aucune)'}
+
+KITS ROLL-UP (id | nom | prix de vente €) :
+${ctx.kits.map(k => `${k.id} | ${k.nom} | ${k.prix}`).join('\n') || '(aucun)'}
+
+DEVIS ENREGISTRÉS (id | client | type | qté | HT | TTC | date) :
+${ctx.devis.map(d => `${d.id} | ${d.client || 'sans nom'} | ${d.type} | ${d.qty} | ${d.ht} | ${d.ttc} | ${new Date(d.created_at).toLocaleDateString('fr-FR')}`).join('\n') || '(aucun devis enregistré)'}`;
+
+        const messages = [
+            ...(Array.isArray(historique) ? historique.slice(-10).filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string') : []),
+            { role: 'user', content: String(message) }
+        ];
+
+        const reponse = await client.messages.create({
+            model: 'claude-opus-5',
+            max_tokens: 4000,
+            thinking: { type: 'adaptive' },
+            output_config: { effort: 'medium' }, // extraction + Q&A : pas besoin de l'effort maximal
+            system,
+            tools: [OUTIL_DEVIS],
+            messages
+        });
+
+        const texte = reponse.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        const appelOutil = reponse.content.find(b => b.type === 'tool_use');
+
+        res.json({
+            reponse: texte,
+            devis: appelOutil ? appelOutil.input : null,
+            refus: reponse.stop_reason === 'refusal'
+        });
+    } catch (err) {
+        if (err instanceof Anthropic.AuthenticationError) return res.status(502).json({ error: 'Clé API Anthropic invalide.' });
+        if (err instanceof Anthropic.RateLimitError) return res.status(502).json({ error: 'Trop de requêtes vers l\'assistant, réessayez dans un instant.' });
+        if (err instanceof Anthropic.APIError) return res.status(502).json({ error: `Assistant indisponible (${err.status}).` });
+        console.error('Chat:', err.message);
+        res.status(500).json({ error: 'Erreur assistant : ' + err.message });
+    }
+});
+
 // ===== V8 — STOCK (module independant du moteur de prix) =====
 const STOCK_TABLES = {
     vinyles: { table: 'vinyles', nameCol: 'name' },

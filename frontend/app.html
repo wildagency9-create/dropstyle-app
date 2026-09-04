@@ -361,6 +361,7 @@
                 <button class="tab-btn" onclick="switchTab('signaletique', this)">📋 Signal.</button>
                 <button class="tab-btn" onclick="switchTab('impression', this)">🖨️ Print</button>
                 <button class="tab-btn" onclick="switchTab('stickers', this)">🏷️ Stickers</button>
+                <button class="tab-btn" onclick="switchTab('chat', this)">💬 Assistant</button>
                 <button class="tab-btn" onclick="switchTab('tarifs', this); renderTarifs()">📖 Tarifs</button>
                 <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Hist.</button>
             </div>
@@ -711,6 +712,21 @@
                 <button onclick="calcStickers()" class="btn-block">Calculer optimisation</button>
             </div>
 
+            <!-- ASSISTANT (V10) — decrit le job en francais, l'IA remplit le formulaire -->
+            <div class="tab-content" id="tab-chat">
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;">
+                    Décris le travail en une phrase et l'assistant remplit le calculateur — c'est le moteur qui chiffre, jamais l'IA.
+                    Tu peux aussi poser une question sur tes devis enregistrés.
+                </p>
+                <div id="chat-messages" style="max-height:340px;overflow-y:auto;margin-bottom:12px;"></div>
+                <div class="form-group">
+                    <textarea id="chat-input" rows="3" placeholder="Ex : 3 panneaux dibond 1200x800 imprimés, pose sur site 1 point&#10;Ex : combien de devis j'ai fait pour la mairie ?"
+                        style="width:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:10px;font-family:inherit;font-size:12px;resize:vertical;"
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();envoyerChat();}"></textarea>
+                </div>
+                <button class="btn-block" id="chat-send" onclick="envoyerChat()">Envoyer</button>
+            </div>
+
             <!-- TARIFS (V6) — verification des donnees matiere et parametres du moteur -->
             <div class="tab-content" id="tab-tarifs">
                 <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">Données actuellement utilisées par le moteur (synchronisées depuis Google Sheets via l'admin). Prix = <b>achat</b>, multipliés par le coefficient dans les devis.</p>
@@ -949,7 +965,9 @@ function renderTarifs() {
     html += section('Poseurs', allPoseurs.map(pp => row(`${pp.nom}${pp.type_prix === 'cout' ? ' <span style="color:var(--text-light);">· coût × P24</span>' : ' <span style="color:var(--text-light);">· vente directe</span>'}`, `${eur(pp.jour)}/j · ${eur(pp.demijour)}/½j`)).join(''));
 
     const P = [
-        ['P01 Coefficient matière', '×' + num('coefficient', 2)],
+        ['P01 Coefficient vinyle / production interne', '×' + num('coefficient', 2)],
+        ['Coef achat-revente matériaux panneaux', '×' + num('coef_materiaux', 2.0)],
+        ['Coef impression numérique interne', '×' + num('coef_impression_interne', 3.75)],
         ['P02 TVA', num('tva', 20) + '%'],
         ['P03 Minimum de commande', eur(num('minimum_commande', 80))],
         ['P04 Frais de dossier', eur(num('frais_dossier', 40))],
@@ -1598,7 +1616,7 @@ async function calcSignaletique() {
     const lamM2 = lamination ? parseFloat(lamination.prix) : 0;
     const visuelSupportM2 = visuelVinyle ? parseFloat(visuelVinyle.price) : 0;
     const coutM2Impression = visuelVinyle ? num('impression_m2', 12) : 0;
-    const coefMateriaux = num('coef_materiaux', 1.5);
+    const coefMateriaux = num('coef_materiaux', 2.0); // doit rester aligne sur DEFAULT_PARAMS cote serveur
 
     // Le materiau panneau est de l'achat-revente (coef_materiaux, plus bas) ; le vinyle du
     // visuel + la lamination restent de la production interne (coefficient P01, comme partout ailleurs).
@@ -1748,6 +1766,155 @@ async function saveDevis(type, qty, ht, ttc, btn) {
         showNotification('Erreur', 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'Sauvegarder le devis'; } // reactive pour reessayer
     }
+}
+
+// ===== V10 — ASSISTANT =====
+// L'IA renvoie uniquement un remplissage de formulaire ; le chiffrage reste fait par
+// computeTotal() avec les coefficients calibres. Rien ici ne calcule de prix.
+let chatHistorique = [];
+
+function chatAjouter(role, html) {
+    const zone = document.getElementById('chat-messages');
+    const bulle = document.createElement('div');
+    const moi = role === 'user';
+    bulle.style.cssText = `margin-bottom:8px;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;${
+        moi ? 'background:rgba(216,90,48,0.15);border:1px solid var(--primary);'
+            : 'background:var(--bg-card);border:1px solid var(--border);'}`;
+    bulle.innerHTML = html;
+    zone.appendChild(bulle);
+    zone.scrollTop = zone.scrollHeight;
+    return bulle;
+}
+
+async function envoyerChat() {
+    const input = document.getElementById('chat-input');
+    const bouton = document.getElementById('chat-send');
+    const message = input.value.trim();
+    if (!message) return;
+
+    chatAjouter('user', escapeHtml(message));
+    input.value = '';
+    bouton.disabled = true;
+    const attente = chatAjouter('assistant', '<span style="color:var(--text-light);">…</span>');
+
+    try {
+        const r = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, historique: chatHistorique })
+        });
+        const d = await r.json();
+        if (!r.ok) { attente.innerHTML = `<span style="color:var(--danger);">${escapeHtml(d.error || 'Erreur')}</span>`; return; }
+
+        chatHistorique.push({ role: 'user', content: message });
+        chatHistorique.push({ role: 'assistant', content: d.reponse || '(formulaire rempli)' });
+
+        let html = d.reponse ? escapeHtml(d.reponse).replace(/\n/g, '<br>') : '';
+        if (d.devis) {
+            const applique = appliquerDevisIA(d.devis);
+            html += (html ? '<br><br>' : '') + `<span style="color:var(--success);">✓ ${escapeHtml(applique)}</span>`;
+            if (d.devis.manque) html += `<br><span style="color:var(--text-light);">À vérifier : ${escapeHtml(d.devis.manque)}</span>`;
+        }
+        attente.innerHTML = html || '<span style="color:var(--text-light);">(pas de réponse)</span>';
+    } catch (err) {
+        attente.innerHTML = '<span style="color:var(--danger);">Erreur réseau</span>';
+    } finally {
+        bouton.disabled = false;
+    }
+}
+
+// Positionne un menu deroulant (valeur + libelle visible), comme le ferait un clic utilisateur.
+function setDropdown(id, value) {
+    const dd = document.getElementById(id);
+    if (!dd || value === null || value === undefined) return;
+    dd.dataset.value = String(value);
+    const item = [...dd.querySelectorAll('.dropdown-item')].find(i => i.dataset.value == value);
+    if (item) dd.querySelector('.dropdown-label').textContent = item.textContent;
+}
+
+function appliquerDevisIA(d) {
+    const lignes = Array.isArray(d.lignes) ? d.lignes : [];
+    const imprime = d.imprime !== false; // imprime par defaut
+
+    if (d.onglet === 'vehicule') {
+        switchTab('vehicule', document.querySelectorAll('.tab-btn')[0]);
+        setDropdown('dd-v-type', d.type_vehicule);
+        setDropdown('dd-v-marquage', d.type_marquage);
+        setDropdown('dd-v-vinyle', d.vinyle_id);
+        setDropdown('dd-v-lam', d.lamination_id || 0);
+        document.getElementById('v-imprime-check').checked = imprime;
+        document.getElementById('v-pao-check').checked = !!d.pao; togglePAO();
+        setDropdown('dd-v-delai', d.delai || 'normal');
+        calcVehicule();
+        return 'Calculateur Véhicule rempli et calculé.';
+    }
+
+    if (d.onglet === 'stickers') {
+        switchTab('stickers', document.querySelectorAll('.tab-btn')[3]);
+        document.getElementById('st-shapes').innerHTML = '';
+        (lignes.length ? lignes : [{ largeur_mm: 80, hauteur_mm: 60, quantite: 100 }]).forEach(l => {
+            addShapeRow();
+            const row = document.querySelector('#st-shapes .shape-row:last-child');
+            row.querySelector('.st-shape-larg').value = l.largeur_mm;
+            row.querySelector('.st-shape-haut').value = l.hauteur_mm;
+            row.querySelector('.st-shape-qty').value = l.quantite;
+        });
+        setDropdown('dd-st-vinyle', d.vinyle_id);
+        setDropdown('dd-st-lam', d.lamination_id || 0);
+        document.getElementById('st-imprime-check').checked = imprime;
+        setDropdown('dd-st-delai', d.delai || 'normal');
+        calcStickers();
+        return `Calculateur Stickers rempli (${lignes.length || 1} forme${lignes.length > 1 ? 's' : ''}) et calculé.`;
+    }
+
+    // Signaletique
+    switchTab('signaletique', document.querySelectorAll('.tab-btn')[1]);
+    setDropdown('dd-s-type', d.type_support || 'panneau');
+    updateSignaletiqueFields(d.type_support || 'panneau');
+    setDropdown('dd-s-lam', d.lamination_id || 0);
+    document.getElementById('s-pose-points').value = d.pose_points || 0;
+    document.getElementById('s-pao-check').checked = !!d.pao; toggleSPAO();
+    setDropdown('dd-s-delai', d.delai || 'normal');
+
+    const type = d.type_support || 'panneau';
+    if (type === 'rollup') {
+        document.getElementById('s-rollup-lines').innerHTML = '';
+        addRollupLine();
+        const row = document.querySelector('#s-rollup-lines .line-row:last-child');
+        setDropdown(row.querySelector('.s-kit-line').id, d.kit_id);
+        row.querySelector('.s-line-qty').value = d.quantite_kit || 1;
+        document.getElementById('s-visuel-check').checked = imprime; toggleVisuel();
+        if (imprime) setDropdown('dd-s-vinyle', d.vinyle_id);
+    } else if (type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage') {
+        setDropdown('dd-s-vinyle-direct', d.vinyle_id);
+        document.getElementById('s-direct-imprime-check').checked = imprime;
+        document.getElementById('s-direct-lines').innerHTML = '';
+        lignes.forEach(l => {
+            addDirectLine();
+            const row = document.querySelector('#s-direct-lines .line-row:last-child');
+            row.querySelector('.s-line-larg').value = l.largeur_mm;
+            row.querySelector('.s-line-haut').value = l.hauteur_mm;
+            row.querySelector('.s-line-qty').value = l.quantite;
+            updateLineM2(row.querySelector('.s-line-larg'));
+        });
+        if (!lignes.length) addDirectLine();
+    } else { // panneau / bache
+        document.getElementById('s-panneau-lines').innerHTML = '';
+        lignes.forEach(l => {
+            addPanneauLine();
+            const row = document.querySelector('#s-panneau-lines .line-row:last-child');
+            setDropdown(row.querySelector('.s-mat-line').id, l.materiau_id);
+            row.querySelector('.s-line-larg').value = l.largeur_mm;
+            row.querySelector('.s-line-haut').value = l.hauteur_mm;
+            row.querySelector('.s-line-qty').value = l.quantite;
+            updateLineM2(row.querySelector('.s-line-larg'));
+        });
+        if (!lignes.length) addPanneauLine();
+        document.getElementById('s-visuel-check').checked = imprime; toggleVisuel();
+        if (imprime) setDropdown('dd-s-vinyle', d.vinyle_id);
+    }
+    calcSignaletique();
+    return `Calculateur Signalétique rempli (${SIGNALETIQUE_LABELS[type] || type}) et calculé.`;
 }
 
 async function renderHistorique() {
