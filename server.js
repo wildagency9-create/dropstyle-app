@@ -815,12 +815,14 @@ const STOCK_TABLES = {
     tapes: { table: 'tapes', nameCol: 'nom' }
 };
 
-function sendBrevoEmail(to, subject, text) {
+// nomExpediteur : ce que le destinataire voit dans sa boite mail. Il depend du type de
+// message — une convocation a une reunion ne doit pas arriver signee "DropStyle Stock".
+function sendBrevoEmail(to, subject, text, nomExpediteur) {
     return new Promise((resolve) => {
         const apiKey = process.env.BREVO_API_KEY;
-        if (!apiKey) { console.log('BREVO_API_KEY non configurée — alerte stock non envoyée par email.'); return resolve(); }
+        if (!apiKey) { console.log('BREVO_API_KEY non configurée — email non envoyé : ' + subject); return resolve(); }
         const payload = JSON.stringify({
-            sender: { email: process.env.BREVO_FROM_EMAIL || 'contact@dropstyle.fr', name: 'DropStyle Stock' },
+            sender: { email: process.env.BREVO_FROM_EMAIL || 'contact@dropstyle.fr', name: nomExpediteur || 'DropStyle' },
             to: to.map(email => ({ email })),
             subject,
             textContent: text
@@ -844,7 +846,8 @@ async function sendStockAlertEmail(nom, stock, seuil) {
     await conn.release();
     if (!admins.length) return;
     await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
-        `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`);
+        `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`,
+        'DropStyle Stock');
 }
 
 app.get('/api/stock', verifyToken, async (req, res) => {
@@ -1061,8 +1064,11 @@ app.post('/api/notifications', verifyToken, async (req, res) => {
             const de = expediteur.length ? expediteur[0].nom : 'Un collègue';
             const quand = date_rdv ? `\n\nDate : ${new Date(date_rdv).toLocaleString('fr-FR')}` : '';
             // Volontairement non attendu : un echec d'email ne doit pas faire echouer la notification.
+            // Le nom du collegue apparait comme expediteur : le destinataire voit tout de suite
+            // qui lui ecrit, sans avoir a ouvrir le message.
             sendBrevoEmail([dest[0].email], `DropStyle — ${titre.trim()}`,
-                `${de} vous a envoyé un message dans DropStyle :\n\n${titre.trim()}\n${message || ''}${quand}`);
+                `${de} vous a envoyé un message dans DropStyle :\n\n${titre.trim()}\n${message || ''}${quand}`,
+                `${de} · DropStyle`);
         }
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
