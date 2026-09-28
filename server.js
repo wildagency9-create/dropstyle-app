@@ -13,6 +13,11 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
     return require('crypto').randomBytes(32).toString('hex');
 })();
 
+// Railway place l'application derriere son proxy : sans ceci, express-rate-limit voit
+// l'adresse du proxy pour tout le monde et compte les tentatives de connexion de tous les
+// utilisateurs dans le meme compteur. 1 = on ne fait confiance qu'au premier relais.
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
@@ -831,10 +836,18 @@ const STOCK_TABLES = {
 
 // nomExpediteur : ce que le destinataire voit dans sa boite mail. Il depend du type de
 // message — une convocation a une reunion ne doit pas arriver signee "DropStyle Stock".
+//
+// Ne rejette jamais : un email rate ne doit pas faire echouer l'action en cours (invitation,
+// devis, alerte). Renvoie en revanche le resultat reel, pour que l'interface puisse le dire
+// au lieu de laisser l'utilisateur croire que le message est parti.
+// Resultat : { ok: true } ou { ok: false, message: "<phrase lisible>" }
 function sendBrevoEmail(to, subject, text, nomExpediteur) {
     return new Promise((resolve) => {
         const apiKey = process.env.BREVO_API_KEY;
-        if (!apiKey) { console.log('BREVO_API_KEY non configurée — email non envoyé : ' + subject); return resolve(); }
+        if (!apiKey) {
+            console.log('BREVO_API_KEY non configurée — email non envoyé : ' + subject);
+            return resolve({ ok: false, message: "la clé BREVO_API_KEY n'est pas configurée sur le serveur" });
+        }
         const payload = JSON.stringify({
             sender: { email: process.env.BREVO_FROM_EMAIL || 'contact@dropstyle.fr', name: nomExpediteur || 'DropStyle' },
             to: to.map(email => ({ email })),
@@ -846,9 +859,21 @@ function sendBrevoEmail(to, subject, text, nomExpediteur) {
             headers: { 'api-key': apiKey, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
         }, (r) => {
             let d = ''; r.on('data', c => d += c);
-            r.on('end', () => { if (r.statusCode >= 400) console.error('Brevo HTTP ' + r.statusCode + ': ' + d); resolve(); });
+            r.on('end', () => {
+                if (r.statusCode < 400) return resolve({ ok: true });
+                console.error('Brevo HTTP ' + r.statusCode + ': ' + d);
+                // Brevo renvoie {"message": "...", "code": "..."} : on remonte sa phrase telle
+                // quelle, c'est elle qui dit quoi corriger (IP non autorisee, expediteur non
+                // valide, cle invalide...).
+                let detail = '';
+                try { detail = JSON.parse(d).message || ''; } catch (e) { detail = (d || '').slice(0, 300); }
+                resolve({ ok: false, message: `Brevo a refusé l'envoi (erreur ${r.statusCode})${detail ? ' : ' + detail : ''}` });
+            });
         });
-        request.on('error', (e) => { console.error('Brevo:', e.message); resolve(); });
+        request.on('error', (e) => {
+            console.error('Brevo:', e.message);
+            resolve({ ok: false, message: 'le serveur de mail est injoignable (' + e.message + ')' });
+        });
         request.write(payload);
         request.end();
     });
@@ -859,9 +884,10 @@ async function sendStockAlertEmail(nom, stock, seuil) {
     const [admins] = await conn.query("SELECT email FROM users WHERE role = 'admin'");
     await conn.release();
     if (!admins.length) return;
-    await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
+    const envoi = await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
         `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`,
         'DropStyle Stock');
+    if (!envoi.ok) console.error(`Alerte stock "${nom}" non envoyée — ${envoi.message}`);
 }
 
 app.get('/api/stock', verifyToken, async (req, res) => {
@@ -1074,17 +1100,19 @@ app.post('/api/notifications', verifyToken, async (req, res) => {
              ref_type || null, ref_id || null, date_rdv || null]);
         const [expediteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
         await conn.release();
+        // La notification est deja enregistree : elle apparaitra sur la cloche meme si l'email
+        // echoue. On attend seulement pour pouvoir signaler cet echec a l'ecran.
+        let envoi = null;
         if (envoyer_email && dest[0].email) {
             const de = expediteur.length ? expediteur[0].nom : 'Un collègue';
             const quand = date_rdv ? `\n\nDate : ${new Date(date_rdv).toLocaleString('fr-FR')}` : '';
-            // Volontairement non attendu : un echec d'email ne doit pas faire echouer la notification.
             // Le nom du collegue apparait comme expediteur : le destinataire voit tout de suite
             // qui lui ecrit, sans avoir a ouvrir le message.
-            sendBrevoEmail([dest[0].email], `DropStyle — ${titre.trim()}`,
+            envoi = await sendBrevoEmail([dest[0].email], `DropStyle — ${titre.trim()}`,
                 `${de} vous a envoyé un message dans DropStyle :\n\n${titre.trim()}\n${message || ''}${quand}`,
                 `${de} · DropStyle`);
         }
-        res.status(201).json({ message: 'OK' });
+        res.status(201).json({ message: 'OK', envoi });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/notifications/toutes-lues', verifyToken, async (req, res) => {
@@ -1153,11 +1181,11 @@ app.post('/api/invitations', verifyToken, async (req, res) => {
         const corps = (message || `Bonjour,\n\n${de} vous invite à rejoindre DropStyle, le calculateur de devis de l'entreprise.`)
             + `\n\nCliquez sur ce lien pour créer votre accès :\n${lien}`
             + `\n\nCe lien est personnel et valable ${DUREE_INVITATION_JOURS} jours.`;
-        // Non attendu : si l'email echoue, l'invitation existe quand meme et le lien
-        // est renvoye a l'admin, qui peut le transmettre lui-meme.
-        sendBrevoEmail([email], `Invitation à rejoindre DropStyle`, corps, `${de} · DropStyle`);
+        // Attendu pour pouvoir dire a l'admin ce qui s'est reellement passe. Un echec
+        // n'annule pas l'invitation : le lien reste valable et affiche a l'ecran.
+        const envoi = await sendBrevoEmail([email], `Invitation à rejoindre DropStyle`, corps, `${de} · DropStyle`);
 
-        res.status(201).json({ lien, email, expire_dans_jours: DUREE_INVITATION_JOURS, email_configure: !!process.env.BREVO_API_KEY });
+        res.status(201).json({ lien, email, expire_dans_jours: DUREE_INVITATION_JOURS, envoi });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

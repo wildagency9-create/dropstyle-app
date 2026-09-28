@@ -709,7 +709,7 @@ async function envoyerNotifAdmin() {
     if (!titre) { alert("L'objet est obligatoire"); return; }
     btn.disabled = true; btn.textContent = 'Envoi...';
     try {
-        await apiAdmin('/notifications', 'POST', {
+        const d = await apiAdmin('/notifications', 'POST', {
             vers_user_id: parseInt(document.getElementById('ni-dest').value, 10),
             type: document.getElementById('ni-type').value,
             titre,
@@ -721,7 +721,10 @@ async function envoyerNotifAdmin() {
         document.getElementById('ni-message').value = '';
         document.getElementById('ni-rdv').value = '';
         document.getElementById('ni-email').checked = false;
-        alert('Message envoyé ✓');
+        // Le message est toujours sur la cloche ; seul l'email a pu echouer.
+        alert(d.envoi && !d.envoi.ok
+            ? `Message envoyé sur la cloche, mais l'email n'est pas parti : ${d.envoi.message}`
+            : 'Message envoyé ✓');
     } catch (err) { alert(err.message); }
     btn.disabled = false; btn.textContent = 'Envoyer';
 }
@@ -739,12 +742,13 @@ async function envoyerInvitation() {
         });
         // Le lien est toujours affiche : si Brevo n'est pas configure ou si l'email
         // n'arrive pas, l'admin peut le transmettre lui-meme.
+        const ok = d.envoi && d.envoi.ok;
         document.getElementById('inv-resultat').innerHTML = `
-            <div style="background:rgba(76,175,80,.1);border:1px solid var(--success);border-radius:6px;padding:12px;">
+            <div style="background:${ok ? 'rgba(76,175,80,.1)' : 'rgba(212,175,55,.1)'};border:1px solid ${ok ? 'var(--success)' : 'var(--gold)'};border-radius:6px;padding:12px;">
                 <div style="font-size:12px;margin-bottom:8px;">
-                    ${d.email_configure
-                        ? `Invitation envoyée à <b>${escapeHtml(d.email)}</b>.`
-                        : `Invitation créée. <b>L'email n'a pas été envoyé</b> : BREVO_API_KEY n'est pas configurée sur Railway. Transmettez le lien vous-même.`}
+                    ${ok
+                        ? `Invitation envoyée par email à <b>${escapeHtml(d.email)}</b>.`
+                        : `Invitation créée, mais <b>l'email n'est pas parti</b> : ${escapeHtml((d.envoi && d.envoi.message) || 'raison inconnue')}.<br>Transmettez le lien ci-dessous vous-même.`}
                 </div>
                 <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Lien personnel (valable ${d.expire_dans_jours} jours, à usage unique) :</div>
                 <input type="text" readonly value="${escapeHtml(d.lien)}" onclick="this.select()" style="font-size:11px;">

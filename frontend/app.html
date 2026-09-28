@@ -2413,7 +2413,7 @@ async function envoyerNotif() {
     if (!titre) { showNotification('L\'objet est obligatoire', 'error'); return; }
     ok.disabled = true; ok.textContent = 'Envoi...';
     try {
-        await apiSend('/notifications', 'POST', {
+        const d = await apiSend('/notifications', 'POST', {
             vers_user_id: parseInt(document.getElementById('mn-dest').value, 10),
             type: document.getElementById('mn-type').value,
             titre,
@@ -2424,7 +2424,9 @@ async function envoyerNotif() {
             envoyer_email: document.getElementById('mn-email').checked
         });
         fermerModal('modal-notif');
-        showNotification('Message envoyé ✓', 'success');
+        // Le message est toujours sur la cloche du collegue ; seul l'email a pu echouer.
+        if (d.envoi && !d.envoi.ok) showNotification("Envoyé, mais l'email n'est pas parti : " + d.envoi.message, 'error');
+        else showNotification('Message envoyé ✓', 'success');
     } catch (err) {
         showNotification(err.message, 'error');
         ok.disabled = false; ok.textContent = 'Envoyer';
