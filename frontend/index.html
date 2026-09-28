@@ -241,6 +241,34 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Gege traverse l'ecran au clic sur "S'inscrire". L'image n'est telechargee
+           qu'au declenchement (src pose en JS), la page de connexion reste legere. */
+        .gege {
+            position: fixed; bottom: -14px; left: -220px;
+            height: 240px; width: auto;
+            z-index: 200; pointer-events: none; display: none;
+            filter: drop-shadow(0 8px 18px rgba(0,0,0,.6));
+        }
+        .gege.go { display: block; animation: gege-traverse 3s linear forwards; }
+        @keyframes gege-traverse {
+            0%   { left: -220px; transform: translateY(0)    rotate(-5deg); }
+            15%  {               transform: translateY(-20px) rotate(5deg); }
+            30%  {               transform: translateY(0)     rotate(-5deg); }
+            45%  {               transform: translateY(-20px) rotate(5deg); }
+            60%  {               transform: translateY(0)     rotate(-5deg); }
+            80%  {               transform: translateY(-20px) rotate(5deg); }
+            100% { left: 100vw;  transform: translateY(0)     rotate(-5deg); }
+        }
+        /* Reglage systeme "animations reduites" : une image qui traverse l'ecran est
+           exactement ce qu'il faut eviter. On garde la surprise, en fondu et immobile. */
+        @media (prefers-reduced-motion: reduce) {
+            .gege.go { left: 24px; animation: gege-fondu 2.4s ease-in-out forwards; }
+            @keyframes gege-fondu {
+                0%, 100% { opacity: 0; }
+                12%, 80% { opacity: 1; }
+            }
+        }
     </style>
 </head>
 <body>
@@ -265,21 +293,17 @@
             <form onsubmit="handleLogin(event)">
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" id="login-email" placeholder="vous@example.com" required />
+                    <input type="email" id="login-email" name="email" autocomplete="username" placeholder="vous@example.com" required />
                 </div>
 
                 <div class="form-group">
                     <label>Mot de passe</label>
-                    <input type="password" id="login-password" placeholder="••••••••" required />
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" placeholder="••••••••" required />
                 </div>
 
                 <button type="submit" id="login-btn">Connexion</button>
                 <div class="loader" id="login-loader"></div>
             </form>
-
-            <div class="links">
-                Demo : admin@dropstyle.com / admin123
-            </div>
         </div>
 
         <!-- TAB REGISTER -->
@@ -287,22 +311,22 @@
             <form onsubmit="handleRegister(event)">
                 <div class="form-group">
                     <label>Nom complet</label>
-                    <input type="text" id="register-nom" placeholder="Gérard Yousern" required />
+                    <input type="text" id="register-nom" name="nom" autocomplete="name" placeholder="Gérard Yousern" required />
                 </div>
 
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" id="register-email" placeholder="gégédu38@gouttestylé.fr" required />
+                    <input type="email" id="register-email" name="email" autocomplete="username" placeholder="gégédu38@gouttestylé.fr" required />
                 </div>
 
                 <div class="form-group">
                     <label>Mot de passe</label>
-                    <input type="password" id="register-password" placeholder="••••••••" required />
+                    <input type="password" id="register-password" name="password" autocomplete="new-password" placeholder="••••••••" required />
                 </div>
 
                 <div class="form-group">
                     <label>Confirmer mot de passe</label>
-                    <input type="password" id="register-confirm" placeholder="••••••••" required />
+                    <input type="password" id="register-confirm" name="password-confirm" autocomplete="new-password" placeholder="••••••••" required />
                 </div>
 
                 <button type="submit" id="register-btn">S'inscrire</button>
@@ -323,7 +347,11 @@ function switchTab(tab) {
         el.classList.remove('active');
     });
     document.getElementById('tab-' + tab).classList.add('active');
-    event.target.classList.add('active');
+    // L'onglet actif est retrouve par son nom : switchTab est aussi appele hors d'un clic
+    // (apres une inscription reussie), ou event.target n'existe pas.
+    const btn = [...document.querySelectorAll('.tab-btn')]
+        .find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${tab}'`));
+    if (btn) btn.classList.add('active');
     document.getElementById('message').className = 'message';
 }
 
@@ -374,6 +402,7 @@ async function handleLogin(event) {
 
 async function handleRegister(event) {
     event.preventDefault();
+    animerGege();
     const nom = document.getElementById('register-nom').value;
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
@@ -428,7 +457,19 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// Petite animation au clic sur "S'inscrire". Sans effet sur l'inscription elle-meme :
+// elle se joue par-dessus, et l'image n'est chargee qu'a ce moment-la.
+function animerGege() {
+    const g = document.getElementById('gege');
+    if (!g || g.classList.contains('go')) return;
+    if (!g.src) g.src = '/img/gege.png';
+    g.classList.add('go');
+    g.addEventListener('animationend', () => g.classList.remove('go'), { once: true });
+}
 </script>
+
+<img class="gege" id="gege" alt="">
 
 </body>
 </html>

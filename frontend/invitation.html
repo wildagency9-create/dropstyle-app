@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropStyle — Créer mon accès</title>
+    <style>
+        :root {
+            --primary: #FF5722;
+            --primary-dark: #E64A19;
+            --bg-dark: #0a0a0a;
+            --bg-card: #1a1a1a;
+            --bg-input: #2a2a2a;
+            --border: #404040;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999;
+            --danger: #ff5252;
+            --success: #4caf50;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(255,87,34,0.1) 100%);
+            color: var(--text-primary);
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .container { width: 100%; max-width: 420px; }
+        .card {
+            background: var(--bg-card); border: 2px solid var(--primary);
+            border-radius: 12px; padding: 40px; box-shadow: 0 8px 32px rgba(0,0,0,.5);
+        }
+        .logo-area { text-align: center; margin-bottom: 32px; }
+        .logo-icon {
+            width: 60px; height: 60px; background: #fff; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 8px; margin: 0 auto 16px; box-shadow: 0 4px 12px rgba(255,87,34,.3);
+        }
+        .logo-icon img { height: 100%; width: auto; display: block; }
+        .logotype { height: 42px; width: auto; display: block; margin: 0 auto; }
+        .subtitle { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
+        .form-group { margin-bottom: 18px; }
+        label {
+            display: block; font-size: 10px; font-weight: 700; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+        }
+        input {
+            width: 100%; padding: 12px 14px; background: var(--bg-input);
+            border: 1.5px solid var(--border); border-radius: 8px;
+            color: var(--text-primary); font-size: 14px;
+        }
+        input:focus { outline: none; border-color: var(--primary); }
+        input[readonly] { color: var(--text-secondary); cursor: default; }
+        button {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, var(--primary), #FF7043);
+            color: #fff; border: none; border-radius: 8px; cursor: pointer;
+            font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
+        }
+        button:disabled { opacity: .55; cursor: default; }
+        .message { font-size: 13px; padding: 12px; border-radius: 8px; margin-bottom: 18px; display: none; }
+        .message.on { display: block; }
+        .message.error { background: rgba(255,82,82,.12); color: var(--danger); border: 1px solid var(--danger); }
+        .message.success { background: rgba(76,175,80,.12); color: var(--success); border: 1px solid var(--success); }
+        .aide { font-size: 11px; color: var(--text-secondary); margin-top: 14px; text-align: center; }
+        .aide a { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="logo-area">
+            <div class="logo-icon"><img src="/img/goutte.png" alt=""></div>
+            <h1 style="line-height:0;"><img class="logotype" src="/img/logotype.png" alt="DropStyle"></h1>
+            <p class="subtitle" id="sous-titre">Vérification de votre invitation...</p>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <form id="formulaire" style="display:none;" onsubmit="accepter(event)">
+            <div class="form-group">
+                <label>Votre email</label>
+                <!-- Fige : le compte est cree sur l'adresse reellement invitee, le serveur
+                     ne lit pas ce champ. readonly plutot que disabled : un champ desactive
+                     est ignore par les gestionnaires de mots de passe, qui n'auraient alors
+                     aucun identifiant a associer au mot de passe enregistre. -->
+                <input type="email" id="email" name="email" autocomplete="username" readonly />
+            </div>
+            <div class="form-group">
+                <label>Votre nom complet</label>
+                <input type="text" id="nom" name="nom" autocomplete="name" placeholder="Gérard Yousern" required />
+            </div>
+            <div class="form-group">
+                <label>Choisissez un mot de passe</label>
+                <input type="password" id="password" name="password" autocomplete="new-password" placeholder="6 caractères minimum" required />
+            </div>
+            <div class="form-group">
+                <label>Confirmez le mot de passe</label>
+                <input type="password" id="confirm" name="password-confirm" autocomplete="new-password" required />
+            </div>
+            <button type="submit" id="btn">Créer mon accès</button>
+        </form>
+
+        <p class="aide" id="aide" style="display:none;">
+            <a href="/">Retour à la page de connexion</a>
+        </p>
+    </div>
+</div>
+
+<script>
+const API_URL = window.location.origin + '/api';
+const token = new URLSearchParams(window.location.search).get('token');
+
+function afficherMessage(texte, type) {
+    const el = document.getElementById('message');
+    el.textContent = texte;
+    el.className = `message on ${type}`;
+}
+
+function effacerMessage() {
+    const el = document.getElementById('message');
+    el.textContent = '';
+    el.className = 'message';
+}
+
+async function verifier() {
+    // Repart d'un ecran propre : sans cela, l'erreur d'une tentative precedente
+    // resterait affichee au-dessus du formulaire.
+    effacerMessage();
+    document.getElementById('aide').style.display = 'none';
+    document.getElementById('formulaire').style.display = 'none';
+    if (!token) {
+        document.getElementById('sous-titre').textContent = 'Lien incomplet';
+        afficherMessage("Ce lien d'invitation est incomplet. Vérifiez que vous l'avez copié en entier.", 'error');
+        document.getElementById('aide').style.display = 'block';
+        return;
+    }
+    try {
+        const r = await fetch(`${API_URL}/invitations/verifier/${encodeURIComponent(token)}`);
+        const d = await r.json();
+        if (!r.ok) {
+            document.getElementById('sous-titre').textContent = 'Invitation non valable';
+            afficherMessage(d.error || 'Invitation non valable.', 'error');
+            document.getElementById('aide').style.display = 'block';
+            return;
+        }
+        document.getElementById('sous-titre').textContent =
+            d.inviteur ? `${d.inviteur} vous invite à rejoindre l'équipe` : 'Créez votre accès';
+        document.getElementById('email').value = d.email;
+        document.getElementById('formulaire').style.display = 'block';
+        document.getElementById('nom').focus();
+    } catch (err) {
+        document.getElementById('sous-titre').textContent = 'Erreur';
+        afficherMessage('Impossible de vérifier l\'invitation. Réessayez dans un instant.', 'error');
+    }
+}
+
+async function accepter(event) {
+    event.preventDefault();
+    const nom = document.getElementById('nom').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+    if (password !== confirm) { afficherMessage('Les mots de passe ne correspondent pas.', 'error'); return; }
+    if (password.length < 6) { afficherMessage('Le mot de passe doit faire au moins 6 caractères.', 'error'); return; }
+
+    const btn = document.getElementById('btn');
+    btn.disabled = true; btn.textContent = 'Création...';
+    try {
+        const r = await fetch(`${API_URL}/invitations/accepter`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, nom, password })
+        });
+        const d = await r.json();
+        if (!r.ok) {
+            afficherMessage(d.error || 'Création impossible.', 'error');
+            btn.disabled = false; btn.textContent = 'Créer mon accès';
+            return;
+        }
+        // Connecte directement : le mot de passe vient d'etre choisi.
+        localStorage.setItem('token', d.token);
+        localStorage.setItem('user', JSON.stringify(d.user));
+        afficherMessage('Accès créé. Bienvenue !', 'success');
+        setTimeout(() => { window.location.href = d.user.role === 'admin' ? '/admin' : '/app'; }, 1200);
+    } catch (err) {
+        afficherMessage('Erreur serveur. Réessayez dans un instant.', 'error');
+        btn.disabled = false; btn.textContent = 'Créer mon accès';
+    }
+}
+
+verifier();
+</script>
+
+</body>
+</html>

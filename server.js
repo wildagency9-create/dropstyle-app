@@ -139,7 +139,21 @@ async function ensureV11Tables(existingConn) {
             INDEX idx_destinataire (vers_user_id, lu)
         )`,
         `ALTER TABLE devis ADD COLUMN client_id INT DEFAULT NULL`,
-        `ALTER TABLE devis ADD COLUMN auteur_id INT DEFAULT NULL`
+        `ALTER TABLE devis ADD COLUMN auteur_id INT DEFAULT NULL`,
+        // V12 — invitations. Le jeton est l'element sensible : il vaut une creation de compte
+        // dans l'equipe, d'ou l'expiration et l'usage unique (utilise_le).
+        `CREATE TABLE IF NOT EXISTS invitations (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            equipe_id INT NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            token VARCHAR(64) NOT NULL UNIQUE,
+            role ENUM('user', 'admin') DEFAULT 'user',
+            cree_par INT DEFAULT NULL,
+            expire_le DATETIME NOT NULL,
+            utilise_le DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_equipe (equipe_id)
+        )`
     ];
     for (const q of queries) {
         try { await conn.query(q); }
@@ -1090,6 +1104,122 @@ app.put('/api/notifications/:id/lu', verifyToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===== V12 — INVITATIONS =====
+// Le lien contient un jeton aleatoire : c'est lui qui rattache l'invite a l'equipe.
+// Sans cela, une personne qui s'inscrit seule atterrit dans une equipe vide et ne voit
+// aucune donnee de l'entreprise.
+const DUREE_INVITATION_JOURS = 7;
+
+app.get('/api/invitations', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT id, email, role, expire_le, utilise_le, created_at FROM invitations
+             WHERE equipe_id = ? ORDER BY created_at DESC LIMIT 50`, [req.userId]);
+        await conn.release();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/invitations', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        await ensureV11Tables();
+        const email = (req.body.email || '').trim().toLowerCase();
+        const role = req.body.role === 'admin' ? 'admin' : 'user';
+        const message = (req.body.message || '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
+
+        const conn = await pool.getConnection();
+        const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existant.length) { await conn.release(); return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse' }); }
+
+        // Une nouvelle invitation pour la meme adresse annule les precedentes encore valides :
+        // sinon un ancien lien resterait utilisable apres un changement d'avis.
+        await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE equipe_id = ? AND email = ? AND utilise_le IS NULL', [req.userId, email]);
+
+        const token = require('crypto').randomBytes(24).toString('hex');
+        await conn.query(
+            'INSERT INTO invitations (equipe_id, email, token, role, cree_par, expire_le) VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
+            [req.userId, email, token, role, req.authUserId, DUREE_INVITATION_JOURS]);
+        const [inviteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
+        await conn.release();
+
+        const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        const lien = `${base}/invitation?token=${token}`;
+        const de = inviteur.length ? inviteur[0].nom : 'DropStyle';
+        const corps = (message || `Bonjour,\n\n${de} vous invite à rejoindre DropStyle, le calculateur de devis de l'entreprise.`)
+            + `\n\nCliquez sur ce lien pour créer votre accès :\n${lien}`
+            + `\n\nCe lien est personnel et valable ${DUREE_INVITATION_JOURS} jours.`;
+        // Non attendu : si l'email echoue, l'invitation existe quand meme et le lien
+        // est renvoye a l'admin, qui peut le transmettre lui-meme.
+        sendBrevoEmail([email], `Invitation à rejoindre DropStyle`, corps, `${de} · DropStyle`);
+
+        res.status(201).json({ lien, email, expire_dans_jours: DUREE_INVITATION_JOURS, email_configure: !!process.env.BREVO_API_KEY });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/invitations/:id', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const conn = await pool.getConnection();
+        await conn.query('DELETE FROM invitations WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Publics : consultes par la page d'invitation, avant toute connexion.
+app.get('/api/invitations/verifier/:token', async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT i.email, i.expire_le, i.utilise_le, u.nom AS inviteur
+             FROM invitations i LEFT JOIN users u ON u.id = i.cree_par
+             WHERE i.token = ?`, [req.params.token]);
+        await conn.release();
+        if (!rows.length) return res.status(404).json({ error: "Cette invitation n'existe pas." });
+        if (rows[0].utilise_le) return res.status(410).json({ error: 'Cette invitation a déjà été utilisée.' });
+        if (new Date(rows[0].expire_le) < new Date()) return res.status(410).json({ error: 'Cette invitation a expiré. Demandez-en une nouvelle.' });
+        res.json({ email: rows[0].email, inviteur: rows[0].inviteur });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/invitations/accepter', authLimiter, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const { token, nom, password } = req.body;
+        if (!token || !(nom || '').trim() || !password) return res.status(400).json({ error: 'Nom et mot de passe requis' });
+        if (String(password).length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query('SELECT * FROM invitations WHERE token = ?', [token]);
+        if (!rows.length) { await conn.release(); return res.status(404).json({ error: "Cette invitation n'existe pas." }); }
+        const inv = rows[0];
+        if (inv.utilise_le) { await conn.release(); return res.status(410).json({ error: 'Cette invitation a déjà été utilisée.' }); }
+        if (new Date(inv.expire_le) < new Date()) { await conn.release(); return res.status(410).json({ error: 'Cette invitation a expiré.' }); }
+
+        const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [inv.email]);
+        if (existant.length) { await conn.release(); return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse.' }); }
+
+        const bcrypt = require('bcrypt');
+        const hash = await bcrypt.hash(password, 10);
+        const [r] = await conn.query('INSERT INTO users (email, password, nom, role, equipe_id) VALUES (?, ?, ?, ?, ?)',
+            [inv.email, hash, nom.trim(), inv.role, inv.equipe_id]);
+        await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE id = ?', [inv.id]);
+        await conn.release();
+
+        // Connexion immediate : l'invite vient de choisir son mot de passe, lui redemander
+        // de se connecter n'apporte rien.
+        const jwt = require('jsonwebtoken');
+        const jeton = jwt.sign({ id: r.insertId, email: inv.email, role: inv.role, equipe_id: inv.equipe_id }, JWT_SECRET, { expiresIn: '7d' });
+        res.status(201).json({ token: jeton, user: { id: r.insertId, email: inv.email, nom: nom.trim(), role: inv.role } });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ADMIN
 app.get('/api/admin/users', verifyToken, async (req, res) => {
     try {
@@ -1152,6 +1282,7 @@ app.get('/api/admin/stats', verifyToken, async (req, res) => {
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/index.html')); });
 app.get('/app', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/app.html')); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/admin-dashboard.html')); });
+app.get('/invitation', (req, res) => { res.sendFile(path.join(__dirname, 'frontend/invitation.html')); });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
