@@ -39,11 +39,12 @@
         .header-left { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
             width: 42px; height: 42px;
-            background: linear-gradient(135deg, var(--primary), #FF7043);
+            background: #fff;
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: white; font-size: 20px;
+            padding: 6px;
         }
+        .logo-icon img { height: 100%; width: auto; display: block; }
         h1 {
             font-size: 22px; font-weight: 700;
             background: linear-gradient(135deg, var(--primary), var(--gold));
@@ -89,10 +90,11 @@
         .stat-value { font-size: 32px; font-weight: 700; color: var(--primary); }
         .tabs {
             display: flex;
-            gap: 4px;
+            flex-wrap: wrap;          /* V11 : 8 onglets — on passe a la ligne plutot que de
+                                         masquer les derniers derriere un defilement horizontal */
+            gap: 2px;
             border-bottom: 1px solid var(--border);
             margin-bottom: 20px;
-            overflow-x: auto;
         }
         .tab-btn {
             padding: 12px 18px;
@@ -170,7 +172,7 @@
 
 <header>
     <div class="header-left">
-        <div class="logo-icon">D</div>
+        <div class="logo-icon"><img src="/img/goutte.png" alt=""></div>
         <h1>Dashboard Admin</h1>
     </div>
     <div class="header-actions">
@@ -196,6 +198,7 @@
         <button class="tab-btn" onclick="switchTab('poseurs', this)">👷 Poseurs</button>
         <button class="tab-btn" onclick="switchTab('impressions', this)">🖨️ Impressions</button>
         <button class="tab-btn" onclick="switchTab('stock', this)">📦 Stock</button>
+        <button class="tab-btn" onclick="switchTab('sources', this); loadSources()">🎯 Sources</button>
         <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
     </div>
 
@@ -205,6 +208,24 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Inscrit</th><th>Action</th></tr></thead>
             <tbody id="users-list"><tr><td colspan="5" class="empty-state">Chargement...</td></tr></tbody>
+        </table></div>
+    </div>
+
+    <!-- V11 — SOURCES D'ACQUISITION -->
+    <div class="tab-content" id="tab-sources">
+        <div class="section-header"><div class="section-title">Sources d'acquisition</div></div>
+        <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;">
+            Liste proposée à la création d'un client dans le calculateur, et axe des statistiques.
+            Supprimer une source ne modifie pas les clients qui l'ont déjà : l'historique reste intact.
+        </p>
+        <div style="display:flex;gap:8px;max-width:460px;margin-bottom:14px;">
+            <input type="text" id="source-nouvelle" placeholder="Nouvelle source..." style="flex:1;"
+                   onkeydown="if(event.key==='Enter')ajouterSource()">
+            <button onclick="ajouterSource()">+ Ajouter</button>
+        </div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Source</th><th>Action</th></tr></thead>
+            <tbody id="sources-list"><tr><td colspan="2" class="empty-state">Chargement...</td></tr></tbody>
         </table></div>
     </div>
 
@@ -572,6 +593,40 @@ async function loadStats() {
         document.getElementById('stat-devis').textContent = data.devis;
         document.getElementById('stat-revenue').textContent = parseFloat(data.revenue).toFixed(2) + '€';
     } catch (err) { console.error(err); }
+}
+
+// ===== V11 — SOURCES D'ACQUISITION =====
+async function loadSources() {
+    const el = document.getElementById('sources-list');
+    try {
+        const sources = await fetch(`${API_URL}/sources-client`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        el.innerHTML = sources.length
+            ? sources.map(s => `<tr><td>${escapeHtml(s.nom)}</td>
+                <td><button class="danger small" onclick="supprimerSource(${s.id})">Suppr</button></td></tr>`).join('')
+            : '<tr><td colspan="2" class="empty-state">Aucune source</td></tr>';
+    } catch (err) {
+        el.innerHTML = '<tr><td colspan="2" class="empty-state">Erreur de chargement</td></tr>';
+    }
+}
+
+async function ajouterSource() {
+    const champ = document.getElementById('source-nouvelle');
+    const nom = champ.value.trim();
+    if (!nom) return;
+    const r = await fetch(`${API_URL}/sources-client`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom })
+    });
+    if (!r.ok) { alert('Ajout impossible'); return; }
+    champ.value = '';
+    loadSources();
+}
+
+async function supprimerSource(id) {
+    if (!confirm('Supprimer cette source ? Les clients qui l\'ont déjà la conservent.')) return;
+    await fetch(`${API_URL}/sources-client/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    loadSources();
 }
 
 async function loadUsers() {

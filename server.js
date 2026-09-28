@@ -80,6 +80,88 @@ async function ensureV9Tables(existingConn) {
     if (!existingConn) await conn.release();
 }
 
+// V11 — equipe, clients/prospects et notifications internes.
+// equipe_id sur users : tous les membres d'une meme entreprise partagent tarifs, devis et clients.
+// Backfill equipe_id = id, donc chaque compte existant devient sa propre equipe : rien ne bouge
+// pour les donnees deja en place, et aucune donnee ne fuite d'un compte a l'autre.
+const SOURCES_PAR_DEFAUT = [
+    'Site web / Google', 'Réseaux sociaux', 'Bouche-à-oreille', 'Recommandation d\'un client',
+    'Connaissance', 'Soirée business / réseau pro', 'Véhicule ou chantier vu en circulation',
+    'Salon / foire', 'Apporteur d\'affaires', 'Confrère / sous-traitance',
+    'Appel d\'offres / collectivité', 'Prospection sortante', 'Autre'
+];
+
+// Une fois la V11 en place, on ne rejoue plus les migrations a chaque appel d'API :
+// sans ce drapeau, chaque requete relance 3 CREATE, 2 ALTER et 1 UPDATE pour rien.
+// Le drapeau est propre au processus : un redemarrage rejoue la verification.
+let v11Prete = false;
+
+async function ensureV11Tables(existingConn) {
+    if (v11Prete && !existingConn) return;
+    const conn = existingConn || await pool.getConnection();
+    let echec = false;
+    const queries = [
+        `ALTER TABLE users ADD COLUMN equipe_id INT DEFAULT NULL`,
+        `UPDATE users SET equipe_id = id WHERE equipe_id IS NULL`,
+        `CREATE TABLE IF NOT EXISTS clients (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            equipe_id INT NOT NULL,
+            nom VARCHAR(255) NOT NULL,
+            type ENUM('prospect', 'client') DEFAULT 'prospect',
+            source VARCHAR(100) DEFAULT NULL,
+            email VARCHAR(255) DEFAULT NULL,
+            telephone VARCHAR(50) DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            auteur_id INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_equipe (equipe_id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS sources_client (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            equipe_id INT NOT NULL,
+            nom VARCHAR(100) NOT NULL,
+            ordre INT DEFAULT 0,
+            INDEX idx_equipe (equipe_id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS notifications (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            equipe_id INT NOT NULL,
+            de_user_id INT NOT NULL,
+            vers_user_id INT NOT NULL,
+            type VARCHAR(20) NOT NULL DEFAULT 'message',
+            titre VARCHAR(255) NOT NULL,
+            message TEXT DEFAULT NULL,
+            ref_type VARCHAR(20) DEFAULT NULL,
+            ref_id INT DEFAULT NULL,
+            date_rdv DATETIME DEFAULT NULL,
+            lu TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_destinataire (vers_user_id, lu)
+        )`,
+        `ALTER TABLE devis ADD COLUMN client_id INT DEFAULT NULL`,
+        `ALTER TABLE devis ADD COLUMN auteur_id INT DEFAULT NULL`
+    ];
+    for (const q of queries) {
+        try { await conn.query(q); }
+        catch (e) {
+            // "Duplicate column" = migration deja appliquee, ce n'est pas un echec.
+            if (!/Duplicate column/i.test(e.message)) { echec = true; console.error('V11 init:', e.message); }
+        }
+    }
+    if (!echec) v11Prete = true;
+    if (!existingConn) await conn.release();
+}
+
+// Les sources sont creees a la demande, par equipe, et restent modifiables depuis l'admin :
+// une equipe qui a supprime une source ne la voit pas revenir (on ne reseme que si la table est vide).
+async function ensureSourcesEquipe(conn, equipeId) {
+    const [[{ n }]] = await conn.query('SELECT COUNT(*) AS n FROM sources_client WHERE equipe_id = ?', [equipeId]);
+    if (n > 0) return;
+    for (let i = 0; i < SOURCES_PAR_DEFAUT.length; i++) {
+        await conn.query('INSERT INTO sources_client (equipe_id, nom, ordre) VALUES (?, ?, ?)', [equipeId, SOURCES_PAR_DEFAUT[i], i]);
+    }
+}
+
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
     const conn = existingConn || await pool.getConnection();
@@ -109,6 +191,8 @@ async function initDB() {
         await ensureV8Tables(conn);
         // V9 — Nom du client sur les devis
         await ensureV9Tables(conn);
+        // V11 — Equipe, clients/prospects, notifications
+        await ensureV11Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -169,7 +253,13 @@ const verifyToken = (req, res, next) => {
     const jwt = require('jsonwebtoken');
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.id;
+        // V11 — equipe. req.userId designe le PROPRIETAIRE des donnees (le compte principal de
+        // l'entreprise) : tous les endpoints existants filtrent deja dessus, ils deviennent donc
+        // partages entre collegues sans etre modifies. req.authUserId reste la personne connectee,
+        // pour tout ce qui est nominatif (auteur d'un devis, expediteur d'une notification).
+        // Jeton emis avant la V11 : equipe_id absent -> on retombe sur son propre id, comportement inchange.
+        req.authUserId = decoded.id;
+        req.userId = decoded.equipe_id || decoded.id;
         req.userRole = decoded.role;
         next();
     } catch (err) {
@@ -211,7 +301,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         const user = rows[0];
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(401).json({ error: 'Identifiants invalides' });
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, equipe_id: user.equipe_id || user.id }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
@@ -558,10 +648,33 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
 });
 
 app.post('/api/devis', verifyToken, async (req, res) => {
-    try { await ensureV9Tables(); const { type, qty, ht, ttc, details, client } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())', [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try {
+        await ensureV9Tables(); await ensureV11Tables();
+        const { type, qty, ht, ttc, details, client, client_id } = req.body;
+        const conn = await pool.getConnection();
+        // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
+        // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
+        let lien = null;
+        if (client_id) {
+            const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
+            if (c.length) lien = c[0].id;
+        }
+        await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+            [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId]);
+        await conn.release();
+        res.status(201).json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/devis', verifyToken, async (req, res) => {
-    try { await ensureV9Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try {
+        await ensureV9Tables(); await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT d.*, u.nom AS auteur_nom FROM devis d LEFT JOIN users u ON u.id = d.auteur_id
+             WHERE d.user_id = ? ORDER BY d.created_at DESC LIMIT 50`, [req.userId]);
+        await conn.release();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/devis/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
@@ -784,12 +897,200 @@ app.put('/api/stock/:type/:id', verifyToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===== V11 — SOURCES D'ACQUISITION =====
+app.get('/api/sources-client', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        await ensureSourcesEquipe(conn, req.userId);
+        const [rows] = await conn.query('SELECT id, nom FROM sources_client WHERE equipe_id = ? ORDER BY ordre, nom', [req.userId]);
+        await conn.release();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/sources-client', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const nom = (req.body.nom || '').trim();
+        if (!nom) return res.status(400).json({ error: 'Nom requis' });
+        const conn = await pool.getConnection();
+        const [[{ maxi }]] = await conn.query('SELECT COALESCE(MAX(ordre), 0) AS maxi FROM sources_client WHERE equipe_id = ?', [req.userId]);
+        await conn.query('INSERT INTO sources_client (equipe_id, nom, ordre) VALUES (?, ?, ?)', [req.userId, nom, maxi + 1]);
+        await conn.release();
+        res.status(201).json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/sources-client/:id', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const conn = await pool.getConnection();
+        await conn.query('DELETE FROM sources_client WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+        await conn.release();
+        // Les clients gardent la source deja saisie : supprimer la source de la liste ne
+        // reecrit pas l'historique, sinon les statistiques passees deviendraient fausses.
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V11 — CLIENTS / PROSPECTS =====
+app.get('/api/clients', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT c.*, COUNT(d.id) AS nb_devis, COALESCE(SUM(d.ht), 0) AS ca_devis
+             FROM clients c LEFT JOIN devis d ON d.client_id = c.id
+             WHERE c.equipe_id = ? GROUP BY c.id ORDER BY c.nom`, [req.userId]);
+        await conn.release();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/clients/:id', verifyToken, async (req, res) => {
+    try {
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+        if (!rows.length) { await conn.release(); return res.status(404).json({ error: 'Client introuvable' }); }
+        const [devis] = await conn.query('SELECT id, type, qty, ht, ttc, created_at FROM devis WHERE client_id = ? ORDER BY created_at DESC', [req.params.id]);
+        await conn.release();
+        res.json({ client: rows[0], devis });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/clients', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const { nom, type, source, email, telephone, notes } = req.body;
+        if (!(nom || '').trim()) return res.status(400).json({ error: 'Nom requis' });
+        const conn = await pool.getConnection();
+        const [r] = await conn.query(
+            'INSERT INTO clients (equipe_id, nom, type, source, email, telephone, notes, auteur_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.userId, nom.trim(), type === 'client' ? 'client' : 'prospect', (source || '').trim() || null,
+             (email || '').trim() || null, (telephone || '').trim() || null, (notes || '').trim() || null, req.authUserId]);
+        await conn.release();
+        res.status(201).json({ id: r.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/clients/:id', verifyToken, async (req, res) => {
+    try {
+        const { nom, type, source, email, telephone, notes } = req.body;
+        const conn = await pool.getConnection();
+        await conn.query(
+            'UPDATE clients SET nom = ?, type = ?, source = ?, email = ?, telephone = ?, notes = ? WHERE id = ? AND equipe_id = ?',
+            [(nom || '').trim(), type === 'client' ? 'client' : 'prospect', (source || '').trim() || null,
+             (email || '').trim() || null, (telephone || '').trim() || null, (notes || '').trim() || null,
+             req.params.id, req.userId]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/clients/:id', verifyToken, async (req, res) => {
+    try {
+        const conn = await pool.getConnection();
+        // Les devis sont conserves : on detache seulement le lien, le nom saisi reste lisible.
+        await conn.query('UPDATE devis SET client_id = NULL WHERE client_id = ?', [req.params.id]);
+        await conn.query('DELETE FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V11 — STATISTIQUES PAR SOURCE =====
+// Un prospect sans devis compte dans le nombre de contacts mais pas dans le CA : c'est
+// exactement ce qu'on veut voir, un canal qui ramene du monde sans ramener d'argent.
+app.get('/api/stats/sources', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT COALESCE(NULLIF(c.source, ''), 'Non renseignée') AS source,
+                    COUNT(DISTINCT c.id) AS total,
+                    COUNT(DISTINCT CASE WHEN c.type = 'client' THEN c.id END) AS clients,
+                    COUNT(DISTINCT CASE WHEN c.type = 'prospect' THEN c.id END) AS prospects,
+                    COUNT(d.id) AS nb_devis,
+                    COALESCE(SUM(d.ht), 0) AS ca_devis
+             FROM clients c LEFT JOIN devis d ON d.client_id = c.id
+             WHERE c.equipe_id = ? GROUP BY source ORDER BY ca_devis DESC, total DESC`, [req.userId]);
+        await conn.release();
+        res.json(rows.map(r => ({
+            ...r,
+            ca_devis: Number(r.ca_devis),
+            taux: r.total > 0 ? Math.round((r.clients / r.total) * 100) : 0
+        })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V11 — EQUIPE ET NOTIFICATIONS INTERNES =====
+app.get('/api/equipe', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query('SELECT id, nom, email, role FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom', [req.userId]);
+        await conn.release();
+        res.json({ moi: req.authUserId, membres: rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/notifications', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [rows] = await conn.query(
+            `SELECT n.*, u.nom AS de_nom FROM notifications n
+             LEFT JOIN users u ON u.id = n.de_user_id
+             WHERE n.vers_user_id = ? ORDER BY n.lu, n.created_at DESC LIMIT 50`, [req.authUserId]);
+        const [[{ nonLus }]] = await conn.query('SELECT COUNT(*) AS nonLus FROM notifications WHERE vers_user_id = ? AND lu = 0', [req.authUserId]);
+        await conn.release();
+        res.json({ nonLus, notifications: rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/notifications', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const { vers_user_id, type, titre, message, ref_type, ref_id, date_rdv, envoyer_email } = req.body;
+        if (!(titre || '').trim()) return res.status(400).json({ error: 'Titre requis' });
+        const conn = await pool.getConnection();
+        // Le destinataire doit appartenir a la meme equipe : sans ce controle, n'importe quel
+        // compte pourrait ecrire a n'importe quel utilisateur du logiciel.
+        const [dest] = await conn.query('SELECT id, nom, email FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [vers_user_id, req.userId]);
+        if (!dest.length) { await conn.release(); return res.status(400).json({ error: 'Destinataire hors de votre équipe' }); }
+        await conn.query(
+            'INSERT INTO notifications (equipe_id, de_user_id, vers_user_id, type, titre, message, ref_type, ref_id, date_rdv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.userId, req.authUserId, vers_user_id, type || 'message', titre.trim(), (message || '').trim() || null,
+             ref_type || null, ref_id || null, date_rdv || null]);
+        const [expediteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
+        await conn.release();
+        if (envoyer_email && dest[0].email) {
+            const de = expediteur.length ? expediteur[0].nom : 'Un collègue';
+            const quand = date_rdv ? `\n\nDate : ${new Date(date_rdv).toLocaleString('fr-FR')}` : '';
+            // Volontairement non attendu : un echec d'email ne doit pas faire echouer la notification.
+            sendBrevoEmail([dest[0].email], `DropStyle — ${titre.trim()}`,
+                `${de} vous a envoyé un message dans DropStyle :\n\n${titre.trim()}\n${message || ''}${quand}`);
+        }
+        res.status(201).json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/notifications/toutes-lues', verifyToken, async (req, res) => {
+    try {
+        const conn = await pool.getConnection();
+        await conn.query('UPDATE notifications SET lu = 1 WHERE vers_user_id = ?', [req.authUserId]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/notifications/:id/lu', verifyToken, async (req, res) => {
+    try {
+        const conn = await pool.getConnection();
+        await conn.query('UPDATE notifications SET lu = 1 WHERE id = ? AND vers_user_id = ?', [req.params.id, req.authUserId]);
+        await conn.release();
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ADMIN
 app.get('/api/admin/users', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT id, email, nom, role, created_at FROM users');
+        await ensureV11Tables(conn);
+        const [rows] = await conn.query('SELECT id, email, nom, role, created_at FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
         await conn.release();
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -801,7 +1102,10 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
         const bcrypt = require('bcrypt');
         const hashedPassword = await bcrypt.hash(password, 10);
         const conn = await pool.getConnection();
-        await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, role]);
+        await ensureV11Tables(conn);
+        // Le nouveau compte rejoint l'equipe de l'admin qui le cree : il partage donc
+        // immediatement les tarifs, les devis et les clients de l'entreprise.
+        await conn.query('INSERT INTO users (email, password, nom, role, equipe_id) VALUES (?, ?, ?, ?, ?)', [email, hashedPassword, nom, role, req.userId]);
         await conn.release();
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -809,13 +1113,18 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
 app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        if (String(req.params.id) === String(req.userId)) return res.status(400).json({ error: 'Impossible de supprimer son propre compte' });
+        // Comparaison sur la personne connectee, pas sur le proprietaire des donnees :
+        // un second admin de l'equipe doit rester protege contre sa propre suppression.
+        if (String(req.params.id) === String(req.authUserId)) return res.status(400).json({ error: 'Impossible de supprimer son propre compte' });
         const conn = await pool.getConnection();
-        const [target] = await conn.query('SELECT role FROM users WHERE id = ?', [req.params.id]);
-        if (target.length && target[0].role === 'admin') {
-            const [[{ count }]] = await conn.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+        const [target] = await conn.query('SELECT role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
+        if (!target.length) { await conn.release(); return res.status(404).json({ error: 'Utilisateur hors de votre équipe' }); }
+        if (target[0].role === 'admin') {
+            const [[{ count }]] = await conn.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
             if (count <= 1) { await conn.release(); return res.status(400).json({ error: 'Impossible de supprimer le dernier compte admin' }); }
         }
+        // Le compte proprietaire porte toutes les donnees de l'equipe : le supprimer les effacerait.
+        if (String(req.params.id) === String(req.userId)) { await conn.release(); return res.status(400).json({ error: 'Impossible de supprimer le compte principal de l\'équipe' }); }
         await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
         await conn.release();
         res.json({ message: 'OK' });
@@ -825,9 +1134,9 @@ app.get('/api/admin/stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         const conn = await pool.getConnection();
-        const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
-        const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis');
-        const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis');
+        const [users] = await conn.query('SELECT COUNT(*) as count FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
+        const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis WHERE user_id = ?', [req.userId]);
+        const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis WHERE user_id = ?', [req.userId]);
         await conn.release();
         res.json({ users: users[0].count, devis: devis[0].count, revenue: revenue[0].total || 0 });
     } catch (err) { res.status(500).json({ error: err.message }); }

@@ -39,11 +39,16 @@
         .header-left { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
             width: 42px; height: 42px;
-            background: linear-gradient(135deg, var(--primary), #FF7043);
+            background: #fff;
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: white; font-size: 20px;
+            padding: 6px;
         }
+        .logo-icon img { height: 100%; width: auto; display: block; }
+        /* Le h1 porte un degrade decoupe sur le texte : neutralise quand il accueille le logotype,
+           sinon le fond deborde autour de l'image. */
+        h1.logo-title { background: none; -webkit-text-fill-color: initial; line-height: 0; }
+        .logotype { height: 24px; width: auto; display: block; }
         h1 {
             font-size: 20px; font-weight: 700;
             background: linear-gradient(135deg, var(--primary), var(--gold));
@@ -94,13 +99,14 @@
 
         .tabs {
             display: flex;
-            gap: 4px;
+            flex-wrap: wrap;          /* V11 : 9 onglets — on passe a la ligne plutot que de
+                                         masquer les derniers derriere un defilement horizontal */
+            gap: 2px;
             border-bottom: 1px solid var(--border);
             margin-bottom: 16px;
-            overflow-x: auto;
         }
         .tab-btn {
-            padding: 10px 14px;
+            padding: 10px 11px;
             background: transparent;
             color: var(--text-secondary);
             border: none;
@@ -314,11 +320,70 @@
 
         /* ===== Mobile / tablette : une seule colonne, le resultat passe SOUS le formulaire.
            Sans ca, le formulaire etait comprime sur ~la moitie d'un ecran de telephone. ===== */
+        /* ===== V11 — clients, statistiques, notifications ===== */
+        select, textarea {
+            width: 100%; padding: 9px 11px; background: var(--bg-input);
+            border: 1.5px solid var(--border); border-radius: 6px;
+            color: var(--text-primary); font-size: 12px; font-family: inherit;
+        }
+        textarea { resize: vertical; min-height: 64px; }
+        .bell { position: relative; background: none; border: 1px solid var(--border); color: var(--text-primary);
+                border-radius: 8px; width: 38px; height: 38px; font-size: 17px; cursor: pointer; padding: 0; }
+        .bell:hover { border-color: var(--primary); }
+        .bell-count { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff;
+                      border-radius: 10px; min-width: 18px; height: 18px; font-size: 10px; font-weight: 700;
+                      display: none; align-items: center; justify-content: center; padding: 0 4px; }
+        .bell-count.on { display: flex; }
+        .notif-panel { position: absolute; top: 52px; right: 0; width: 340px; max-width: calc(100vw - 24px);
+                       max-height: 420px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border);
+                       border-radius: 10px; padding: 10px; z-index: 60; display: none;
+                       box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+        .notif-panel.open { display: block; }
+        .notif-item { border-bottom: 1px solid var(--border); padding: 9px 4px; font-size: 12px; cursor: pointer; }
+        .notif-item:last-child { border-bottom: 0; }
+        .notif-item.neuf { background: rgba(255,87,34,.08); border-radius: 6px; }
+        .notif-item .qui { color: var(--text-secondary); font-size: 10px; }
+        .notif-item .titre { font-weight: 600; margin: 2px 0; }
+        .notif-item .msg { color: var(--text-secondary); white-space: pre-wrap; }
+
+        .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100;
+                      display: none; align-items: center; justify-content: center; padding: 16px; }
+        .modal-back.open { display: flex; }
+        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+                 padding: 20px; width: 420px; max-width: 100%; max-height: 90vh; overflow-y: auto; }
+        .modal h3 { font-size: 15px; margin-bottom: 14px; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .modal-actions button { flex: 1; }
+
+        .client-row { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+                      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+                      padding: 10px 12px; margin-bottom: 7px; cursor: pointer; }
+        .client-row:hover { border-color: var(--primary); }
+        .client-row .nom { font-weight: 600; font-size: 13px; }
+        .client-row .meta { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+        .pill { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 3px 7px;
+                border-radius: 20px; white-space: nowrap; }
+        .pill.prospect { background: rgba(212,175,55,.15); color: var(--gold); }
+        .pill.client { background: rgba(76,175,80,.15); color: var(--success); }
+
+        .stat-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+                    padding: 10px 12px; margin-bottom: 7px; }
+        .stat-bar .haut { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+        .stat-bar .jauge { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+        .stat-bar .jauge i { display: block; height: 100%; background: var(--primary); }
+        .stat-bar .bas { font-size: 10px; color: var(--text-secondary); margin-top: 6px; }
+
         @media (max-width: 820px) {
+            /* Sur mobile l'en-tete passe a la ligne et la cloche se retrouve a gauche :
+               un positionnement relatif a la cloche ferait sortir le panneau de l'ecran.
+               On le fixe donc par rapport a la fenetre. */
+            .notif-panel { position: fixed; top: 12px; left: 12px; right: 12px; width: auto;
+                           max-height: calc(100vh - 24px); z-index: 90; }
             body { overflow: auto; }
             .app { height: auto; min-height: 100vh; }
             header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
-            .logo-icon { width: 34px; height: 34px; font-size: 16px; }
+            .logo-icon { width: 34px; height: 34px; padding: 5px; }
+            .logotype { height: 19px; }
             h1 { font-size: 17px; }
             .user-info { display: none; } /* on garde les boutons, on enleve l'email */
             .main-grid {
@@ -339,13 +404,17 @@
 <div class="app">
     <header>
         <div class="header-left">
-            <div class="logo-icon">D</div>
-            <h1>DropStyle</h1>
+            <div class="logo-icon"><img src="/img/goutte.png" alt=""></div>
+            <h1 class="logo-title"><img class="logotype" src="/img/logotype.png" alt="DropStyle"></h1>
         </div>
         <div class="header-actions">
             <div class="user-info">
                 <strong id="user-nom">...</strong>
                 <span id="user-email">...</span>
+            </div>
+            <div style="position:relative;">
+                <button class="bell" onclick="toggleNotifs(event)" title="Notifications">🔔<span class="bell-count" id="bell-count">0</span></button>
+                <div class="notif-panel" id="notif-panel"></div>
             </div>
             <button class="admin-btn" id="admin-btn" onclick="window.location.href='/admin'" style="display:none;">Admin</button>
             <button class="logout-btn" onclick="logout()">Déconnexion</button>
@@ -362,6 +431,8 @@
                 <button class="tab-btn" onclick="switchTab('impression', this)">🖨️ Print</button>
                 <button class="tab-btn" onclick="switchTab('stickers', this)">🏷️ Stickers</button>
                 <button class="tab-btn" onclick="switchTab('chat', this)">💬 Assistant</button>
+                <button class="tab-btn" onclick="switchTab('clients', this); renderClients()">👥 Clients</button>
+                <button class="tab-btn" onclick="switchTab('stats', this); renderStats()">📈 Stats</button>
                 <button class="tab-btn" onclick="switchTab('tarifs', this); renderTarifs()">📖 Tarifs</button>
                 <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Hist.</button>
             </div>
@@ -733,6 +804,23 @@
                 <div id="tarifs-view"></div>
             </div>
 
+            <!-- V11 — CLIENTS / PROSPECTS -->
+            <div class="tab-content" id="tab-clients">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="client-recherche" placeholder="Rechercher un nom..." oninput="renderClients()" style="flex:1;">
+                    <button style="white-space:nowrap;" onclick="ouvrirFicheClient(null)">+ Nouveau</button>
+                </div>
+                <div id="clients-list"></div>
+            </div>
+
+            <!-- V11 — STATISTIQUES PAR SOURCE -->
+            <div class="tab-content" id="tab-stats">
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">
+                    D'où viennent vos contacts, et lesquels rapportent réellement. Le CA est celui des devis
+                    rattachés à un client — un devis enregistré sans client n'y apparaît pas.</p>
+                <div id="stats-view"></div>
+            </div>
+
             <!-- HISTORIQUE -->
             <div class="tab-content" id="tab-historique">
                 <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Tous tes devis sauvegardés</p>
@@ -745,6 +833,81 @@
             <div id="result">
                 <div class="empty-state"><p>Configure et clique sur Calculer</p></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- V11 — fiche client / prospect -->
+<div class="modal-back" id="modal-client" onclick="if(event.target===this)fermerModal('modal-client')">
+    <div class="modal">
+        <h3 id="mc-titre">Nouveau client</h3>
+        <div class="form-group"><label>Nom / société</label><input type="text" id="mc-nom" placeholder="Ex : Mairie de Saint-Pierre"></div>
+        <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label>Statut</label>
+                <select id="mc-type"><option value="prospect">Prospect</option><option value="client">Client</option></select>
+            </div>
+            <div class="form-group"><label>Source</label><select id="mc-source"></select></div>
+        </div>
+        <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label>Email</label><input type="text" id="mc-email"></div>
+            <div class="form-group"><label>Téléphone</label><input type="text" id="mc-tel"></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea id="mc-notes"></textarea></div>
+        <div id="mc-devis"></div>
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-client')">Annuler</button>
+            <button id="mc-suppr" class="danger" style="display:none;" onclick="supprimerClient()">Supprimer</button>
+            <button onclick="enregistrerFicheClient()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- V11 — enregistrement d'un devis : rattachement au client -->
+<div class="modal-back" id="modal-devis" onclick="if(event.target===this)annulerSaveDevis()">
+    <div class="modal">
+        <h3>Enregistrer le devis</h3>
+        <div class="form-group"><label>Client</label>
+            <select id="md-client" onchange="majChampsNouveauClient()"></select>
+        </div>
+        <div id="md-nouveau" style="display:none;">
+            <div class="form-group"><label>Nom du nouveau client</label><input type="text" id="md-nom"></div>
+            <div class="row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div class="form-group"><label>Statut</label>
+                    <select id="md-type"><option value="prospect">Prospect</option><option value="client">Client</option></select>
+                </div>
+                <div class="form-group"><label>Source</label><select id="md-source"></select></div>
+            </div>
+        </div>
+        <p style="font-size:10px;color:var(--text-light);">Sans client rattaché, le devis reste enregistré mais n'apparaît pas dans les statistiques par source.</p>
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="annulerSaveDevis()">Annuler</button>
+            <button id="md-ok" onclick="confirmerSaveDevis()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- V11 — envoi d'une notification a un collegue -->
+<div class="modal-back" id="modal-notif" onclick="if(event.target===this)fermerModal('modal-notif')">
+    <div class="modal">
+        <h3>Envoyer à un collègue</h3>
+        <div class="form-group"><label>Destinataire</label><select id="mn-dest"></select></div>
+        <div class="form-group"><label>Type</label>
+            <select id="mn-type" onchange="majChampRdv()">
+                <option value="message">Message</option>
+                <option value="reunion">Réunion</option>
+                <option value="client">Client à suivre</option>
+                <option value="devis">Devis à regarder</option>
+            </select>
+        </div>
+        <div class="form-group" id="mn-rdv-group" style="display:none;"><label>Date et heure</label><input type="datetime-local" id="mn-rdv"></div>
+        <div class="form-group"><label>Objet</label><input type="text" id="mn-titre"></div>
+        <div class="form-group"><label>Message</label><textarea id="mn-message"></textarea></div>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:11px;cursor:pointer;">
+            <input type="checkbox" id="mn-email" style="width:auto;"> Prévenir aussi par email
+        </label>
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-notif')">Annuler</button>
+            <button id="mn-ok" onclick="envoyerNotif()">Envoyer</button>
         </div>
     </div>
 </div>
@@ -811,12 +974,21 @@ window.addEventListener('DOMContentLoaded', () => {
     addDirectLine();
     addRollupLine();
     loadTarifs();
+    // V11 — clients, equipe et notifications. Charges en arriere-plan : un echec ici
+    // ne doit jamais empecher de chiffrer un devis.
+    chargerClientsEtSources();
+    chargerEquipe().then(chargerNotifs);
+    setInterval(chargerNotifs, 45000);
 });
 
 function setupDropdownListeners() {
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.dropdown')) {
             document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+        }
+        // V11 — le panneau de notifications se referme comme les listes deroulantes
+        if (!e.target.closest('.notif-panel') && !e.target.closest('.bell')) {
+            document.getElementById('notif-panel').classList.remove('open');
         }
     });
 }
@@ -1748,25 +1920,8 @@ function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
     `;
 }
 
-async function saveDevis(type, qty, ht, ttc, btn) {
-    // Le nom du client est demande ici (et pas dans le formulaire) : il ne sert qu'a retrouver
-    // le devis dans l'historique, il n'entre pas dans le calcul.
-    const client = prompt('Nom du client / référence du devis :', '');
-    if (client === null) return; // annule
-    if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
-    try {
-        await fetch(`${API_URL}/devis`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, qty, ht, ttc, details: lastDevisDetails || {}, client })
-        });
-        showNotification('Devis sauvegardé ✓', 'success');
-        if (btn) btn.textContent = 'Devis enregistré ✓'; // reste desactive : evite les doublons
-    } catch (err) {
-        showNotification('Erreur', 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'Sauvegarder le devis'; } // reactive pour reessayer
-    }
-}
+// V11 — saveDevis() est defini plus bas : le nom du client n'est plus saisi librement,
+// il est choisi dans la liste des clients pour rendre les statistiques par source exploitables.
 
 // ===== V10 — ASSISTANT =====
 // L'IA renvoie uniquement un remplissage de formulaire ; le chiffrage reste fait par
@@ -1955,6 +2110,325 @@ async function deleteDevis(id) {
         showNotification('Devis supprimé', 'success');
         renderHistorique();
     } catch (err) { showNotification('Erreur', 'error'); }
+}
+
+// ===== V11 — CLIENTS, STATISTIQUES ET NOTIFICATIONS INTERNES =====
+// Rien ici ne touche au calcul des prix : on ne fait que rattacher un devis deja chiffre
+// a un client, pour pouvoir ensuite mesurer ce que rapporte chaque canal d'acquisition.
+let allClients = [], allSources = [], equipeMembres = [], moiId = null;
+let ficheClientId = null;          // client en cours d'edition dans la fiche
+let devisEnAttente = null;         // devis calcule, en attente de rattachement
+
+async function apiSend(path, method, body) {
+    const r = await fetch(`${API_URL}${path}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+    });
+    if (r.status === 401 || r.status === 403) { logout(); throw new Error('Session expirée'); }
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Erreur serveur');
+    return data;
+}
+
+function fermerModal(id) { document.getElementById(id).classList.remove('open'); }
+function ouvrirModal(id) { document.getElementById(id).classList.add('open'); }
+
+function optionsSources(selectId, valeur) {
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = '<option value="">— Non renseignée —</option>' +
+        allSources.map(s => `<option value="${escapeHtml(s.nom)}">${escapeHtml(s.nom)}</option>`).join('');
+    sel.value = valeur || '';
+}
+
+async function chargerClientsEtSources() {
+    try {
+        [allClients, allSources] = await Promise.all([apiFetch('/clients'), apiFetch('/sources-client')]);
+    } catch (err) { allClients = []; allSources = []; }
+}
+
+// ---- Liste des clients ----
+function renderClients() {
+    const q = (document.getElementById('client-recherche').value || '').toLowerCase().trim();
+    const liste = allClients.filter(c => !q || (c.nom || '').toLowerCase().includes(q));
+    const el = document.getElementById('clients-list');
+    if (!allClients.length) {
+        el.innerHTML = '<div class="empty-state"><p>Aucun client pour l\'instant. Cliquez sur « + Nouveau », ou rattachez un client en enregistrant un devis.</p></div>';
+        return;
+    }
+    if (!liste.length) { el.innerHTML = '<div class="empty-state"><p>Aucun résultat.</p></div>'; return; }
+    el.innerHTML = liste.map(c => `
+        <div class="client-row" onclick="ouvrirFicheClient(${c.id})">
+            <div style="min-width:0;">
+                <div class="nom">${escapeHtml(c.nom)}</div>
+                <div class="meta">${escapeHtml(c.source || 'Source non renseignée')}
+                    · ${c.nb_devis} devis · ${Number(c.ca_devis).toFixed(2)} € HT</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="pill ${c.type}">${c.type}</span>
+                <button style="padding:5px 9px;font-size:9px;" title="Envoyer ce client à un collègue"
+                        onclick="event.stopPropagation();ouvrirEnvoiNotif('client', ${c.id}, ${JSON.stringify(c.nom).replace(/"/g, '&quot;')})">Envoyer</button>
+            </div>
+        </div>`).join('');
+}
+
+async function ouvrirFicheClient(id) {
+    ficheClientId = id;
+    const c = id ? allClients.find(x => x.id === id) : null;
+    document.getElementById('mc-titre').textContent = c ? c.nom : 'Nouveau client';
+    document.getElementById('mc-nom').value = c ? c.nom : '';
+    document.getElementById('mc-type').value = c ? c.type : 'prospect';
+    document.getElementById('mc-email').value = c && c.email ? c.email : '';
+    document.getElementById('mc-tel').value = c && c.telephone ? c.telephone : '';
+    document.getElementById('mc-notes').value = c && c.notes ? c.notes : '';
+    optionsSources('mc-source', c ? c.source : '');
+    document.getElementById('mc-suppr').style.display = c ? 'block' : 'none';
+    document.getElementById('mc-devis').innerHTML = '';
+    ouvrirModal('modal-client');
+    if (id) {
+        try {
+            const d = await apiSend(`/clients/${id}`, 'GET');
+            document.getElementById('mc-devis').innerHTML = d.devis.length
+                ? `<div style="margin-top:6px;"><label>Devis de ce client</label>` + d.devis.map(x =>
+                    `<div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border);">
+                        <span>${escapeHtml(x.type)} × ${x.qty} — ${new Date(x.created_at).toLocaleDateString('fr-FR')}</span>
+                        <span style="color:var(--primary);font-weight:600;">${Number(x.ht).toFixed(2)} € HT</span>
+                     </div>`).join('') + '</div>'
+                : '';
+        } catch (err) { /* la fiche reste utilisable sans l'historique */ }
+    }
+}
+
+async function enregistrerFicheClient() {
+    const body = {
+        nom: document.getElementById('mc-nom').value,
+        type: document.getElementById('mc-type').value,
+        source: document.getElementById('mc-source').value,
+        email: document.getElementById('mc-email').value,
+        telephone: document.getElementById('mc-tel').value,
+        notes: document.getElementById('mc-notes').value
+    };
+    if (!body.nom.trim()) { showNotification('Le nom est obligatoire', 'error'); return; }
+    try {
+        if (ficheClientId) await apiSend(`/clients/${ficheClientId}`, 'PUT', body);
+        else await apiSend('/clients', 'POST', body);
+        await chargerClientsEtSources();
+        renderClients();
+        fermerModal('modal-client');
+        showNotification('Client enregistré ✓', 'success');
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+async function supprimerClient() {
+    if (!ficheClientId) return;
+    if (!confirm('Supprimer ce client ? Ses devis sont conservés mais ne seront plus comptés dans les statistiques.')) return;
+    try {
+        await apiSend(`/clients/${ficheClientId}`, 'DELETE');
+        await chargerClientsEtSources();
+        renderClients();
+        fermerModal('modal-client');
+        showNotification('Client supprimé', 'success');
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+// ---- Statistiques par source ----
+async function renderStats() {
+    const el = document.getElementById('stats-view');
+    el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Chargement...</p>';
+    try {
+        const rows = await apiFetch('/stats/sources');
+        if (!rows.length) { el.innerHTML = '<div class="empty-state"><p>Aucun client enregistré : les statistiques apparaîtront dès le premier client créé.</p></div>'; return; }
+        const maxCA = Math.max(...rows.map(r => r.ca_devis), 1);
+        const totalContacts = rows.reduce((s, r) => s + r.total, 0);
+        const totalCA = rows.reduce((s, r) => s + r.ca_devis, 0);
+        el.innerHTML = `
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+                <div class="stat-bar" style="flex:1;margin:0;"><div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">Contacts</div><div style="font-size:20px;font-weight:700;">${totalContacts}</div></div>
+                <div class="stat-bar" style="flex:1;margin:0;"><div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;">CA devisé</div><div style="font-size:20px;font-weight:700;color:var(--primary);">${totalCA.toFixed(0)} €</div></div>
+            </div>` + rows.map(r => `
+            <div class="stat-bar">
+                <div class="haut">
+                    <span style="font-weight:600;">${escapeHtml(r.source)}</span>
+                    <span style="color:var(--primary);font-weight:700;white-space:nowrap;">${r.ca_devis.toFixed(2)} € HT</span>
+                </div>
+                <div class="jauge"><i style="width:${Math.round((r.ca_devis / maxCA) * 100)}%;"></i></div>
+                <div class="bas">${r.total} contact${r.total > 1 ? 's' : ''} · ${r.clients} client${r.clients > 1 ? 's' : ''}
+                     · ${r.prospects} prospect${r.prospects > 1 ? 's' : ''} · ${r.nb_devis} devis
+                     · transformation ${r.taux} %</div>
+            </div>`).join('');
+    } catch (err) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`; }
+}
+
+// ---- Enregistrement d'un devis avec rattachement client ----
+// Remplace l'ancienne invite de saisie : on choisit un client existant ou on en cree un,
+// ce qui est la condition pour que les statistiques par source aient un sens.
+async function saveDevis(type, qty, ht, ttc, btn) {
+    devisEnAttente = { type, qty, ht, ttc, btn };
+    if (!allClients.length && !allSources.length) await chargerClientsEtSources();
+    const sel = document.getElementById('md-client');
+    sel.innerHTML = '<option value="">— Sans client —</option>'
+        + allClients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('')
+        + '<option value="__new">+ Nouveau client…</option>';
+    sel.value = '';
+    document.getElementById('md-nom').value = '';
+    document.getElementById('md-type').value = 'prospect';
+    optionsSources('md-source', '');
+    majChampsNouveauClient();
+    document.getElementById('md-ok').disabled = false;
+    document.getElementById('md-ok').textContent = 'Enregistrer';
+    ouvrirModal('modal-devis');
+}
+
+function majChampsNouveauClient() {
+    document.getElementById('md-nouveau').style.display =
+        document.getElementById('md-client').value === '__new' ? 'block' : 'none';
+}
+
+function annulerSaveDevis() {
+    fermerModal('modal-devis');
+    devisEnAttente = null;
+}
+
+async function confirmerSaveDevis() {
+    if (!devisEnAttente) return;
+    const { type, qty, ht, ttc, btn } = devisEnAttente;
+    const choix = document.getElementById('md-client').value;
+    const ok = document.getElementById('md-ok');
+    ok.disabled = true; ok.textContent = 'Enregistrement...';
+    try {
+        let clientId = null, clientNom = null;
+        if (choix === '__new') {
+            const nom = document.getElementById('md-nom').value.trim();
+            if (!nom) { showNotification('Le nom du client est obligatoire', 'error'); ok.disabled = false; ok.textContent = 'Enregistrer'; return; }
+            const cree = await apiSend('/clients', 'POST', {
+                nom, type: document.getElementById('md-type').value,
+                source: document.getElementById('md-source').value
+            });
+            clientId = cree.id; clientNom = nom;
+            await chargerClientsEtSources();
+        } else if (choix) {
+            clientId = parseInt(choix, 10);
+            const c = allClients.find(x => x.id === clientId);
+            clientNom = c ? c.nom : null;
+        }
+        await apiSend('/devis', 'POST', { type, qty, ht, ttc, details: lastDevisDetails || {}, client: clientNom, client_id: clientId });
+        fermerModal('modal-devis');
+        devisEnAttente = null;
+        showNotification('Devis sauvegardé ✓', 'success');
+        if (btn) { btn.disabled = true; btn.textContent = 'Devis enregistré ✓'; } // reste desactive : evite les doublons
+    } catch (err) {
+        showNotification(err.message, 'error');
+        ok.disabled = false; ok.textContent = 'Enregistrer';
+    }
+}
+
+// ---- Notifications internes ----
+async function chargerEquipe() {
+    try { const d = await apiFetch('/equipe'); equipeMembres = d.membres; moiId = d.moi; }
+    catch (err) { equipeMembres = []; }
+}
+
+async function chargerNotifs() {
+    try {
+        const d = await apiFetch('/notifications');
+        const badge = document.getElementById('bell-count');
+        badge.textContent = d.nonLus;
+        badge.classList.toggle('on', d.nonLus > 0);
+        const panel = document.getElementById('notif-panel');
+        const entete = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 4px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+            <b style="font-size:12px;">Notifications</b>
+            <span style="display:flex;gap:6px;">
+              ${d.nonLus ? '<button style="padding:4px 8px;font-size:9px;background:var(--bg-input);color:var(--text-primary);" onclick="toutLu()">Tout lu</button>' : ''}
+              <button style="padding:4px 8px;font-size:9px;" onclick="ouvrirEnvoiNotif(null,null,\'\')">Envoyer</button>
+            </span></div>`;
+        panel.innerHTML = entete + (d.notifications.length ? d.notifications.map(n => {
+            const icone = { reunion: '📅', client: '👤', devis: '📄' }[n.type] || '💬';
+            const rdv = n.date_rdv ? `<div style="color:var(--primary);font-size:11px;">📅 ${new Date(n.date_rdv).toLocaleString('fr-FR')}</div>` : '';
+            return `<div class="notif-item ${n.lu ? '' : 'neuf'}" onclick="ouvrirNotif(${n.id}, '${n.ref_type || ''}', ${n.ref_id || 'null'})">
+                <div class="qui">${icone} ${escapeHtml(n.de_nom || 'Collègue')} · ${new Date(n.created_at).toLocaleDateString('fr-FR')}</div>
+                <div class="titre">${escapeHtml(n.titre)}</div>
+                ${rdv}${n.message ? `<div class="msg">${escapeHtml(n.message)}</div>` : ''}
+            </div>`;
+        }).join('') : '<p style="font-size:11px;color:var(--text-light);padding:8px 4px;">Aucun message.</p>');
+    } catch (err) { /* silencieux : une notification indisponible ne doit pas gener le chiffrage */ }
+}
+
+function toggleNotifs(e) {
+    e.stopPropagation();
+    const p = document.getElementById('notif-panel');
+    p.classList.toggle('open');
+    if (p.classList.contains('open')) chargerNotifs();
+}
+
+async function ouvrirNotif(id, refType, refId) {
+    try { await apiSend(`/notifications/${id}/lu`, 'PUT'); } catch (err) { /* sans effet sur l'affichage */ }
+    if (refType === 'client' && refId) {
+        document.getElementById('notif-panel').classList.remove('open');
+        const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Clients'));
+        if (btn) { switchTab('clients', btn); renderClients(); }
+        ouvrirFicheClient(refId);
+    } else if (refType === 'devis' && refId) {
+        document.getElementById('notif-panel').classList.remove('open');
+        const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Hist.'));
+        if (btn) { switchTab('historique', btn); renderHistorique(); }
+    }
+    chargerNotifs();
+}
+
+async function toutLu() {
+    try { await apiSend('/notifications/toutes-lues', 'PUT'); chargerNotifs(); }
+    catch (err) { showNotification(err.message, 'error'); }
+}
+
+function ouvrirEnvoiNotif(refType, refId, libelle) {
+    const sel = document.getElementById('mn-dest');
+    const autres = equipeMembres.filter(m => m.id !== moiId);
+    if (!autres.length) {
+        showNotification('Aucun collègue : ajoutez un utilisateur depuis l\'admin', 'error');
+        return;
+    }
+    sel.innerHTML = autres.map(m => `<option value="${m.id}">${escapeHtml(m.nom)}</option>`).join('');
+    document.getElementById('mn-type').value = refType || 'message';
+    document.getElementById('mn-titre').value = libelle ? `${refType === 'client' ? 'Client' : 'Devis'} : ${libelle}` : '';
+    document.getElementById('mn-message').value = '';
+    document.getElementById('mn-rdv').value = '';
+    document.getElementById('mn-email').checked = false;
+    document.getElementById('mn-ok').disabled = false;
+    document.getElementById('mn-ok').textContent = 'Envoyer';
+    document.getElementById('mn-ok').dataset.refType = refType || '';
+    document.getElementById('mn-ok').dataset.refId = refId || '';
+    majChampRdv();
+    document.getElementById('notif-panel').classList.remove('open');
+    ouvrirModal('modal-notif');
+}
+
+function majChampRdv() {
+    document.getElementById('mn-rdv-group').style.display =
+        document.getElementById('mn-type').value === 'reunion' ? 'block' : 'none';
+}
+
+async function envoyerNotif() {
+    const ok = document.getElementById('mn-ok');
+    const titre = document.getElementById('mn-titre').value.trim();
+    if (!titre) { showNotification('L\'objet est obligatoire', 'error'); return; }
+    ok.disabled = true; ok.textContent = 'Envoi...';
+    try {
+        await apiSend('/notifications', 'POST', {
+            vers_user_id: parseInt(document.getElementById('mn-dest').value, 10),
+            type: document.getElementById('mn-type').value,
+            titre,
+            message: document.getElementById('mn-message').value,
+            ref_type: ok.dataset.refType || null,
+            ref_id: ok.dataset.refId ? parseInt(ok.dataset.refId, 10) : null,
+            date_rdv: document.getElementById('mn-rdv').value || null,
+            envoyer_email: document.getElementById('mn-email').checked
+        });
+        fermerModal('modal-notif');
+        showNotification('Message envoyé ✓', 'success');
+    } catch (err) {
+        showNotification(err.message, 'error');
+        ok.disabled = false; ok.textContent = 'Envoyer';
+    }
 }
 
 function showNotification(msg, type) {

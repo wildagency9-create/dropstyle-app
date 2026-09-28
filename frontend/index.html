@@ -53,17 +53,20 @@
         .logo-icon {
             width: 60px;
             height: 60px;
-            background: linear-gradient(135deg, var(--primary), #FF7043);
+            background: #fff;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 700;
-            color: white;
-            font-size: 28px;
+            padding: 8px;
             margin: 0 auto 16px;
             box-shadow: 0 4px 12px rgba(255,87,34,0.3);
         }
+        .logo-icon img { height: 100%; width: auto; display: block; }
+        /* Le h1 porte un degrade decoupe sur le texte : neutralise quand il accueille le logotype,
+           sinon le fond deborde autour de l'image. */
+        h1.logo-title { background: none; -webkit-text-fill-color: initial; line-height: 0; }
+        .logotype { height: 42px; width: auto; display: block; margin: 0 auto; }
 
         h1 {
             font-size: 24px;
@@ -245,8 +248,8 @@
 <div class="container">
     <div class="card">
         <div class="logo-area">
-            <div class="logo-icon">D</div>
-            <h1>DropStyle</h1>
+            <div class="logo-icon"><img src="/img/goutte.png" alt=""></div>
+            <h1 class="logo-title"><img class="logotype" src="/img/logotype.png" alt="DropStyle"></h1>
             <p class="subtitle">Calculateur de Prix</p>
         </div>
 
