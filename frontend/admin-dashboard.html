@@ -8,15 +8,20 @@
         :root {
             --primary: #FF5722;
             --primary-dark: #E64A19;
-            --bg-dark: #0a0a0a;
-            --bg-card: #1a1a1a;
-            --bg-input: #2a2a2a;
-            --border: #404040;
-            --text-primary: #e0e0e0;
-            --text-secondary: #999;
+            --primary-clair: #FF8A50;
+            --bg-dark: #07080b;
+            --bg-card: #12141a;
+            --bg-input: #1b1e26;
+            --border: rgba(255,255,255,0.09);
+            --text-primary: #e8e9ee;
+            --text-secondary: #8b90a0;
             --success: #4caf50;
             --danger: #ff5252;
             --gold: #d4af37;
+            /* Surfaces en verre : translucides, posees sur le fond lumineux du body */
+            --verre: rgba(255,255,255,0.035);
+            --verre-haut: rgba(255,255,255,0.065);
+            --halo: rgba(255,87,34,0.35);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -24,10 +29,31 @@
             background: var(--bg-dark);
             color: var(--text-primary);
             min-height: 100vh;
+            position: relative;
         }
+        /* Fond : deux halos orange et une grille fine. En position fixe et non cliquable,
+           il ne gene ni le defilement ni les interactions. */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(1100px 620px at 10% -10%, rgba(255,87,34,0.26), transparent 62%),
+                radial-gradient(820px 560px at 102% 2%, rgba(212,175,55,0.13), transparent 58%),
+                radial-gradient(900px 700px at 50% 110%, rgba(90,120,255,0.07), transparent 60%),
+                linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 100% 46px,
+                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 46px 100%;
+            /* La grille s'efface sur les bords pour ne pas cerner l'ecran d'un quadrillage net */
+            mask-image: radial-gradient(130% 110% at 50% 0%, #000 45%, transparent 100%);
+            -webkit-mask-image: radial-gradient(130% 110% at 50% 0%, #000 45%, transparent 100%);
+        }
+        header, .container, .modal { position: relative; z-index: 1; }
+
         header {
-            background: linear-gradient(135deg, var(--bg-card), rgba(255,87,34,0.05));
-            border-bottom: 2px solid var(--primary);
+            background: rgba(18,20,26,0.72);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 0 rgba(255,87,34,0.28), 0 10px 40px -18px rgba(0,0,0,0.9);
             padding: 16px 32px;
             display: flex;
             justify-content: space-between;
@@ -45,8 +71,9 @@
             padding: 6px;
         }
         .logo-icon img { height: 100%; width: auto; display: block; }
+        .logo-icon { box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 6px 22px -6px var(--halo); }
         h1 {
-            font-size: 22px; font-weight: 700;
+            font-size: 22px; font-weight: 700; letter-spacing: -0.4px;
             background: linear-gradient(135deg, var(--primary), var(--gold));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -54,22 +81,29 @@
         }
         button {
             padding: 10px 18px;
-            background: linear-gradient(135deg, var(--primary), #FF7043);
+            background: linear-gradient(135deg, var(--primary), var(--primary-clair));
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
             font-size: 12px;
+            letter-spacing: .4px;
             text-transform: uppercase;
-            transition: all 0.3s;
+            position: relative;
+            box-shadow: 0 6px 20px -8px var(--halo);
+            transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
         }
-        button:hover { transform: translateY(-1px); }
-        button.calc-btn { background: rgba(212,175,55,0.2); color: var(--gold); border: 1px solid var(--gold); }
-        button.logout-btn { background: rgba(255,82,82,0.2); color: var(--danger); border: 1px solid var(--danger); }
-        button.danger { background: var(--danger); }
-        button.success { background: var(--success); }
-        button.small { padding: 6px 10px; font-size: 10px; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -10px var(--halo); filter: brightness(1.06); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: .5; transform: none; box-shadow: none; cursor: default; filter: none; }
+        button.calc-btn { background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid rgba(212,175,55,.45); box-shadow: none; }
+        button.calc-btn:hover { box-shadow: 0 8px 24px -10px rgba(212,175,55,.55); }
+        button.logout-btn { background: rgba(255,82,82,0.1); color: var(--danger); border: 1px solid rgba(255,82,82,.45); box-shadow: none; }
+        button.logout-btn:hover { box-shadow: 0 8px 24px -10px rgba(255,82,82,.55); }
+        button.danger { background: linear-gradient(135deg, #e53935, var(--danger)); box-shadow: 0 6px 20px -8px rgba(255,82,82,.5); }
+        button.success { background: linear-gradient(135deg, #3d9140, var(--success)); box-shadow: 0 6px 20px -8px rgba(76,175,80,.5); }
+        button.small { padding: 6px 10px; font-size: 10px; border-radius: 6px; }
         .header-actions { display: flex; gap: 10px; }
         .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
         .stats-grid {
@@ -79,15 +113,38 @@
             margin-bottom: 28px;
         }
         .stat-card {
-            background: var(--bg-card);
+            background: linear-gradient(160deg, var(--verre-haut), var(--verre));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: 14px;
+            padding: 22px 20px;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
         }
-        .stat-icon { font-size: 32px; margin-bottom: 8px; }
-        .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
-        .stat-value { font-size: 32px; font-weight: 700; color: var(--primary); }
+        /* Liseré lumineux en haut de chaque tuile */
+        .stat-card::before {
+            content: '';
+            position: absolute; top: 0; left: 14%; right: 14%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            opacity: .75;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255,87,34,.4);
+            box-shadow: 0 18px 40px -22px rgba(0,0,0,.95), 0 0 0 1px rgba(255,87,34,.12);
+        }
+        .stat-icon { font-size: 30px; margin-bottom: 8px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+        .stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 6px; }
+        .stat-value {
+            font-size: 34px; font-weight: 800; letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--primary-clair), var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            text-shadow: 0 0 26px var(--halo);
+            font-variant-numeric: tabular-nums;
+        }
         .tabs {
             display: flex;
             flex-wrap: wrap;          /* V11 : 8 onglets — on passe a la ligne plutot que de
@@ -105,21 +162,58 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: 600;
+            letter-spacing: .3px;
             text-transform: uppercase;
             white-space: nowrap;
             margin-bottom: -1px;
+            border-radius: 8px 8px 0 0;
+            transition: color .2s ease, background .2s ease;
         }
-        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-btn:hover { color: var(--text-primary); background: var(--verre); }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: linear-gradient(180deg, transparent, rgba(255,87,34,.10));
+            box-shadow: 0 6px 18px -12px var(--halo);
+        }
         .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        /* Apparition douce au changement d'onglet */
+        .tab-content.active { display: block; animation: apparition .3s ease both; }
+        @keyframes apparition { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+            .tab-content.active { animation: none; }
+            button:hover, .stat-card:hover { transform: none; }
+        }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .section-title { font-size: 18px; font-weight: 700; color: var(--primary); }
-        .table-wrap { background: var(--bg-card); border-radius: 8px; overflow: hidden; }
+        .section-title {
+            font-size: 18px; font-weight: 700; color: var(--primary);
+            letter-spacing: -0.2px; display: flex; align-items: center; gap: 10px;
+        }
+        .section-title::after {
+            content: ''; flex: 1; height: 1px; min-width: 20px;
+            background: linear-gradient(90deg, rgba(255,87,34,.45), transparent);
+        }
+        .table-wrap {
+            background: linear-gradient(160deg, var(--verre-haut), var(--verre));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 20px 44px -30px rgba(0,0,0,.95);
+        }
         table { width: 100%; border-collapse: collapse; }
-        th { background: rgba(255,87,34,0.1); padding: 12px; text-align: left; font-weight: 600; color: var(--primary); font-size: 11px; text-transform: uppercase; }
-        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
-        tr:hover { background: rgba(255,87,34,0.03); }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        th {
+            background: rgba(255,87,34,0.09);
+            padding: 13px 12px; text-align: left; font-weight: 700;
+            color: var(--primary); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+            border-bottom: 1px solid rgba(255,87,34,.22);
+        }
+        td { padding: 13px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        tbody tr { transition: background .18s ease; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: linear-gradient(90deg, rgba(255,87,34,.09), rgba(255,87,34,.02)); }
+        .badge { display: inline-block; padding: 4px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .5px; }
         .badge.admin { background: rgba(255,87,34,0.2); color: var(--primary); }
         .badge.user { background: rgba(76,175,80,0.2); color: var(--success); }
         .modal {
@@ -131,43 +225,72 @@
             justify-content: center;
             z-index: 1000;
         }
+        .modal { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); background: rgba(3,4,6,0.72); }
         .modal.active { display: flex; }
         .modal-content {
-            background: var(--bg-card);
-            border: 2px solid var(--primary);
-            border-radius: 8px;
-            padding: 24px;
+            background: linear-gradient(160deg, #191c24, #12141a);
+            border: 1px solid rgba(255,87,34,.35);
+            border-radius: 16px;
+            padding: 26px;
             max-width: 480px;
             width: 90%;
             max-height: 90vh;
             overflow-y: auto;
+            box-shadow: 0 30px 70px -30px #000, 0 0 0 1px rgba(255,255,255,.05), 0 0 60px -30px var(--halo);
+            animation: modale .22s ease both;
         }
-        .modal-header { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 16px; }
+        @keyframes modale { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+        .modal-header { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 16px; letter-spacing: -0.2px; }
         .form-group { margin-bottom: 12px; }
         label { display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
         input, select, textarea {
             width: 100%;
-            padding: 10px;
-            background: var(--bg-input);
+            padding: 11px 12px;
+            background: rgba(255,255,255,0.045);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 9px;
             color: var(--text-primary);
             font-size: 13px;
             font-family: inherit;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
         }
+        input::placeholder, textarea::placeholder { color: #5f6577; }
         textarea { resize: vertical; }
         select option {
             background: var(--bg-dark);
             color: var(--primary);
         }
-        input:focus, select:focus { outline: none; border-color: var(--primary); }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(255,87,34,.75);
+            background: rgba(255,255,255,0.07);
+            box-shadow: 0 0 0 3px rgba(255,87,34,.14);
+        }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
-        .message { padding: 12px; border-radius: 6px; margin-bottom: 16px; display: none; }
-        .message.success { background: rgba(76,175,80,0.15); color: var(--success); border-left: 3px solid var(--success); display: block; }
-        .message.error { background: rgba(255,82,82,0.15); color: var(--danger); border-left: 3px solid var(--danger); display: block; }
+        .message { padding: 12px 14px; border-radius: 9px; margin-bottom: 16px; display: none; font-size: 13px; }
+        .message.success { background: rgba(76,175,80,0.12); color: var(--success); border: 1px solid rgba(76,175,80,.3); border-left: 3px solid var(--success); display: block; }
+        .message.error { background: rgba(255,82,82,0.12); color: var(--danger); border: 1px solid rgba(255,82,82,.3); border-left: 3px solid var(--danger); display: block; }
         .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         .empty-state { text-align: center; padding: 30px; color: var(--text-secondary); font-size: 13px; }
+
+        /* Barre de defilement assortie plutot que celle du systeme */
+        * { scrollbar-width: thin; scrollbar-color: rgba(255,87,34,.4) transparent; }
+        *::-webkit-scrollbar { width: 10px; height: 10px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb { background: rgba(255,87,34,.34); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+        *::-webkit-scrollbar-thumb:hover { background: rgba(255,87,34,.6); background-clip: content-box; }
+
+        @media (max-width: 720px) {
+            /* L'en-tete passe a la ligne plutot que de pousser les boutons hors de l'ecran */
+            header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+            .header-actions { width: 100%; }
+            .header-actions button { flex: 1; padding: 10px 8px; font-size: 11px; }
+            .container { padding: 16px; }
+            h1 { font-size: 18px; }
+            .row2, .row3 { grid-template-columns: 1fr; }
+            .stat-value { font-size: 28px; }
+        }
     </style>
 </head>
 <body>
@@ -654,13 +777,36 @@ async function loadAll() {
     testMoteur();
 }
 
+// Compteur qui monte jusqu'a la valeur. Purement decoratif : si quoi que ce soit cloche,
+// on ecrit directement le chiffre — un tableau de bord doit d'abord afficher le bon nombre.
+function animerNombre(id, valeur, suffixe, decimales) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const fin = Number(valeur);
+    const dec = decimales || 0;
+    const ecrire = v => { el.textContent = v.toFixed(dec) + (suffixe || ''); };
+    // Valeur absente ou illisible : un tiret vaut mieux que "undefined" ou un zero
+    // qui laisserait croire a un chiffre reel.
+    if (!isFinite(fin)) { el.textContent = '—'; return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { ecrire(fin); return; }
+    const duree = 700, depart = performance.now();
+    (function etape(t) {
+        const p = Math.min(1, (t - depart) / duree);
+        ecrire(fin * (1 - Math.pow(1 - p, 3)));   // ralentit en fin de course
+        if (p < 1) requestAnimationFrame(etape); else ecrire(fin);
+    })(depart);
+}
+
 async function loadStats() {
     try {
         const data = await fetch(`${API_URL}/admin/stats`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-        document.getElementById('stat-users').textContent = data.users;
-        document.getElementById('stat-devis').textContent = data.devis;
-        document.getElementById('stat-revenue').textContent = parseFloat(data.revenue).toFixed(2) + '€';
-    } catch (err) { console.error(err); }
+        animerNombre('stat-users', data.users);
+        animerNombre('stat-devis', data.devis);
+        animerNombre('stat-revenue', parseFloat(data.revenue), '€', 2);
+    } catch (err) {
+        console.error(err);
+        ['stat-users', 'stat-devis', 'stat-revenue'].forEach(id => animerNombre(id, null));
+    }
 }
 
 // ===== V12 — NOTIFICATIONS ET INVITATIONS =====
@@ -680,8 +826,11 @@ async function apiAdmin(chemin, methode, corps) {
 async function initNotifs() {
     try {
         const d = await apiAdmin('/equipe');
-        equipeAdmin = d.membres; moiAdmin = d.moi;
-    } catch (err) { equipeAdmin = []; }
+        // Une reponse de forme inattendue ne doit pas casser l'onglet : on retombe sur une
+        // liste vide, ce que la suite sait deja gerer.
+        equipeAdmin = Array.isArray(d && d.membres) ? d.membres : [];
+        moiAdmin = d && d.moi;
+    } catch (err) { equipeAdmin = []; moiAdmin = null; }
     const autres = equipeAdmin.filter(m => m.id !== moiAdmin);
     const sel = document.getElementById('ni-dest');
     sel.innerHTML = autres.length
@@ -831,16 +980,34 @@ async function supprimerSource(id) {
 // ===== V13 — ACTIVITE DE L'EQUIPE =====
 // Graphiques dessines en SVG : pas de bibliotheque externe a charger, et le meme style
 // que le reste de l'interface.
+// Degrade et halo partages par les deux graphiques, declares une fois par SVG.
+const DEFS_SVG = `<defs>
+    <linearGradient id="degOrange" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#FF7043"></stop><stop offset="100%" stop-color="#FF5722"></stop>
+    </linearGradient>
+    <linearGradient id="degOrangeV" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#E64A19"></stop><stop offset="100%" stop-color="#FF8A50"></stop>
+    </linearGradient>
+    <filter id="halo" x="-30%" y="-60%" width="160%" height="220%">
+        <feGaussianBlur stdDeviation="4" result="f"></feGaussianBlur>
+        <feMerge><feMergeNode in="f"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+    </filter>
+</defs>`;
+
 function barresSVG(lignes, unite) {
     if (!lignes.length) return '<p style="color:var(--text-secondary);font-size:12px;">Aucune donnée</p>';
     const maxi = Math.max(...lignes.map(l => l.valeur), 1);
-    const hLigne = 26, h = lignes.length * hLigne + 6, largeurNom = 130, droite = 76;
-    return `<svg viewBox="0 0 560 ${h}" style="width:100%;height:${h}px;" role="img">
+    const hLigne = 28, h = lignes.length * hLigne + 6, largeurNom = 130, droite = 76;
+    return `<svg viewBox="0 0 560 ${h}" style="width:100%;height:${h}px;" role="img">${DEFS_SVG}
         ${lignes.map((l, i) => {
-            const y = i * hLigne + 4, larg = Math.max(2, (l.valeur / maxi) * (560 - largeurNom - droite));
-            return `<text x="0" y="${y + 13}" fill="var(--text-primary)" font-size="12">${escapeHtml(l.nom)}</text>
-                    <rect x="${largeurNom}" y="${y + 3}" width="${larg}" height="13" rx="3" fill="${l.couleur || 'var(--primary)'}"></rect>
-                    <text x="${largeurNom + larg + 6}" y="${y + 14}" fill="var(--text-secondary)" font-size="11">${l.libelle ?? (l.valeur + (unite || ''))}</text>`;
+            const y = i * hLigne + 4, plein = 560 - largeurNom - droite;
+            const larg = Math.max(2, (l.valeur / maxi) * plein);
+            const remplissage = l.couleur || 'url(#degOrange)';
+            return `<text x="0" y="${y + 14}" fill="var(--text-primary)" font-size="12">${escapeHtml(l.nom)}</text>
+                    <rect x="${largeurNom}" y="${y + 4}" width="${plein}" height="14" rx="7" fill="rgba(255,255,255,.05)"></rect>
+                    <rect x="${largeurNom}" y="${y + 4}" width="${larg}" height="14" rx="7" fill="${remplissage}"
+                          ${l.couleur ? '' : 'filter="url(#halo)"'}></rect>
+                    <text x="${largeurNom + larg + 8}" y="${y + 15}" fill="var(--text-secondary)" font-size="11">${l.libelle ?? (l.valeur + (unite || ''))}</text>`;
         }).join('')}
     </svg>`;
 }
@@ -850,14 +1017,14 @@ function colonnesSVG(points) {
     const maxi = Math.max(...points.map(p => p.nb), 1);
     const l = 560, h = 150, base = h - 22, larg = Math.min(34, (l - 10) / points.length - 6);
     const pas = (l - 10) / points.length;
-    return `<svg viewBox="0 0 ${l} ${h}" style="width:100%;height:${h}px;" role="img">
-        <line x1="0" y1="${base}" x2="${l}" y2="${base}" stroke="var(--border)" stroke-width="1"></line>
+    return `<svg viewBox="0 0 ${l} ${h}" style="width:100%;height:${h}px;" role="img">${DEFS_SVG}
+        <line x1="0" y1="${base}" x2="${l}" y2="${base}" stroke="rgba(255,87,34,.35)" stroke-width="1"></line>
         ${points.map((p, i) => {
             const haut = Math.max(2, (p.nb / maxi) * (base - 18)), x = 5 + i * pas + (pas - larg) / 2;
             const d = new Date(p.semaine);
-            return `<rect x="${x}" y="${base - haut}" width="${larg}" height="${haut}" rx="3" fill="var(--primary)"></rect>
-                    <text x="${x + larg / 2}" y="${base - haut - 4}" fill="var(--text-secondary)" font-size="10" text-anchor="middle">${p.nb}</text>
-                    <text x="${x + larg / 2}" y="${base + 14}" fill="var(--text-light, #666)" font-size="9" text-anchor="middle">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</text>`;
+            return `<rect x="${x}" y="${base - haut}" width="${larg}" height="${haut}" rx="5" fill="url(#degOrangeV)" filter="url(#halo)"></rect>
+                    <text x="${x + larg / 2}" y="${base - haut - 5}" fill="var(--text-primary)" font-size="10" font-weight="600" text-anchor="middle">${p.nb}</text>
+                    <text x="${x + larg / 2}" y="${base + 14}" fill="var(--text-secondary)" font-size="9" text-anchor="middle">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</text>`;
         }).join('')}
     </svg>`;
 }
