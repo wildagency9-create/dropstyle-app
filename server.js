@@ -158,7 +158,11 @@ async function ensureV11Tables(existingConn) {
             utilise_le DATETIME DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_equipe (equipe_id)
-        )`
+        )`,
+        // V13 — suivi des connexions. Volontairement minimal : on enregistre quand et
+        // combien de fois, pas une duree de presence, qui ne mesurerait qu'un onglet ouvert.
+        `ALTER TABLE users ADD COLUMN derniere_connexion DATETIME DEFAULT NULL`,
+        `ALTER TABLE users ADD COLUMN nb_connexions INT DEFAULT 0`
     ];
     for (const q of queries) {
         try { await conn.query(q); }
@@ -320,6 +324,13 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         const user = rows[0];
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(401).json({ error: 'Identifiants invalides' });
+        // V13 — suivi des connexions. Hors du chemin critique : si la colonne n'existe pas
+        // encore au premier demarrage, la connexion doit reussir quand meme.
+        try {
+            const c = await pool.getConnection();
+            await c.query('UPDATE users SET derniere_connexion = NOW(), nb_connexions = COALESCE(nb_connexions, 0) + 1 WHERE id = ?', [user.id]);
+            await c.release();
+        } catch (e) { console.error('Suivi connexion :', e.message); }
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role, equipe_id: user.equipe_id || user.id }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
@@ -1235,7 +1246,8 @@ app.post('/api/invitations/accepter', authLimiter, async (req, res) => {
 
         const bcrypt = require('bcrypt');
         const hash = await bcrypt.hash(password, 10);
-        const [r] = await conn.query('INSERT INTO users (email, password, nom, role, equipe_id) VALUES (?, ?, ?, ?, ?)',
+        // L'invite est connecte dans la foulee : c'est bien une premiere connexion.
+        const [r] = await conn.query('INSERT INTO users (email, password, nom, role, equipe_id, derniere_connexion, nb_connexions) VALUES (?, ?, ?, ?, ?, NOW(), 1)',
             [inv.email, hash, nom.trim(), inv.role, inv.equipe_id]);
         await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE id = ?', [inv.id]);
         await conn.release();
@@ -1294,6 +1306,52 @@ app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// V13 — activite par utilisateur. Les devis et clients crees avant la V11 n'ont pas
+// d'auteur enregistre : ils sont regroupes a part plutot qu'attribues au hasard.
+app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+
+        const [membres] = await conn.query(
+            `SELECT id, nom, email, role, created_at, derniere_connexion, COALESCE(nb_connexions, 0) AS nb_connexions
+             FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
+        // devis.user_id = l'equipe proprietaire, devis.auteur_id = la personne qui l'a saisi.
+        const [parDevis] = await conn.query(
+            `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
+             FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
+        const [parClient] = await conn.query(
+            `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
+        // Activite hebdomadaire : lundi de chaque semaine, sur 12 semaines.
+        const [activite] = await conn.query(
+            `SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS semaine,
+                    COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
+             FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+             GROUP BY semaine ORDER BY semaine`, [req.userId]);
+        await conn.release();
+
+        const devisPar = new Map(parDevis.map(r => [r.auteur_id, r]));
+        const clientsPar = new Map(parClient.map(r => [r.auteur_id, r]));
+        const utilisateurs = membres.map(m => ({
+            ...m,
+            nb_devis: devisPar.has(m.id) ? devisPar.get(m.id).nb : 0,
+            ca_devis: devisPar.has(m.id) ? Number(devisPar.get(m.id).ca) : 0,
+            nb_clients: clientsPar.has(m.id) ? clientsPar.get(m.id).nb : 0
+        }));
+        const orphelinD = devisPar.get(null), orphelinC = clientsPar.get(null);
+        res.json({
+            utilisateurs,
+            sansAuteur: {
+                nb_devis: orphelinD ? orphelinD.nb : 0,
+                ca_devis: orphelinD ? Number(orphelinD.ca) : 0,
+                nb_clients: orphelinC ? orphelinC.nb : 0
+            },
+            activite: activite.map(a => ({ semaine: a.semaine, nb: a.nb, ca: Number(a.ca) }))
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });

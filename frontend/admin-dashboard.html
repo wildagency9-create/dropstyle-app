@@ -208,9 +208,17 @@
     <!-- USERS -->
     <div class="tab-content active" id="tab-users">
         <div class="section-header"><div class="section-title">Gestion Utilisateurs</div><button onclick="openModal('modal-user')">+ Ajouter</button></div>
+
+        <!-- V13 — activite de l'equipe -->
+        <div id="activite-equipe"></div>
+
         <div class="table-wrap"><table>
-            <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Inscrit</th><th>Action</th></tr></thead>
-            <tbody id="users-list"><tr><td colspan="5" class="empty-state">Chargement...</td></tr></tbody>
+            <thead><tr>
+                <th>Nom</th><th>Email</th><th>Rôle</th>
+                <th>Devis</th><th>Clients</th><th>CA devisé</th>
+                <th>Dernière connexion</th><th>Connexions</th><th>Action</th>
+            </tr></thead>
+            <tbody id="users-list"><tr><td colspan="9" class="empty-state">Chargement...</td></tr></tbody>
         </table></div>
     </div>
 
@@ -820,17 +828,123 @@ async function supprimerSource(id) {
     loadSources();
 }
 
+// ===== V13 — ACTIVITE DE L'EQUIPE =====
+// Graphiques dessines en SVG : pas de bibliotheque externe a charger, et le meme style
+// que le reste de l'interface.
+function barresSVG(lignes, unite) {
+    if (!lignes.length) return '<p style="color:var(--text-secondary);font-size:12px;">Aucune donnée</p>';
+    const maxi = Math.max(...lignes.map(l => l.valeur), 1);
+    const hLigne = 26, h = lignes.length * hLigne + 6, largeurNom = 130, droite = 76;
+    return `<svg viewBox="0 0 560 ${h}" style="width:100%;height:${h}px;" role="img">
+        ${lignes.map((l, i) => {
+            const y = i * hLigne + 4, larg = Math.max(2, (l.valeur / maxi) * (560 - largeurNom - droite));
+            return `<text x="0" y="${y + 13}" fill="var(--text-primary)" font-size="12">${escapeHtml(l.nom)}</text>
+                    <rect x="${largeurNom}" y="${y + 3}" width="${larg}" height="13" rx="3" fill="${l.couleur || 'var(--primary)'}"></rect>
+                    <text x="${largeurNom + larg + 6}" y="${y + 14}" fill="var(--text-secondary)" font-size="11">${l.libelle ?? (l.valeur + (unite || ''))}</text>`;
+        }).join('')}
+    </svg>`;
+}
+
+function colonnesSVG(points) {
+    if (!points.length) return '<p style="color:var(--text-secondary);font-size:12px;">Aucun devis sur les 12 dernières semaines</p>';
+    const maxi = Math.max(...points.map(p => p.nb), 1);
+    const l = 560, h = 150, base = h - 22, larg = Math.min(34, (l - 10) / points.length - 6);
+    const pas = (l - 10) / points.length;
+    return `<svg viewBox="0 0 ${l} ${h}" style="width:100%;height:${h}px;" role="img">
+        <line x1="0" y1="${base}" x2="${l}" y2="${base}" stroke="var(--border)" stroke-width="1"></line>
+        ${points.map((p, i) => {
+            const haut = Math.max(2, (p.nb / maxi) * (base - 18)), x = 5 + i * pas + (pas - larg) / 2;
+            const d = new Date(p.semaine);
+            return `<rect x="${x}" y="${base - haut}" width="${larg}" height="${haut}" rx="3" fill="var(--primary)"></rect>
+                    <text x="${x + larg / 2}" y="${base - haut - 4}" fill="var(--text-secondary)" font-size="10" text-anchor="middle">${p.nb}</text>
+                    <text x="${x + larg / 2}" y="${base + 14}" fill="var(--text-light, #666)" font-size="9" text-anchor="middle">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</text>`;
+        }).join('')}
+    </svg>`;
+}
+
+function carte(titre, valeur, teinte) {
+    return `<div style="flex:1;min-width:140px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);">${titre}</div>
+        <div style="font-size:22px;font-weight:700;${teinte ? 'color:' + teinte + ';' : ''}">${valeur}</div>
+    </div>`;
+}
+
 async function loadUsers() {
-    const users = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-    if (users.length === 0) {
-        document.getElementById('users-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun utilisateur</td></tr>';
+    const zone = document.getElementById('activite-equipe');
+    let d = null;
+    try {
+        d = await fetch(`${API_URL}/admin/utilisateurs-stats`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        if (d.error) throw new Error(d.error);
+    } catch (err) {
+        // Sans les statistiques, on affiche quand meme la liste des comptes.
+        zone.innerHTML = '';
+        d = null;
+    }
+
+    if (!d || !d.utilisateurs) {
+        const users = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        document.getElementById('users-list').innerHTML = users.length
+            ? users.map(u => `<tr><td>${escapeHtml(u.nom)}</td><td>${escapeHtml(u.email)}</td>
+                <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
+                <td colspan="5" style="color:var(--text-secondary);">Statistiques indisponibles</td>
+                <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td></tr>`).join('')
+            : '<tr><td colspan="9" class="empty-state">Aucun utilisateur</td></tr>';
         return;
     }
-    document.getElementById('users-list').innerHTML = users.map(u => `
-        <tr><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.nom)}</td>
-        <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
-        <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
-        <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td></tr>`).join('');
+
+    const us = d.utilisateurs;
+    const totDevis = us.reduce((s, u) => s + u.nb_devis, 0) + d.sansAuteur.nb_devis;
+    const totClients = us.reduce((s, u) => s + u.nb_clients, 0) + d.sansAuteur.nb_clients;
+    const totCA = us.reduce((s, u) => s + u.ca_devis, 0) + d.sansAuteur.ca_devis;
+    const ceMois = us.filter(u => u.derniere_connexion &&
+        (Date.now() - new Date(u.derniere_connexion)) < 30 * 864e5).length;
+
+    // Les lignes sans auteur correspondent aux saisies anterieures au suivi : on les montre
+    // en gris plutot que de les repartir entre les comptes, ce qui serait faux.
+    const barresDevis = us.map(u => ({ nom: u.nom, valeur: u.nb_devis }));
+    if (d.sansAuteur.nb_devis) barresDevis.push({ nom: 'Auteur inconnu', valeur: d.sansAuteur.nb_devis, couleur: 'var(--text-light, #666)' });
+    const barresCA = us.map(u => ({ nom: u.nom, valeur: u.ca_devis, libelle: u.ca_devis.toFixed(0) + ' €' }));
+    if (d.sansAuteur.ca_devis) barresCA.push({ nom: 'Auteur inconnu', valeur: d.sansAuteur.ca_devis, libelle: d.sansAuteur.ca_devis.toFixed(0) + ' €', couleur: 'var(--text-light, #666)' });
+
+    zone.innerHTML = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+            ${carte('Devis enregistrés', totDevis)}
+            ${carte('Clients saisis', totClients)}
+            ${carte('CA devisé', totCA.toFixed(0) + ' €', 'var(--primary)')}
+            ${carte('Actifs ce mois', ceMois + ' / ' + us.length)}
+        </div>
+        ${(d.sansAuteur.nb_devis || d.sansAuteur.nb_clients) ? `
+        <p style="font-size:11px;color:var(--text-secondary);background:rgba(212,175,55,.08);border:1px solid var(--gold);border-radius:6px;padding:10px;margin-bottom:18px;">
+            ${d.sansAuteur.nb_devis} devis et ${d.sansAuteur.nb_clients} client(s) ont été saisis avant la mise en place du suivi :
+            leur auteur n'est pas connu et ils ne sont attribués à personne.
+        </p>` : ''}
+        <div style="margin-bottom:20px;">
+            <div class="section-title" style="font-size:13px;margin-bottom:8px;">Devis par personne</div>
+            ${barresSVG(barresDevis)}
+        </div>
+        <div style="margin-bottom:20px;">
+            <div class="section-title" style="font-size:13px;margin-bottom:8px;">CA devisé par personne</div>
+            ${barresSVG(barresCA)}
+        </div>
+        <div style="margin-bottom:22px;">
+            <div class="section-title" style="font-size:13px;margin-bottom:8px;">Devis par semaine (12 dernières semaines)</div>
+            ${colonnesSVG(d.activite)}
+        </div>`;
+
+    document.getElementById('users-list').innerHTML = us.map(u => `
+        <tr>
+            <td>${escapeHtml(u.nom)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
+            <td>${u.nb_devis}</td>
+            <td>${u.nb_clients}</td>
+            <td>${u.ca_devis.toFixed(2)} €</td>
+            <td>${u.derniere_connexion
+                    ? new Date(u.derniere_connexion).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+                    : '<span style="color:var(--text-secondary);">jamais</span>'}</td>
+            <td>${u.nb_connexions}</td>
+            <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td>
+        </tr>`).join('');
 }
 
 async function loadVinyles() {
