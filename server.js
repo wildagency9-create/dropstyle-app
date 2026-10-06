@@ -162,7 +162,21 @@ async function ensureV11Tables(existingConn) {
         // V13 — suivi des connexions. Volontairement minimal : on enregistre quand et
         // combien de fois, pas une duree de presence, qui ne mesurerait qu'un onglet ouvert.
         `ALTER TABLE users ADD COLUMN derniere_connexion DATETIME DEFAULT NULL`,
-        `ALTER TABLE users ADD COLUMN nb_connexions INT DEFAULT 0`
+        `ALTER TABLE users ADD COLUMN nb_connexions INT DEFAULT 0`,
+        // V14 — suivi des devis. Les devis existants restent au statut 'calcule' : on ignore
+        // s'ils ont ete acceptes, et les compter comme valides gonflerait le chiffre d'affaires.
+        `ALTER TABLE devis ADD COLUMN statut VARCHAR(20) NOT NULL DEFAULT 'calcule'`,
+        `ALTER TABLE devis ADD COLUMN statut_le DATETIME DEFAULT NULL`,
+        `ALTER TABLE devis ADD COLUMN statut_par INT DEFAULT NULL`,
+        // V15 — trace des recapitulatifs deja envoyes. En base et non en memoire : un
+        // redemarrage du serveur ne doit pas provoquer un second envoi.
+        `CREATE TABLE IF NOT EXISTS recaps_envoyes (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            equipe_id INT NOT NULL,
+            periode VARCHAR(16) NOT NULL,
+            envoye_le DATETIME NOT NULL,
+            UNIQUE KEY uniq_equipe_periode (equipe_id, periode)
+        )`
     ];
     for (const q of queries) {
         try { await conn.query(q); }
@@ -706,6 +720,28 @@ app.get('/api/devis', verifyToken, async (req, res) => {
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// V14 — statut d'un devis. 'calcule' = prix etabli, sans reponse du client ; 'valide' =
+// commande obtenue ; 'refuse' = affaire perdue. La distinction entre 'calcule' et 'refuse'
+// est ce qui permet de calculer un vrai taux de transformation.
+const STATUTS_DEVIS = ['calcule', 'valide', 'refuse'];
+
+app.put('/api/devis/:id/statut', verifyToken, async (req, res) => {
+    try {
+        // Verifie avant d'ouvrir une connexion : inutile de solliciter la base pour
+        // rejeter une valeur invalide.
+        const statut = String(req.body.statut || '');
+        if (!STATUTS_DEVIS.includes(statut)) return res.status(400).json({ error: 'Statut inconnu' });
+        await ensureV11Tables();
+        const conn = await pool.getConnection();
+        const [r] = await conn.query(
+            'UPDATE devis SET statut = ?, statut_le = NOW(), statut_par = ? WHERE id = ? AND user_id = ?',
+            [statut, req.authUserId, req.params.id, req.userId]);
+        await conn.release();
+        if (!r.affectedRows) return res.status(404).json({ error: 'Devis introuvable' });
+        res.json({ message: 'OK', statut });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/devis/:id', verifyToken, async (req, res) => {
     try { const conn = await pool.getConnection(); await conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1260,6 +1296,138 @@ app.post('/api/invitations/accepter', authLimiter, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===== V15 — CLASSEMENT ET RECAPITULATIF HEBDOMADAIRE =====
+// Trois categories : devis crees, devis valides, CA valide. Le CA valide compte, sinon
+// celui qui multiplie les petits devis passerait devant celui qui decroche la grosse affaire.
+const DEBUT_PERIODE = {
+    semaine: 'DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)',      // lundi de cette semaine
+    mois:    'DATE_FORMAT(CURDATE(), "%Y-%m-01")'
+};
+
+async function classementEquipe(conn, equipeId, periode, debutExplicite, finExplicite) {
+    const borne = debutExplicite
+        ? 'd.created_at >= ? AND d.created_at < ?'
+        : `d.created_at >= ${DEBUT_PERIODE[periode] || DEBUT_PERIODE.semaine}`;
+    const params = debutExplicite ? [equipeId, equipeId, debutExplicite, finExplicite] : [equipeId, equipeId];
+    const [rows] = await conn.query(
+        `SELECT u.id, u.nom,
+                COUNT(d.id) AS nb_devis,
+                COALESCE(SUM(d.statut = 'valide'), 0) AS nb_valides,
+                COALESCE(SUM(CASE WHEN d.statut = 'valide' THEN d.ht ELSE 0 END), 0) AS ca_valide
+         FROM users u
+         LEFT JOIN devis d ON d.auteur_id = u.id AND d.user_id = ? AND ${borne}
+         WHERE COALESCE(u.equipe_id, u.id) = ?
+         GROUP BY u.id, u.nom
+         ORDER BY nb_valides DESC, ca_valide DESC, nb_devis DESC`, params);
+    return rows.map(r => ({
+        id: r.id, nom: r.nom,
+        nb_devis: Number(r.nb_devis),
+        nb_valides: Number(r.nb_valides),
+        ca_valide: Number(r.ca_valide)
+    }));
+}
+
+// Visible par toute l'equipe : un classement que personne ne regarde ne motive personne.
+app.get('/api/classement', verifyToken, async (req, res) => {
+    try {
+        await ensureV11Tables();
+        const periode = DEBUT_PERIODE[req.query.periode] ? req.query.periode : 'semaine';
+        const conn = await pool.getConnection();
+        const lignes = await classementEquipe(conn, req.userId, periode);
+        await conn.release();
+        res.json({ periode, moi: req.authUserId, lignes });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Recapitulatif hebdomadaire par email ---
+// Railway n'offre pas de planificateur : le serveur verifie lui-meme, a intervalle regulier,
+// si le recap de la semaine ecoulee a deja ete envoye. La trace est en base et non en memoire,
+// pour qu'un redemarrage ne provoque pas de second envoi.
+const RECAP_JOUR = 5;    // 5 = vendredi (1 = lundi)
+const RECAP_HEURE = 18;
+const FUSEAU = process.env.FUSEAU_HORAIRE || 'Europe/Paris';
+
+function maintenantLocal() {
+    // On relit l'heure dans le fuseau de l'entreprise : le serveur, lui, tourne en UTC.
+    const p = new Intl.DateTimeFormat('fr-FR', {
+        timeZone: FUSEAU, weekday: 'short', hour: 'numeric', hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    const v = t => p.find(x => x.type === t)?.value;
+    const jours = { lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6, dim: 7 };
+    return {
+        jour: jours[(v('weekday') || '').slice(0, 3).toLowerCase().replace('.', '')] || 0,
+        heure: parseInt(v('hour'), 10),
+        date: `${v('year')}-${v('month')}-${v('day')}`
+    };
+}
+
+function cleSemaine(d) {
+    // Identifiant de la semaine ISO, pour ne jamais envoyer deux fois le meme recap.
+    const t = new Date(d + 'T00:00:00Z');
+    const jeudi = new Date(t); jeudi.setUTCDate(t.getUTCDate() + 3 - ((t.getUTCDay() + 6) % 7));
+    const debut = new Date(Date.UTC(jeudi.getUTCFullYear(), 0, 1));
+    const no = Math.ceil(((jeudi - debut) / 86400000 + 1) / 7);
+    return `${jeudi.getUTCFullYear()}-S${String(no).padStart(2, '0')}`;
+}
+
+function texteClassement(lignes) {
+    const medailles = ['🥇', '🥈', '🥉'];
+    return lignes.map((l, i) =>
+        `${medailles[i] || ' ' + (i + 1) + '.'} ${l.nom} — ${l.nb_valides} devis validés`
+        + ` (${l.ca_valide.toFixed(0)} € HT), ${l.nb_devis} devis chiffrés`).join('\n');
+}
+
+async function envoyerRecapSemaine(conn, equipeId, cle) {
+    const lignes = await classementEquipe(conn, equipeId, 'semaine');
+    const actifs = lignes.filter(l => l.nb_devis > 0);
+    // Deux garde-fous : feliciter quelqu'un d'avoir battu personne n'a pas de sens, et un
+    // classement vide chaque vendredi finirait en indesirable.
+    if (actifs.length < 2) return { envoye: false, raison: 'moins de deux personnes actives' };
+
+    const [membres] = await conn.query(
+        'SELECT nom, email FROM users WHERE COALESCE(equipe_id, id) = ? AND email IS NOT NULL', [equipeId]);
+    if (!membres.length) return { envoye: false, raison: 'aucun destinataire' };
+
+    const maxVal = Math.max(...lignes.map(l => l.nb_valides));
+    const maxCree = Math.max(...lignes.map(l => l.nb_devis));
+    // Egalites : on nomme tous les ex aequo plutot que d'en departager un arbitrairement.
+    const champVal = lignes.filter(l => l.nb_valides === maxVal && maxVal > 0).map(l => l.nom);
+    const champCree = lignes.filter(l => l.nb_devis === maxCree && maxCree > 0).map(l => l.nom);
+
+    const liste = n => n.length > 1 ? n.slice(0, -1).join(', ') + ' et ' + n[n.length - 1] : n[0];
+    let corps = '🏆 Classement de la semaine\n\n' + texteClassement(lignes) + '\n\n';
+    if (champCree.length) corps += `✏️ Le plus de devis chiffrés : ${liste(champCree)} (${maxCree})\n`;
+    if (champVal.length) corps += `✅ Le plus de devis validés : ${liste(champVal)} (${maxVal})\n`;
+    corps += '\nFélicitations, et bonne semaine à toute l\'équipe !';
+
+    const envoi = await sendBrevoEmail(membres.map(m => m.email), '🏆 DropStyle — classement de la semaine', corps, 'DropStyle');
+    if (!envoi.ok) return { envoye: false, raison: envoi.message };
+    await conn.query('INSERT INTO recaps_envoyes (equipe_id, periode, envoye_le) VALUES (?, ?, NOW())', [equipeId, cle]);
+    return { envoye: true, destinataires: membres.length };
+}
+
+async function verifierRecaps() {
+    const t = maintenantLocal();
+    if (t.jour !== RECAP_JOUR || t.heure < RECAP_HEURE) return;
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const cle = cleSemaine(t.date);
+        const [equipes] = await conn.query('SELECT DISTINCT COALESCE(equipe_id, id) AS eq FROM users');
+        for (const { eq } of equipes) {
+            const [deja] = await conn.query('SELECT id FROM recaps_envoyes WHERE equipe_id = ? AND periode = ?', [eq, cle]);
+            if (deja.length) continue;
+            const r = await envoyerRecapSemaine(conn, eq, cle);
+            console.log(`Recap ${cle} equipe ${eq} :`, r.envoye ? `envoye a ${r.destinataires} personnes` : `non envoye (${r.raison})`);
+        }
+    } catch (e) {
+        console.error('Recap hebdomadaire :', e.message);
+    } finally {
+        if (conn) await conn.release();
+    }
+}
+
 // ADMIN
 app.get('/api/admin/users', verifyToken, async (req, res) => {
     try {
@@ -1319,7 +1487,10 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
              FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
         // devis.user_id = l'equipe proprietaire, devis.auteur_id = la personne qui l'a saisi.
         const [parDevis] = await conn.query(
-            `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
+            `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
+                    SUM(statut = 'valide') AS nb_valides,
+                    SUM(statut = 'refuse') AS nb_refuses,
+                    COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide
              FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
         const [parClient] = await conn.query(
             `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
@@ -1333,18 +1504,27 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
 
         const devisPar = new Map(parDevis.map(r => [r.auteur_id, r]));
         const clientsPar = new Map(parClient.map(r => [r.auteur_id, r]));
-        const utilisateurs = membres.map(m => ({
-            ...m,
-            nb_devis: devisPar.has(m.id) ? devisPar.get(m.id).nb : 0,
-            ca_devis: devisPar.has(m.id) ? Number(devisPar.get(m.id).ca) : 0,
-            nb_clients: clientsPar.has(m.id) ? clientsPar.get(m.id).nb : 0
-        }));
-        const orphelinD = devisPar.get(null), orphelinC = clientsPar.get(null);
+        const chiffres = (d) => ({
+            nb_devis: d ? Number(d.nb) : 0,
+            ca_devis: d ? Number(d.ca) : 0,
+            nb_valides: d ? Number(d.nb_valides) : 0,
+            nb_refuses: d ? Number(d.nb_refuses) : 0,
+            ca_valide: d ? Number(d.ca_valide) : 0
+        });
+        const utilisateurs = membres.map(m => {
+            const c = chiffres(devisPar.get(m.id));
+            const tranches = c.nb_valides + c.nb_refuses;
+            return {
+                ...m, ...c,
+                nb_clients: clientsPar.has(m.id) ? clientsPar.get(m.id).nb : 0,
+                taux: tranches ? Math.round((c.nb_valides / tranches) * 100) : null
+            };
+        });
+        const orphelinC = clientsPar.get(null);
         res.json({
             utilisateurs,
             sansAuteur: {
-                nb_devis: orphelinD ? orphelinD.nb : 0,
-                ca_devis: orphelinD ? Number(orphelinD.ca) : 0,
+                ...chiffres(devisPar.get(null)),
                 nb_clients: orphelinC ? orphelinC.nb : 0
             },
             activite: activite.map(a => ({ semaine: a.semaine, nb: a.nb, ca: Number(a.ca) }))
@@ -1356,11 +1536,29 @@ app.get('/api/admin/stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         const conn = await pool.getConnection();
+        await ensureV11Tables(conn);
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
         const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis WHERE user_id = ?', [req.userId]);
+        // "revenue" = tous les devis chiffres, valides ou non : ce n'est pas un revenu, d'ou
+        // "revenu_valide", qui ne compte que les devis devenus commandes.
         const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis WHERE user_id = ?', [req.userId]);
+        const [valides] = await conn.query(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(ttc), 0) AS total FROM devis WHERE user_id = ? AND statut = 'valide'", [req.userId]);
+        const [refuses] = await conn.query(
+            "SELECT COUNT(*) AS n FROM devis WHERE user_id = ? AND statut = 'refuse'", [req.userId]);
         await conn.release();
-        res.json({ users: users[0].count, devis: devis[0].count, revenue: revenue[0].total || 0 });
+        const tranches = Number(valides[0].n) + Number(refuses[0].n);
+        res.json({
+            users: users[0].count,
+            devis: devis[0].count,
+            revenue: revenue[0].total || 0,
+            devis_valides: Number(valides[0].n),
+            devis_refuses: Number(refuses[0].n),
+            revenu_valide: Number(valides[0].total),
+            // Calcule sur les seuls devis tranches : inclure ceux en attente ferait baisser
+            // le taux a tort, alors qu'ils peuvent encore se transformer.
+            taux_transformation: tranches ? Math.round((Number(valides[0].n) / tranches) * 100) : null
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1374,6 +1572,10 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     await initDB();
     console.log(`✅ DropStyle API running on port ${PORT}`);
+    // Verification du recapitulatif hebdomadaire toutes les 30 minutes. Le controle du
+    // jour, de l'heure et du doublon est fait dans verifierRecaps.
+    verifierRecaps();
+    setInterval(verifierRecaps, 30 * 60 * 1000);
 });
 
 module.exports = app;

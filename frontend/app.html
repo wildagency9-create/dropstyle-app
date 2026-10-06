@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DropStyle — Calculateur</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#FF5722">
+    <link rel="apple-touch-icon" href="/img/icone-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="DropStyle">
     <style>
         :root {
             --primary: #FF5722;
@@ -416,6 +421,7 @@
                 <button class="bell" onclick="toggleNotifs(event)" title="Notifications">🔔<span class="bell-count" id="bell-count">0</span></button>
                 <div class="notif-panel" id="notif-panel"></div>
             </div>
+            <button id="btn-installer" onclick="installerApp()" style="display:none;background:rgba(76,175,80,.15);color:#4caf50;border:1px solid #4caf50;">⬇ Installer</button>
             <button class="admin-btn" id="admin-btn" onclick="window.location.href='/admin'" style="display:none;">Admin</button>
             <button class="logout-btn" onclick="logout()">Déconnexion</button>
         </div>
@@ -432,7 +438,7 @@
                 <button class="tab-btn" onclick="switchTab('stickers', this)">🏷️ Stickers</button>
                 <button class="tab-btn" onclick="switchTab('chat', this)">💬 Assistant</button>
                 <button class="tab-btn" onclick="switchTab('clients', this); renderClients()">👥 Clients</button>
-                <button class="tab-btn" onclick="switchTab('stats', this); renderStats()">📈 Stats</button>
+                <button class="tab-btn" onclick="switchTab('stats', this); renderStats(); renderClassement('semaine')">📈 Stats</button>
                 <button class="tab-btn" onclick="switchTab('tarifs', this); renderTarifs()">📖 Tarifs</button>
                 <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Hist.</button>
             </div>
@@ -819,6 +825,18 @@
                     D'où viennent vos contacts, et lesquels rapportent réellement. Le CA est celui des devis
                     rattachés à un client — un devis enregistré sans client n'y apparaît pas.</p>
                 <div id="stats-view"></div>
+
+                <!-- V15 — classement de l'equipe -->
+                <div style="margin-top:26px;border-top:1px solid var(--border);padding-top:18px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+                        <div class="section-title" style="margin:0;">🏆 Classement</div>
+                        <div style="display:flex;gap:4px;">
+                            <button id="cl-semaine" style="padding:6px 10px;font-size:9px;" onclick="renderClassement('semaine')">Semaine</button>
+                            <button id="cl-mois" style="padding:6px 10px;font-size:9px;background:var(--bg-input);color:var(--text-secondary);" onclick="renderClassement('mois')">Mois</button>
+                        </div>
+                    </div>
+                    <div id="classement-view"></div>
+                </div>
             </div>
 
             <!-- HISTORIQUE -->
@@ -2072,6 +2090,35 @@ function appliquerDevisIA(d) {
     return `Calculateur Signalétique rempli (${SIGNALETIQUE_LABELS[type] || type}) et calculé.`;
 }
 
+// V14 — suite donnee a un devis. Un devis enregistre n'est qu'un prix calcule : tant
+// qu'il n'est pas valide, il ne represente aucun revenu.
+const LIBELLES_STATUT = {
+    calcule: { texte: 'En attente', couleur: 'var(--gold)', fond: 'rgba(212,175,55,.15)' },
+    valide:  { texte: 'Validé',     couleur: 'var(--success)', fond: 'rgba(76,175,80,.15)' },
+    refuse:  { texte: 'Refusé',     couleur: 'var(--text-secondary)', fond: 'rgba(255,255,255,.07)' }
+};
+
+function pastilleStatut(statut) {
+    const s = LIBELLES_STATUT[statut] || LIBELLES_STATUT.calcule;
+    return `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:20px;
+        font-size:9px;font-weight:700;text-transform:uppercase;background:${s.fond};color:${s.couleur};">${s.texte}</span>`;
+}
+
+function boutonStatut(id, statut, actuel, libelle) {
+    const actif = statut === actuel;
+    return `<button style="flex:1;padding:8px 6px;font-size:10px;${actif ? '' :
+        'background:var(--bg-input);color:var(--text-secondary);'}"
+        onclick="changerStatut(${id}, '${statut}')" ${actif ? 'disabled' : ''}>${libelle}</button>`;
+}
+
+async function changerStatut(id, statut) {
+    try {
+        await apiSend(`/devis/${id}/statut`, 'PUT', { statut });
+        showNotification('Statut mis à jour ✓', 'success');
+        renderHistorique();
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
 async function renderHistorique() {
     try {
         const devis = await fetch(`${API_URL}/devis`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
@@ -2084,13 +2131,23 @@ async function renderHistorique() {
             const icon = icons[d.type] || '📄';
             const details = typeof d.details === 'string' ? JSON.parse(d.details || '{}') : (d.details || {});
             const hasRows = details.rows && details.rows.length;
+            const st = d.statut || 'calcule';
             return `<div class="breakdown" style="margin-bottom:8px;cursor:pointer;" onclick="toggleHistoriqueDetail(${i})">
                 <div class="breakdown-row"><span style="font-weight:700;">${icon} ${escapeHtml(d.client) || '<span style="font-weight:400;color:var(--text-light);">Sans nom</span>'}</span><span>${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></div>
-                <div class="breakdown-row"><span class="label">${escapeHtml(details.title || d.type)} — Qté: ${d.qty}</span><span style="color:var(--primary);font-weight:600;">${parseFloat(d.ht).toFixed(2)}€ HT</span></div>
+                <div class="breakdown-row">
+                    <span class="label">${escapeHtml(details.title || d.type)} — Qté: ${d.qty} ${pastilleStatut(st)}</span>
+                    <span style="color:var(--primary);font-weight:600;">${parseFloat(d.ht).toFixed(2)}€ HT</span>
+                </div>
                 <div id="historique-detail-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);" onclick="event.stopPropagation()">
                     ${hasRows
                         ? renderBreakdownRows(details.rows) + `<div class="breakdown-row total"><span>TOTAL HT</span><span>${parseFloat(d.ht).toFixed(2)} €</span></div>`
                         : '<p style="font-size:11px;color:var(--text-light);">Détail non disponible pour ce devis (sauvegardé avant cette fonctionnalité)</p>'}
+                    <label style="display:block;margin-top:12px;">Suite donnée</label>
+                    <div style="display:flex;gap:6px;">
+                        ${boutonStatut(d.id, 'calcule', st, 'En attente')}
+                        ${boutonStatut(d.id, 'valide', st, '✅ Validé')}
+                        ${boutonStatut(d.id, 'refuse', st, '❌ Refusé')}
+                    </div>
                     <button class="danger" style="margin-top:10px;width:100%;" onclick="deleteDevis(${d.id})">Supprimer ce devis</button>
                 </div>
             </div>`;
@@ -2257,6 +2314,57 @@ async function renderStats() {
                      · transformation ${r.taux} %</div>
             </div>`).join('');
     } catch (err) { el.innerHTML = `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`; }
+}
+
+// ---- V15 — classement de l'equipe ----
+// Classe sur les devis VALIDES, pas sur les devis chiffres : chiffrer beaucoup sans rien
+// signer ne doit pas faire monter au classement.
+async function renderClassement(periode) {
+    periode = periode || 'semaine';
+    for (const p of ['semaine', 'mois']) {
+        const b = document.getElementById('cl-' + p);
+        if (!b) continue;
+        const actif = p === periode;
+        b.style.background = actif ? '' : 'var(--bg-input)';
+        b.style.color = actif ? '' : 'var(--text-secondary)';
+    }
+    const el = document.getElementById('classement-view');
+    el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Chargement...</p>';
+    try {
+        const d = await apiFetch('/classement?periode=' + periode);
+        const actifs = d.lignes.filter(l => l.nb_devis > 0);
+        if (!actifs.length) {
+            el.innerHTML = `<div class="empty-state"><p>Aucun devis ${periode === 'mois' ? 'ce mois-ci' : 'cette semaine'}. Le classement démarre au premier devis enregistré.</p></div>`;
+            return;
+        }
+        if (d.lignes.length < 2) {
+            el.innerHTML = '<div class="empty-state"><p>Le classement a besoin d\'au moins deux personnes dans l\'équipe. Invitez un collègue depuis l\'admin.</p></div>';
+            return;
+        }
+        const maxi = Math.max(...d.lignes.map(l => l.nb_valides), 1);
+        const medailles = ['🥇', '🥈', '🥉'];
+        el.innerHTML = d.lignes.map((l, i) => {
+            const moi = l.id === d.moi;
+            const larg = Math.round((l.nb_valides / maxi) * 100);
+            return `<div style="background:${moi ? 'rgba(255,87,34,.10)' : 'var(--bg-card)'};
+                        border:1px solid ${moi ? 'var(--primary)' : 'var(--border)'};
+                        border-radius:8px;padding:10px 12px;margin-bottom:7px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;">
+                    <span style="font-weight:600;">${medailles[i] || `<span style="color:var(--text-light);">${i + 1}.</span>`}
+                        ${escapeHtml(l.nom)}${moi ? ' <span style="font-size:9px;color:var(--primary);">(vous)</span>' : ''}</span>
+                    <span style="color:var(--primary);font-weight:700;white-space:nowrap;">${l.nb_valides} validé${l.nb_valides > 1 ? 's' : ''}</span>
+                </div>
+                <div style="height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden;margin-top:6px;">
+                    <div style="height:100%;width:${larg}%;background:linear-gradient(90deg,var(--primary),#FF8A50);"></div>
+                </div>
+                <div style="font-size:10px;color:var(--text-secondary);margin-top:5px;">
+                    ${l.ca_valide.toFixed(0)} € HT signés · ${l.nb_devis} devis chiffré${l.nb_devis > 1 ? 's' : ''}</div>
+            </div>`;
+        }).join('')
+        + `<p style="font-size:10px;color:var(--text-light);margin-top:8px;">Classement sur les devis validés. Un récapitulatif est envoyé à l'équipe le vendredi.</p>`;
+    } catch (err) {
+        el.innerHTML = `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
 }
 
 // ---- Enregistrement d'un devis avec rattachement client ----
@@ -2432,6 +2540,64 @@ async function envoyerNotif() {
         ok.disabled = false; ok.textContent = 'Envoyer';
     }
 }
+
+// ===== V16 — INSTALLATION DE L'APPLICATION =====
+// Le bouton n'apparait que si le navigateur propose reellement l'installation : afficher
+// un bouton qui ne ferait rien serait pire que pas de bouton du tout.
+let invitationInstall = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    invitationInstall = e;
+    const b = document.getElementById('btn-installer');
+    if (b) b.style.display = 'block';
+});
+
+window.addEventListener('appinstalled', () => {
+    invitationInstall = null;
+    const b = document.getElementById('btn-installer');
+    if (b) b.style.display = 'none';
+    showNotification('Application installée ✓', 'success');
+});
+
+function surIphone() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+async function installerApp() {
+    if (invitationInstall) {
+        invitationInstall.prompt();
+        const choix = await invitationInstall.userChoice;
+        if (choix.outcome !== 'accepted') showNotification('Installation annulée', 'error');
+        invitationInstall = null;
+        return;
+    }
+    // iOS n'autorise aucune installation automatique : Apple impose le passage par le
+    // menu Partager. On explique la manipulation au lieu de laisser un bouton inerte.
+    alert(surIphone()
+        ? "Sur iPhone et iPad, l'installation se fait depuis Safari :\n\n"
+          + "1. Touchez le bouton Partager (le carré avec une flèche vers le haut)\n"
+          + "2. Faites défiler et choisissez « Sur l'écran d'accueil »\n"
+          + "3. Touchez « Ajouter »\n\n"
+          + "DropStyle apparaîtra alors comme une application."
+        : "Votre navigateur ne propose pas l'installation.\n\n"
+          + "Avec Chrome ou Edge sur ordinateur, cliquez sur l'icône d'installation à droite "
+          + "de la barre d'adresse. Sur Firefox, l'installation n'est pas disponible.");
+}
+
+// Sur iPhone, le bouton est affiche d'emblee (l'evenement beforeinstallprompt n'existe pas),
+// sauf si l'application tourne deja en mode installe.
+window.addEventListener('DOMContentLoaded', () => {
+    const dejaInstallee = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (surIphone() && !dejaInstallee) {
+        const b = document.getElementById('btn-installer');
+        if (b) b.style.display = 'block';
+    }
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => { /* sans effet sur le reste */ });
+    }
+});
 
 function showNotification(msg, type) {
     const el = document.createElement('div');

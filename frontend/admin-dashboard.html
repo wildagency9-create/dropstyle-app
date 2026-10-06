@@ -138,6 +138,7 @@
         }
         .stat-icon { font-size: 30px; margin-bottom: 8px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
         .stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 6px; }
+        .stat-sous { font-size: 10px; color: var(--text-secondary); margin-top: 6px; line-height: 1.35; }
         .stat-value {
             font-size: 34px; font-weight: 800; letter-spacing: -1px;
             background: linear-gradient(135deg, var(--primary-clair), var(--primary));
@@ -310,7 +311,10 @@
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
         <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
-        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenu Total</div><div class="stat-value" id="stat-revenue">0€</div></div>
+        <!-- "Devis calcules" et non "Revenu" : un devis chiffre n'est pas une commande. -->
+        <div class="stat-card"><div class="stat-icon">🧮</div><div class="stat-label">Devis calculés</div><div class="stat-value" id="stat-revenue">0€</div></div>
+        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenu estimé</div><div class="stat-value" id="stat-revenu-valide">0€</div>
+            <div class="stat-sous" id="stat-transfo">&nbsp;</div></div>
         <div class="stat-card" id="stat-stock-card"><div class="stat-icon">📦</div><div class="stat-label">Stock faible</div><div class="stat-value" id="stat-stock-low">0</div></div>
     </div>
 
@@ -338,7 +342,8 @@
         <div class="table-wrap"><table>
             <thead><tr>
                 <th>Nom</th><th>Email</th><th>Rôle</th>
-                <th>Devis</th><th>Clients</th><th>CA devisé</th>
+                <th>Devis</th><th>Validés</th><th>Clients</th>
+                <th>CA devisé</th><th>CA validé</th>
                 <th>Dernière connexion</th><th>Connexions</th><th>Action</th>
             </tr></thead>
             <tbody id="users-list"><tr><td colspan="9" class="empty-state">Chargement...</td></tr></tbody>
@@ -803,9 +808,16 @@ async function loadStats() {
         animerNombre('stat-users', data.users);
         animerNombre('stat-devis', data.devis);
         animerNombre('stat-revenue', parseFloat(data.revenue), '€', 2);
+        animerNombre('stat-revenu-valide', parseFloat(data.revenu_valide), '€', 2);
+        const t = document.getElementById('stat-transfo');
+        // Le taux n'a de sens que sur les devis tranches ; sans aucun, on n'affiche rien
+        // plutot qu'un 0 % qui ferait croire a un echec commercial.
+        if (t) t.textContent = data.taux_transformation === null || data.taux_transformation === undefined
+            ? `${data.devis_valides || 0} devis validés`
+            : `${data.devis_valides} validés / ${data.devis_refuses} refusés — ${data.taux_transformation} % de transformation`;
     } catch (err) {
         console.error(err);
-        ['stat-users', 'stat-devis', 'stat-revenue'].forEach(id => animerNombre(id, null));
+        ['stat-users', 'stat-devis', 'stat-revenue', 'stat-revenu-valide'].forEach(id => animerNombre(id, null));
     }
 }
 
@@ -1053,9 +1065,9 @@ async function loadUsers() {
         document.getElementById('users-list').innerHTML = users.length
             ? users.map(u => `<tr><td>${escapeHtml(u.nom)}</td><td>${escapeHtml(u.email)}</td>
                 <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
-                <td colspan="5" style="color:var(--text-secondary);">Statistiques indisponibles</td>
+                <td colspan="7" style="color:var(--text-secondary);">Statistiques indisponibles</td>
                 <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td></tr>`).join('')
-            : '<tr><td colspan="9" class="empty-state">Aucun utilisateur</td></tr>';
+            : '<tr><td colspan="11" class="empty-state">Aucun utilisateur</td></tr>';
         return;
     }
 
@@ -1072,12 +1084,16 @@ async function loadUsers() {
     if (d.sansAuteur.nb_devis) barresDevis.push({ nom: 'Auteur inconnu', valeur: d.sansAuteur.nb_devis, couleur: 'var(--text-light, #666)' });
     const barresCA = us.map(u => ({ nom: u.nom, valeur: u.ca_devis, libelle: u.ca_devis.toFixed(0) + ' €' }));
     if (d.sansAuteur.ca_devis) barresCA.push({ nom: 'Auteur inconnu', valeur: d.sansAuteur.ca_devis, libelle: d.sansAuteur.ca_devis.toFixed(0) + ' €', couleur: 'var(--text-light, #666)' });
+    const barresValide = us.map(u => ({ nom: u.nom, valeur: u.ca_valide || 0, libelle: (u.ca_valide || 0).toFixed(0) + ' €' }));
+    if (d.sansAuteur.ca_valide) barresValide.push({ nom: 'Auteur inconnu', valeur: d.sansAuteur.ca_valide, libelle: d.sansAuteur.ca_valide.toFixed(0) + ' €', couleur: 'var(--text-light, #666)' });
+    const totValide = us.reduce((s, u) => s + (u.ca_valide || 0), 0) + (d.sansAuteur.ca_valide || 0);
 
     zone.innerHTML = `
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
             ${carte('Devis enregistrés', totDevis)}
             ${carte('Clients saisis', totClients)}
-            ${carte('CA devisé', totCA.toFixed(0) + ' €', 'var(--primary)')}
+            ${carte('CA devisé', totCA.toFixed(0) + ' €')}
+            ${carte('CA validé', totValide.toFixed(0) + ' €', 'var(--success)')}
             ${carte('Actifs ce mois', ceMois + ' / ' + us.length)}
         </div>
         ${(d.sansAuteur.nb_devis || d.sansAuteur.nb_clients) ? `
@@ -1093,6 +1109,12 @@ async function loadUsers() {
             <div class="section-title" style="font-size:13px;margin-bottom:8px;">CA devisé par personne</div>
             ${barresSVG(barresCA)}
         </div>
+        <div style="margin-bottom:20px;">
+            <div class="section-title" style="font-size:13px;margin-bottom:8px;">CA validé par personne</div>
+            ${totValide
+                ? barresSVG(barresValide)
+                : '<p style="font-size:12px;color:var(--text-secondary);">Aucun devis validé pour l\'instant. Marquez vos devis gagnés comme validés depuis l\'historique du calculateur.</p>'}
+        </div>
         <div style="margin-bottom:22px;">
             <div class="section-title" style="font-size:13px;margin-bottom:8px;">Devis par semaine (12 dernières semaines)</div>
             ${colonnesSVG(d.activite)}
@@ -1104,8 +1126,11 @@ async function loadUsers() {
             <td>${escapeHtml(u.email)}</td>
             <td><span class="badge ${u.role}">${escapeHtml(u.role)}</span></td>
             <td>${u.nb_devis}</td>
+            <td>${u.nb_valides || 0}${u.taux === null || u.taux === undefined ? '' :
+                ` <span style="font-size:10px;color:var(--text-secondary);">(${u.taux} %)</span>`}</td>
             <td>${u.nb_clients}</td>
             <td>${u.ca_devis.toFixed(2)} €</td>
+            <td style="color:var(--success);">${(u.ca_valide || 0).toFixed(2)} €</td>
             <td>${u.derniere_connexion
                     ? new Date(u.derniere_connexion).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
                     : '<span style="color:var(--text-secondary);">jamais</span>'}</td>
