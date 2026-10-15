@@ -1020,6 +1020,17 @@
     </div>
 </div>
 
+<!-- V21 — choix du type de devis (mobile) -->
+<div class="modal-back" id="modal-type" onclick="if(event.target===this)fermerModal('modal-type')">
+    <div class="modal">
+        <h3>Quel type de devis ?</h3>
+        <div id="mt-liste" style="margin-top:14px;"></div>
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-type')">Annuler</button>
+        </div>
+    </div>
+</div>
+
 <!-- V17 — ajustement commercial du prix -->
 <div class="modal-back" id="modal-ajust" onclick="if(event.target===this)fermerModal('modal-ajust')">
     <div class="modal">
@@ -2965,11 +2976,29 @@ const ICO = {
 const ico = (n, t = 21) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="currentColor" aria-hidden="true">${ICO[n]}</svg>`;
 
 const M_CALCULATEURS = [
-    { cle: 'vehicule',     icone: 'vehicule', nom: 'Véhicule' },
-    { cle: 'signaletique', icone: 'signal',   nom: 'Signalétique' },
-    { cle: 'stickers',     icone: 'sticker',  nom: 'Stickers' },
-    { cle: 'impression',   icone: 'print',    nom: 'Impression' }
+    { cle: 'vehicule',     icone: 'vehicule', nom: 'Véhicule',     desc: 'Covering, semi-covering, lettrage' },
+    { cle: 'signaletique', icone: 'signal',   nom: 'Signalétique', desc: 'Panneaux, bâches, vitrophanie, roll-up' },
+    { cle: 'stickers',     icone: 'sticker',  nom: 'Stickers',     desc: 'Découpe, optimisation de laize' },
+    { cle: 'impression',   icone: 'print',    nom: 'Impression',   desc: 'Sous-traitance Exaprint' }
 ];
+
+// Le bouton "Nouveau devis" demande d'abord quel type : partir d'office sur Véhicule
+// obligeait a changer d'onglet trois fois sur quatre.
+function mChoisirType() {
+    document.getElementById('mt-liste').innerHTML = M_CALCULATEURS.map(c => `
+        <div class="m-lien" style="margin-bottom:9px;" onclick="fermerModal('modal-type');mOuvrirCalculateur('${c.cle}')">
+            <span style="display:flex;align-items:center;gap:13px;">
+                <span style="width:40px;height:40px;border-radius:11px;background:var(--bg-input);
+                      display:flex;align-items:center;justify-content:center;color:var(--primary);">${ico(c.icone, 20)}</span>
+                <span>
+                    <span style="display:block;font-weight:600;">${c.nom}</span>
+                    <span style="display:block;font-size:10.5px;color:var(--text-secondary);margin-top:2px;">${c.desc}</span>
+                </span>
+            </span>
+            <span style="color:var(--text-light);">›</span>
+        </div>`).join('');
+    ouvrirModal('modal-type');
+}
 
 let mVueCourante = 'accueil';
 const surMobile = () => window.matchMedia('(max-width: 820px)').matches;
@@ -2980,7 +3009,7 @@ function mBarre() {
     document.getElementById('m-barre').innerHTML =
         item('accueil', 'Accueil', 'accueil') +
         item('devis', 'Devis', 'devis') +
-        `<button class="m-fab" onclick="mAller('accueil')" aria-label="Nouveau devis">
+        `<button class="m-fab" onclick="mChoisirType()" aria-label="Nouveau devis">
             <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
          </button>` +
         item('clients', 'Clients', 'clients') +
@@ -3046,8 +3075,8 @@ async function mRendreAccueil() {
     const prenom = (user && user.nom ? user.nom.split(' ')[0] : '');
     document.getElementById('m-accueil').innerHTML = `
         <div class="m-salut">Bonjour ${escapeHtml(prenom)}</div>
-        <div class="m-titre">Chiffrez un devis<br>en 30 secondes</div>
-        <button class="m-cta" onclick="mOuvrirCalculateur('vehicule')">
+        <div class="m-titre">Nico, votre<br>calculatrice portable</div>
+        <button class="m-cta" onclick="mChoisirType()">
             <span style="display:flex;align-items:center;gap:10px;">${ico('regle', 18)} Nouveau devis</span>
             <span style="font-size:18px;opacity:.8;">›</span>
         </button>
