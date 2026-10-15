@@ -578,6 +578,32 @@
     </div>
 </div>
 
+<!-- V19 — MODIFIER UN COMPTE -->
+<div class="modal" id="modal-modif-user">
+    <div class="modal-content">
+        <div class="modal-header">Modifier le compte</div>
+        <p id="mu-nom" style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;"></p>
+        <form onsubmit="enregistrerModifUser(event)">
+            <input type="hidden" id="mu-id">
+            <div class="form-group"><label>Rôle</label>
+                <select id="mu-role">
+                    <option value="user">Utilisateur — calculateur seulement</option>
+                    <option value="admin">Administrateur — accès à ce tableau de bord</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Nouveau mot de passe</label>
+                <input type="password" id="mu-mdp" autocomplete="new-password" placeholder="Laisser vide pour ne pas le changer">
+                <p style="font-size:10px;color:var(--text-secondary);margin-top:5px;">
+                    6 caractères minimum. Transmettez-le à la personne, qui pourra s'en servir immédiatement.</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-modif-user')">Annuler</button>
+                <button type="submit" class="success">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- MODAL USER -->
 <div class="modal" id="modal-user">
     <div class="modal-content">
@@ -1072,6 +1098,7 @@ async function loadUsers() {
     }
 
     const us = d.utilisateurs;
+    window.__usersCache = us;   // sert a pre-remplir la fenetre de modification
     const totDevis = us.reduce((s, u) => s + u.nb_devis, 0) + d.sansAuteur.nb_devis;
     const totClients = us.reduce((s, u) => s + u.nb_clients, 0) + d.sansAuteur.nb_clients;
     const totCA = us.reduce((s, u) => s + u.ca_devis, 0) + d.sansAuteur.ca_devis;
@@ -1135,8 +1162,37 @@ async function loadUsers() {
                     ? new Date(u.derniere_connexion).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
                     : '<span style="color:var(--text-secondary);">jamais</span>'}</td>
             <td>${u.nb_connexions}</td>
-            <td>${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : '—'}</td>
+            <td style="white-space:nowrap;">
+                <button class="small" onclick="ouvrirModifUser(${u.id})">Modifier</button>
+                ${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : ''}
+            </td>
         </tr>`).join('');
+}
+
+// ===== V19 — modification d'un compte =====
+function ouvrirModifUser(id) {
+    const u = (window.__usersCache || []).find(x => x.id === id);
+    document.getElementById('mu-id').value = id;
+    document.getElementById('mu-nom').textContent = u ? `${u.nom} — ${u.email}` : 'Compte #' + id;
+    document.getElementById('mu-role').value = u ? u.role : 'user';
+    document.getElementById('mu-mdp').value = '';
+    openModal('modal-modif-user');
+}
+
+async function enregistrerModifUser(ev) {
+    ev.preventDefault();
+    const id = document.getElementById('mu-id').value;
+    const corps = { role: document.getElementById('mu-role').value };
+    const mdp = document.getElementById('mu-mdp').value;
+    if (mdp) corps.password = mdp;
+    try {
+        const d = await apiAdmin(`/admin/users/${id}`, 'PUT', corps);
+        closeModal('modal-modif-user');
+        showMessage(d.reconnexion_requise
+            ? 'Compte modifié. La personne doit se reconnecter pour que son nouveau rôle prenne effet.'
+            : 'Compte modifié', 'success');
+        loadUsers();
+    } catch (err) { showMessage(err.message, 'error'); }
 }
 
 async function loadVinyles() {

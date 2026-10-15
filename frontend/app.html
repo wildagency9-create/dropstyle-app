@@ -259,16 +259,22 @@
         }
         .laize-card {
             background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 8px;
             text-align: center;
             font-size: 11px;
+            cursor: pointer;                                   /* V17 : la carte impose la laize */
+            transition: transform .15s ease, border-color .15s ease;
         }
+        .laize-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        .laize-card:active { transform: translateY(0); }
         .laize-card.best {
             border-color: var(--success);
             background: rgba(76,175,80,0.05);
         }
+        /* La laize imposee par l'utilisateur prime visuellement sur la recommandation */
+        .laize-card.choisie { border-color: var(--primary); background: rgba(255,87,34,0.1); }
         .laize-card-title { color: var(--text-secondary); font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
         .laize-card-value { font-size: 14px; font-weight: 700; color: var(--primary); }
         .laize-card.best .laize-card-value { color: var(--success); }
@@ -377,6 +383,133 @@
         .stat-bar .jauge { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
         .stat-bar .jauge i { display: block; height: 100%; background: var(--primary); }
         .stat-bar .bas { font-size: 10px; color: var(--text-secondary); margin-top: 6px; }
+
+        /* ===== V17 — ajustement commercial ===== */
+        .ajust-ligne { font-size: 11px; color: var(--success); margin-top: 6px; }
+        .ajust-ligne.neg { color: #ff9800; }
+        .duo-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .duo-actions .btn-sec {
+            flex: 1; background: var(--bg-input); color: var(--primary);
+            border: 1px solid var(--primary); padding: 12px;
+        }
+        .duo-actions .btn-pri { flex: 1; padding: 12px; }
+
+        .jauge-zone { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+        .jauge-haut { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+        .jauge-pct { font-size: 24px; font-weight: 800; color: var(--success); letter-spacing: -.5px; }
+        .jauge-pct.neg { color: #ff9800; }
+        input[type=range].jauge {
+            -webkit-appearance: none; appearance: none; width: 100%; height: 6px; padding: 0;
+            border: none; border-radius: 3px; background: linear-gradient(90deg, #ff980055, #3a3d46 38%, #4caf5055);
+        }
+        input[type=range].jauge::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #fff;
+            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.6), 0 0 0 3px rgba(255,87,34,.35);
+        }
+        input[type=range].jauge::-moz-range-thumb {
+            width: 24px; height: 24px; border: none; border-radius: 50%; background: #fff; cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,.6), 0 0 0 3px rgba(255,87,34,.35);
+        }
+        .jauge-bornes { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-light); margin-top: 4px; }
+        .raccourcis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+        .raccourcis button {
+            padding: 9px 4px; font-size: 10px; background: var(--bg-card);
+            color: var(--text-secondary); border: 1px solid var(--border); text-transform: none;
+        }
+        .raccourcis button.on { border-color: var(--primary); color: var(--primary); background: rgba(255,87,34,.1); }
+        .recap-vente {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(76,175,80,.08); border: 1px solid rgba(76,175,80,.3);
+            border-radius: 10px; padding: 12px 14px; margin: 14px 0;
+        }
+        .recap-vente.neg { background: rgba(255,152,0,.08); border-color: rgba(255,152,0,.35); }
+        .recap-vente .gros { font-size: 20px; font-weight: 800; color: var(--success); letter-spacing: -.5px; }
+        .recap-vente.neg .gros { color: #ff9800; }
+        .alerte-perte {
+            background: rgba(255,82,82,.1); border: 1px solid var(--danger); color: var(--danger);
+            border-radius: 8px; padding: 10px 12px; font-size: 11px; margin-bottom: 12px; line-height: 1.45;
+        }
+
+        /* ===== V18 — coque mobile ===== */
+        /* Tout est masque par defaut : sur ordinateur, cette couche n'existe pas. */
+        .m-vue, #m-barre, #m-prixbar, .m-retour { display: none; }
+
+        @media (max-width: 820px) {
+            body { padding-bottom: 76px; }          /* place pour la barre du bas */
+            .tabs { display: none; }                /* remplaces par la barre et les tuiles */
+            .m-vue.on { display: block; padding: 0 14px 10px; }
+            .app.sur-vue .main-grid { display: none; }
+
+            .m-salut { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+            .m-titre { font-size: 25px; font-weight: 700; line-height: 1.18; margin: 4px 0 16px; letter-spacing: -.5px; }
+            .m-cta {
+                display: flex; align-items: center; justify-content: space-between; gap: 10px;
+                width: 100%; padding: 16px 18px; border-radius: 14px; font-size: 15px;
+                box-shadow: 0 10px 26px -12px rgba(255,87,34,.8); text-transform: none;
+            }
+            .m-tuiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 16px 0; }
+            .m-tuile {
+                background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+                padding: 13px 4px 11px; text-align: center; cursor: pointer;
+                transition: transform .14s ease, border-color .14s ease;
+            }
+            .m-tuile:active { transform: scale(.96); border-color: var(--primary); }
+            .m-tuile svg { color: var(--primary); }
+            .m-tuile span { display: block; font-size: 9.5px; color: var(--text-secondary); margin-top: 7px; }
+            .m-srt { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; }
+            .m-srt b { font-size: 13px; }
+            .m-srt a { font-size: 11px; color: var(--primary); cursor: pointer; }
+            .m-carte { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+            .m-lien {
+                display: flex; align-items: center; justify-content: space-between; gap: 10px;
+                background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+                padding: 15px 16px; margin-bottom: 8px; font-size: 14px; cursor: pointer;
+            }
+            .m-lien:active { border-color: var(--primary); }
+
+            /* Barre de navigation */
+            #m-barre {
+                display: flex; align-items: flex-end; justify-content: space-around;
+                position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+                background: rgba(14,16,20,.97); border-top: 1px solid var(--border);
+                padding: 9px 6px 14px; backdrop-filter: blur(12px);
+            }
+            .m-nav {
+                display: flex; flex-direction: column; align-items: center; gap: 4px;
+                font-size: 9.5px; color: var(--text-secondary); width: 62px; cursor: pointer;
+                background: none; border: none; padding: 0; text-transform: none; font-weight: 500;
+            }
+            .m-nav.on { color: var(--primary); }
+            .m-nav svg { display: block; }
+            .m-fab {
+                width: 54px; height: 54px; border-radius: 50%; padding: 0;
+                background: linear-gradient(135deg, var(--primary), #FF8A50);
+                display: flex; align-items: center; justify-content: center; margin-top: -26px;
+                box-shadow: 0 12px 26px -8px rgba(255,87,34,.9); border: none; cursor: pointer;
+            }
+
+            /* Barre de prix collante : le prix reste visible pendant la saisie */
+            #m-prixbar.on {
+                display: block; position: fixed; left: 0; right: 0; bottom: 70px; z-index: 69;
+                padding: 0 14px 10px;
+                background: linear-gradient(180deg, rgba(10,10,10,0), var(--bg-dark) 34%);
+            }
+            .m-prixbox {
+                background: var(--bg-card); border: 1px solid rgba(255,87,34,.45); border-radius: 14px;
+                padding: 11px 14px; box-shadow: 0 -8px 28px -12px rgba(255,87,34,.5);
+            }
+            .m-prixhaut { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+            .m-prixht { font-size: 23px; font-weight: 800; color: var(--primary); letter-spacing: -.6px; }
+            .m-prixlb { font-size: 9.5px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .7px; }
+            .m-prixbox .duo-actions { margin-top: 10px; }
+            .m-prixbox .duo-actions button { padding: 11px; font-size: 10px; }
+
+            .m-retour {
+                display: flex; align-items: center; gap: 7px; background: none; border: none;
+                color: var(--text-secondary); font-size: 12px; padding: 0 0 10px;
+                text-transform: none; font-weight: 600; cursor: pointer;
+            }
+        }
 
         @media (max-width: 820px) {
             /* Sur mobile l'en-tete passe a la ligne et la cloche se retrouve a gauche :
@@ -853,6 +986,13 @@
             </div>
         </div>
     </div>
+
+    <!-- ===== V18 — coque mobile. Couche additionnelle : invisible au-dessus de 820px,
+         l'interface sur ordinateur et les calculateurs ne sont pas modifies. ===== -->
+    <div class="m-vue" id="m-accueil"></div>
+    <div class="m-vue" id="m-profil"></div>
+    <div id="m-prixbar"></div>
+    <nav id="m-barre"></nav>
 </div>
 
 <!-- V11 — fiche client / prospect -->
@@ -876,6 +1016,48 @@
             <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-client')">Annuler</button>
             <button id="mc-suppr" class="danger" style="display:none;" onclick="supprimerClient()">Supprimer</button>
             <button onclick="enregistrerFicheClient()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<!-- V17 — ajustement commercial du prix -->
+<div class="modal-back" id="modal-ajust" onclick="if(event.target===this)fermerModal('modal-ajust')">
+    <div class="modal">
+        <h3>Ajuster le prix</h3>
+        <p style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px;">
+            Le moteur calcule le juste prix. Vous décidez de ce que vous vendez.</p>
+
+        <div class="breakdown" id="aj-detail" style="margin-bottom:14px;"></div>
+
+        <div id="aj-alerte"></div>
+
+        <div class="jauge-zone">
+            <div class="jauge-haut">
+                <span style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">Ajustement commercial</span>
+                <span class="jauge-pct" id="aj-pct">+ 0,0 %</span>
+            </div>
+            <input type="range" class="jauge" id="aj-slider" min="-20" max="50" step="0.5" value="0" oninput="majAjustement(parseFloat(this.value))">
+            <div class="jauge-bornes"><span>− 20 %</span><span>Prix calculé</span><span>+ 50 %</span></div>
+            <div class="raccourcis">
+                <button onclick="majAjustement(-10)">− 10 %</button>
+                <button onclick="majAjustement(0)">Calculé</button>
+                <button onclick="majAjustement(10)">+ 10 %</button>
+                <button onclick="majAjustement(20)">+ 20 %</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Ou saisir le prix de vente voulu (HT)</label>
+            <input type="number" id="aj-cible" step="0.01" placeholder="Ex : 4000" oninput="ajusterDepuisCible(this.value)">
+            <p style="font-size:10px;color:var(--text-light);margin-top:5px;">
+                Pratique en rendez-vous : on annonce un chiffre rond, la jauge se règle toute seule.</p>
+        </div>
+
+        <div class="recap-vente" id="aj-recap"></div>
+
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-ajust')">Annuler</button>
+            <button onclick="appliquerAjustement()">Appliquer</button>
         </div>
     </div>
 </div>
@@ -997,6 +1179,16 @@ window.addEventListener('DOMContentLoaded', () => {
     chargerClientsEtSources();
     chargerEquipe().then(chargerNotifs);
     setInterval(chargerNotifs, 45000);
+
+    // V18 — coque mobile. Sur telephone on demarre sur l'accueil ; sur ordinateur
+    // la coque reste invisible et l'interface habituelle s'affiche directement.
+    mBarre();
+    if (surMobile()) mAller('accueil');
+    // Changement d'orientation ou de taille : on remet la barre de prix en coherence.
+    window.addEventListener('resize', () => {
+        if (!surMobile()) document.querySelector('.app').classList.remove('sur-vue');
+        mMajPrixBar();
+    });
 });
 
 function setupDropdownListeners() {
@@ -1311,9 +1503,13 @@ async function calcStickers() {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Une des formes est trop grande pour les laizes disponibles</p></div>';
         return;
     }
-    let best;
-    if (laizeChoice === 'auto') best = candidats.reduce((a, b) => a.totalSurface < b.totalSurface ? a : b);
-    else best = candidats.find(c => c.laize == laizeChoice) || candidats[0];
+    // Deux notions distinctes : la laize la moins couteuse (l'optimale, toujours la meme)
+    // et celle retenue pour le chiffrage. Les confondre ferait porter l'etoile "optimal" a
+    // une laize imposee plus chere, ce qui induirait en erreur.
+    const optimale = candidats.reduce((a, b) => a.totalSurface < b.totalSurface ? a : b);
+    const best = laizeChoice === 'auto'
+        ? optimale
+        : (candidats.find(c => c.laize == laizeChoice) || optimale);
 
     const surface = best.totalSurface;
     const totalQty = shapes.reduce((sum, s) => sum + s.qty, 0);
@@ -1338,16 +1534,21 @@ async function calcStickers() {
     const venteSupport = coutMatiereSupport * t.coefficient;
 
     const compareHTML = candidats.map(c => {
-        const isBest = c.laize === best.laize;
-        const diff = c.totalSurface - best.totalSurface;
-        const diffPct = best.totalSurface > 0 ? (diff / best.totalSurface * 100).toFixed(1) : 0;
+        const isBest = c.laize === optimale.laize;      // l'etoile marque toujours la moins chere
+        const diff = c.totalSurface - optimale.totalSurface;
+        const diffPct = optimale.totalSurface > 0 ? (diff / optimale.totalSurface * 100).toFixed(1) : 0;
+        // V17 — carte cliquable : on force cette laize et on rechiffre. L'emplacement du stock
+        // est pose des maintenant pour n'avoir rien a redessiner lors du branchement.
+        const choisie = laizeChoice !== 'auto' && c.laize == laizeChoice;
         return `
-            <div class="laize-card ${isBest ? 'best' : ''}">
+            <div class="laize-card ${isBest ? 'best' : ''} ${choisie ? 'choisie' : ''}"
+                 onclick="choisirLaize(${c.laize})" title="Utiliser la laize ${c.laize}mm">
                 <div class="laize-card-title">${c.laize}mm</div>
                 <div class="laize-card-value">${c.totalSurface.toFixed(3)} m²</div>
                 <div class="laize-card-detail">${shapes.length} forme${shapes.length > 1 ? 's' : ''}</div>
                 ${isBest ? '<div class="laize-card-detail" style="color:var(--success);font-weight:700;">⭐ OPTIMAL</div>' :
                   `<div class="laize-card-detail">+${diffPct}% perte</div>`}
+                ${choisie ? '<div class="laize-card-detail" style="color:var(--primary);font-weight:700;">✓ CHOISIE</div>' : ''}
             </div>`;
     }).join('');
 
@@ -1373,31 +1574,35 @@ async function calcStickers() {
         lamination ? checkStockWarning(lamination.nom, lamination, surface) : null
     ].filter(Boolean);
 
-    lastDevisDetails = { title: `${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''})`, rows };
-    document.getElementById('result').innerHTML = `
-        ${stockWarningsHTML(stickersWarnings)}
+    // Passe par showResult comme les autres calculateurs : un seul point de rendu du prix,
+    // donc l'ajustement commercial fonctionne ici aussi sans code en double.
+    const encadreLaize = `
         <div class="optimization-box">
             <div class="optimization-title">🎯 Optimisation laize</div>
-            <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px;">
-                Recommandée : ${best.laize}mm — ${surface.toFixed(3)} m² au total
+            <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:4px;">
+                ${laizeChoice === 'auto' ? 'Recommandée' : 'Imposée'} : ${best.laize}mm — ${surface.toFixed(3)} m² au total${
+                    laizeChoice !== 'auto' && best.laize !== optimale.laize
+                        ? ` <span style="color:#ff9800;">(+${(surface - optimale.totalSurface).toFixed(3)} m² vs optimale)</span>` : ''}
+            </div>
+            <div style="font-size:10px;color:var(--text-light);margin-bottom:8px;">
+                Touchez une laize pour l'imposer${laizeChoice !== 'auto' ? " — ou revenez à l'optimale" : ''}.
             </div>
             <div>${shapeBreakdownHTML}</div>
             <div class="laize-compare">${compareHTML}</div>
-        </div>
-        <div class="price-display">
-            <div class="price-label">${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''}) — ${(t.ht / totalQty).toFixed(2)}€/u HT</div>
-            <div class="price-value">${t.ht.toFixed(2).replace('.', ',')}</div>
-            <div class="price-ht">€ HT</div>
-            <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-                TTC: ${t.ttc.toFixed(2).replace('.', ',')}€ • TVA: ${t.tva.toFixed(2).replace('.', ',')}€
-            </div>
-        </div>
-        <div class="breakdown">
-            ${renderBreakdownRows(rows)}
-            <div class="breakdown-row total"><span>TOTAL HT</span><span>${t.ht.toFixed(2).replace('.', ',')} €</span></div>
-        </div>
-        <button class="btn-block" onclick="saveDevis('stickers', ${totalQty}, ${t.ht.toFixed(2)}, ${t.ttc.toFixed(2)}, this)">Sauvegarder le devis</button>
-    `;
+            ${laizeChoice !== 'auto'
+                ? `<button style="width:100%;margin-top:10px;padding:9px;font-size:10px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);"
+                     onclick="choisirLaize('auto')">↺ Revenir à la laize optimale</button>` : ''}
+        </div>`;
+
+    showResult(
+        `${totalQty} stickers (${shapes.length} forme${shapes.length > 1 ? 's' : ''}) — ${(t.ht / totalQty).toFixed(2)}€/u HT`,
+        t.ttc, t.ht, t.tva, rows, 'stickers', totalQty, stickersWarnings, encadreLaize);
+}
+
+// V17 — impose une laize depuis les cartes du resultat, ou revient a l'optimale.
+function choisirLaize(laize) {
+    setDropdown('dd-st-laize', laize);
+    calcStickers();
 }
 
 async function calcVehicule() {
@@ -1918,24 +2123,161 @@ function renderBreakdownRows(rows) {
     return html;
 }
 
-function showResult(title, ttc, ht, tva, rows, type, qty, warnings = []) {
+// ===== V17 — AJUSTEMENT COMMERCIAL =====
+// L'ajustement s'applique APRES le moteur, jamais dedans : computeTotal continue de dire ce
+// que le travail coute reellement, la marge commerciale reste une decision separee et visible.
+// Sans cette separation on ne saurait plus si un prix eleve vient du moteur ou d'un geste
+// commercial, et la calibration batie sur les factures reelles serait perdue.
+let devisCourant = null;   // { title, rows, type, qty, htCalcule, tvaRate, warnings, coutRevient }
+let ajustementPct = 0;
+// Prix saisi a la main. Il prime sur le pourcentage : quand on annonce "on fait 4000",
+// le client doit voir 4000,00 € et pas 3999,88 € du a l'arrondi du pourcentage.
+let prixCible = null;
+
+const fmt = n => n.toFixed(2).replace('.', ',');
+
+// Deboursé sec approximatif : somme des lignes "Coût" du detail. Sert uniquement a prevenir
+// d'une vente a perte — jamais au calcul du prix. Si une ligne echappe au reperage, on perd
+// l'avertissement, jamais l'exactitude du montant.
+function coutRevientDepuisRows(rows) {
+    return rows.reduce((s, r) => {
+        if (!r || !/^Coût/i.test(r.label || '')) return s;
+        const v = parseFloat(String(r.val).replace(/[^0-9.,-]/g, '').replace(',', '.'));
+        return isNaN(v) ? s : s + v;
+    }, 0);
+}
+
+function prixVente() {
+    if (!devisCourant) return 0;
+    if (prixCible !== null) return prixCible;
+    return devisCourant.htCalcule * (1 + ajustementPct / 100);
+}
+
+function showResult(title, ttc, ht, tva, rows, type, qty, warnings = [], prefixHTML = '') {
     lastDevisDetails = { title, rows };
+    ajustementPct = 0; prixCible = null;   // un nouveau calcul repart toujours du prix du moteur
+    devisCourant = {
+        title, rows, type, qty, prefixHTML,
+        htCalcule: ht,
+        tvaRate: ht > 0 ? tva / ht : num('tva', 20) / 100,
+        warnings,
+        coutRevient: coutRevientDepuisRows(rows)
+    };
+    rendreResultat();
+}
+
+function rendreResultat() {
+    const d = devisCourant;
+    if (!d) return;
+    const vente = prixVente();
+    const tva = vente * d.tvaRate;
+    const ttc = vente + tva;
+    const ecart = vente - d.htCalcule;
+    const ajuste = Math.abs(ecart) > 0.005;
+    const pctReel = d.htCalcule > 0 ? (ecart / d.htCalcule) * 100 : 0;
+
     document.getElementById('result').innerHTML = `
-        ${stockWarningsHTML(warnings)}
+        ${stockWarningsHTML(d.warnings)}
+        ${d.prefixHTML || ''}
         <div class="price-display">
-            <div class="price-label">${title}</div>
-            <div class="price-value">${ht.toFixed(2).replace('.', ',')}</div>
-            <div class="price-ht">€ HT</div>
+            <div class="price-label">${d.title}</div>
+            <div class="price-value">${fmt(vente)}</div>
+            <div class="price-ht">€ HT${ajuste ? ' — prix de vente' : ''}</div>
+            ${ajuste ? `<div class="ajust-ligne ${ecart < 0 ? 'neg' : ''}">
+                Calculé ${fmt(d.htCalcule)} € · ajusté ${ecart >= 0 ? '+' : '−'} ${Math.abs(pctReel).toFixed(1).replace('.', ',')} %
+                (${ecart >= 0 ? '+' : '−'} ${fmt(Math.abs(ecart))} €)</div>` : ''}
             <div class="price-ht" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-                TTC: ${ttc.toFixed(2).replace('.', ',')}€ • TVA: ${tva.toFixed(2).replace('.', ',')}€
+                TTC: ${fmt(ttc)}€ • TVA: ${fmt(tva)}€
             </div>
         </div>
         <div class="breakdown">
-            ${renderBreakdownRows(rows)}
-            <div class="breakdown-row total"><span>TOTAL HT</span><span>${ht.toFixed(2).replace('.', ',')} €</span></div>
+            ${renderBreakdownRows(d.rows)}
+            <div class="breakdown-row total"><span>${ajuste ? 'PRIX CALCULÉ HT' : 'TOTAL HT'}</span><span>${fmt(d.htCalcule)} €</span></div>
+            ${ajuste ? `<div class="breakdown-row total" style="color:var(--success);"><span>PRIX DE VENTE HT</span><span>${fmt(vente)} €</span></div>` : ''}
         </div>
-        <button class="btn-block" onclick="saveDevis('${type}', ${qty}, ${ht.toFixed(2)}, ${ttc.toFixed(2)}, this)">Sauvegarder le devis</button>
+        <div class="duo-actions">
+            <button class="btn-sec" onclick="ouvrirAjustement()">${ajuste ? "Modifier l'ajustement" : 'Ajuster le prix'}</button>
+            <button class="btn-pri" onclick="saveDevis('${d.type}', ${d.qty}, ${vente.toFixed(2)}, ${ttc.toFixed(2)}, this)">Enregistrer</button>
+        </div>
     `;
+    if (typeof mMajPrixBar === 'function') mMajPrixBar();
+}
+
+function ouvrirAjustement() {
+    if (!devisCourant) return;
+    const d = devisCourant;
+    document.getElementById('aj-detail').innerHTML =
+        renderBreakdownRows(d.rows) +
+        `<div class="breakdown-row total"><span>PRIX CALCULÉ HT</span><span>${fmt(d.htCalcule)} €</span></div>`;
+    document.getElementById('aj-cible').value = '';
+    majAjustement(ajustementPct);
+    ouvrirModal('modal-ajust');
+}
+
+// Point unique de mise a jour de la feuille : jauge, raccourcis et saisie du prix cible
+// passent tous par ici, pour que les trois affichages ne puissent pas diverger.
+function majAjustement(pct, gardeCible) {
+    const d = devisCourant;
+    if (!d) return;
+    // Toucher la jauge ou un raccourci abandonne le prix saisi a la main.
+    if (!gardeCible) { prixCible = null; document.getElementById('aj-cible').value = ''; }
+    pct = Math.max(-20, Math.min(50, isNaN(pct) ? 0 : pct));
+    ajustementPct = Math.round(pct * 10) / 10;
+
+    document.getElementById('aj-slider').value = ajustementPct;
+    const vraiPct = d.htCalcule > 0 ? (prixVente() / d.htCalcule - 1) * 100 : 0;
+    const elPct = document.getElementById('aj-pct');
+    elPct.textContent = `${vraiPct >= 0 ? '+' : '−'} ${Math.abs(vraiPct).toFixed(1).replace('.', ',')} %`;
+    elPct.classList.toggle('neg', vraiPct < 0);
+
+    document.querySelectorAll('.raccourcis button').forEach(b => {
+        const v = parseFloat((b.textContent.match(/-?\d+/) || [b.textContent.includes('Calculé') ? '0' : 'x'])[0]);
+        const cible = b.textContent.includes('−') ? -Math.abs(v) : v;
+        b.classList.toggle('on', !isNaN(cible) && Math.abs(cible - ajustementPct) < 0.05);
+    });
+
+    const vente = prixVente();
+    const ecart = vente - d.htCalcule;
+    const recap = document.getElementById('aj-recap');
+    recap.classList.toggle('neg', ecart < 0);
+    recap.innerHTML = `
+        <div>
+            <div style="font-size:10px;color:var(--text-secondary);">Prix de vente HT</div>
+            <div class="gros">${fmt(vente)} €</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-secondary);">Écart</div>
+            <div style="font-size:13px;font-weight:700;color:${ecart < 0 ? '#ff9800' : 'var(--success)'};">
+                ${ecart >= 0 ? '+' : '−'} ${fmt(Math.abs(ecart))} €</div>
+        </div>`;
+
+    // Avertissement, jamais blocage : la decision de vendre bas reste commerciale.
+    const al = document.getElementById('aj-alerte');
+    al.innerHTML = (d.coutRevient > 0 && vente < d.coutRevient)
+        ? `<div class="alerte-perte">⚠️ <b>Vente à perte.</b> Le déboursé matière de ce devis est de
+           ${fmt(d.coutRevient)} € HT. À ${fmt(vente)} € vous ne couvrez pas la matière,
+           sans compter la main-d'œuvre.</div>`
+        : '';
+}
+
+function ajusterDepuisCible(valeur) {
+    const d = devisCourant;
+    if (!d || d.htCalcule <= 0) return;
+    const cible = parseFloat(valeur);
+    if (isNaN(cible)) { prixCible = null; majAjustement(ajustementPct, true); return; }
+
+    const pctVoulu = (cible / d.htCalcule - 1) * 100;
+    const pct = Math.max(-20, Math.min(50, pctVoulu));
+    // Hors bornes : on s'aligne sur la borne et on le dit, plutot que de laisser croire
+    // que le prix demande a ete retenu.
+    prixCible = Math.abs(pct - pctVoulu) < 0.001 ? cible : d.htCalcule * (1 + pct / 100);
+    majAjustement(pct, true);
+}
+
+function appliquerAjustement() {
+    fermerModal('modal-ajust');
+    rendreResultat();
+    if (Math.abs(ajustementPct) > 0.01) showNotification('Prix ajusté ✓', 'success');
 }
 
 // V11 — saveDevis() est defini plus bas : le nom du client n'est plus saisi librement,
@@ -2419,7 +2761,14 @@ async function confirmerSaveDevis() {
             const c = allClients.find(x => x.id === clientId);
             clientNom = c ? c.nom : null;
         }
-        await apiSend('/devis', 'POST', { type, qty, ht, ttc, details: lastDevisDetails || {}, client: clientNom, client_id: clientId });
+        // On enregistre le prix REELLEMENT VENDU dans `ht` — c'est lui le chiffre d'affaires —
+        // et le prix du moteur a cote, pour pouvoir mesurer l'ecart et recalibrer plus tard.
+        await apiSend('/devis', 'POST', {
+            type, qty, ht, ttc, details: lastDevisDetails || {}, client: clientNom, client_id: clientId,
+            ht_calcule: devisCourant ? Number(devisCourant.htCalcule.toFixed(2)) : null,
+            ajustement_pct: devisCourant && devisCourant.htCalcule > 0 && Math.abs(ht - devisCourant.htCalcule) > 0.005
+                ? Number((((ht / devisCourant.htCalcule) - 1) * 100).toFixed(2)) : null
+        });
         fermerModal('modal-devis');
         devisEnAttente = null;
         showNotification('Devis sauvegardé ✓', 'success');
@@ -2598,6 +2947,240 @@ window.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => { /* sans effet sur le reste */ });
     }
 });
+
+// ===== V18 — COQUE MOBILE =====
+// Couche de navigation posee par-dessus l'existant : les calculateurs, leurs formulaires et
+// le moteur ne sont pas touches. Au-dessus de 820px, rien de tout ceci ne s'affiche.
+const ICO = {
+    accueil: '<path d="M3 10.2 12 3l9 7.2V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    devis:   '<path d="M6 2h8l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>',
+    clients: '<circle cx="9" cy="8" r="3.4"/><circle cx="17" cy="9.5" r="2.6"/><path d="M2.5 19.5c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6z"/><path d="M16.5 14.2c3 .2 5 2 5 5.3h-4"/>',
+    profil:  '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/>',
+    vehicule:'<path d="M3 16v-3.2L5 8h14l2 4.8V16a1 1 0 0 1-1 1h-1.2a2.3 2.3 0 0 1-4.6 0H9.8a2.3 2.3 0 0 1-4.6 0H4a1 1 0 0 1-1-1z"/>',
+    signal:  '<rect x="3.5" y="4" width="17" height="11" rx="1.6"/><path d="M11 15h2v6h-2z"/>',
+    sticker: '<path d="M4 5.6A1.6 1.6 0 0 1 5.6 4h12.8A1.6 1.6 0 0 1 20 5.6V14l-6 6H5.6A1.6 1.6 0 0 1 4 18.4z"/>',
+    print:   '<path d="M7 3h10v4H7z"/><rect x="3.5" y="7.5" width="17" height="8.5" rx="1.6"/><path d="M7 14h10v7H7z"/>',
+    regle:   '<path d="M2.6 8.4 8.4 2.6l13 13-5.8 5.8z"/>'
+};
+const ico = (n, t = 21) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="currentColor" aria-hidden="true">${ICO[n]}</svg>`;
+
+const M_CALCULATEURS = [
+    { cle: 'vehicule',     icone: 'vehicule', nom: 'Véhicule' },
+    { cle: 'signaletique', icone: 'signal',   nom: 'Signalétique' },
+    { cle: 'stickers',     icone: 'sticker',  nom: 'Stickers' },
+    { cle: 'impression',   icone: 'print',    nom: 'Impression' }
+];
+
+let mVueCourante = 'accueil';
+const surMobile = () => window.matchMedia('(max-width: 820px)').matches;
+
+function mBarre() {
+    const item = (cle, nom, icone) =>
+        `<button class="m-nav ${mVueCourante === cle ? 'on' : ''}" onclick="mAller('${cle}')">${ico(icone)}${nom}</button>`;
+    document.getElementById('m-barre').innerHTML =
+        item('accueil', 'Accueil', 'accueil') +
+        item('devis', 'Devis', 'devis') +
+        `<button class="m-fab" onclick="mAller('accueil')" aria-label="Nouveau devis">
+            <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+         </button>` +
+        item('clients', 'Clients', 'clients') +
+        item('profil', 'Profil', 'profil');
+}
+
+function mAller(vue) {
+    mVueCourante = vue;
+    const app = document.querySelector('.app');
+    document.querySelectorAll('.m-vue').forEach(v => v.classList.remove('on'));
+
+    if (vue === 'accueil') {
+        app.classList.add('sur-vue');
+        document.getElementById('m-accueil').classList.add('on');
+        mRendreAccueil();
+    } else if (vue === 'profil') {
+        app.classList.add('sur-vue');
+        document.getElementById('m-profil').classList.add('on');
+        mRendreProfil();
+    } else {
+        // Les autres entrees reutilisent les onglets existants : aucun ecran en double.
+        app.classList.remove('sur-vue');
+        const onglet = vue === 'devis' ? 'historique' : vue;
+        const btn = [...document.querySelectorAll('.tab-btn')]
+            .find(b => (b.getAttribute('onclick') || '').includes(`'${onglet}'`));
+        if (btn) btn.click();
+    }
+    window.scrollTo(0, 0);
+    mBarre();
+    mMajPrixBar();
+}
+
+function mOuvrirCalculateur(cle) {
+    mVueCourante = '';
+    document.querySelector('.app').classList.remove('sur-vue');
+    document.querySelectorAll('.m-vue').forEach(v => v.classList.remove('on'));
+    const btn = [...document.querySelectorAll('.tab-btn')]
+        .find(b => (b.getAttribute('onclick') || '').includes(`'${cle}'`));
+    if (btn) btn.click();
+    mPoserRetour();
+    window.scrollTo(0, 0);
+    mBarre();
+    mMajPrixBar();
+}
+
+// Fleche de retour vers l'accueil, posee en tete du panneau de saisie. Sans elle on ne
+// peut revenir qu'en passant par la barre du bas, ce qui n'est pas le geste attendu.
+function mPoserRetour() {
+    const panneau = document.querySelector('.panel-left');
+    if (!panneau) return;
+    let b = panneau.querySelector('.m-retour');
+    if (!b) {
+        b = document.createElement('button');
+        b.className = 'm-retour';
+        b.innerHTML = '‹ Accueil';
+        b.onclick = () => mAller('accueil');
+        panneau.insertBefore(b, panneau.firstChild);
+    }
+    b.style.display = surMobile() ? 'flex' : 'none';
+}
+
+async function mRendreAccueil() {
+    const prenom = (user && user.nom ? user.nom.split(' ')[0] : '');
+    document.getElementById('m-accueil').innerHTML = `
+        <div class="m-salut">Bonjour ${escapeHtml(prenom)}</div>
+        <div class="m-titre">Chiffrez un devis<br>en 30 secondes</div>
+        <button class="m-cta" onclick="mOuvrirCalculateur('vehicule')">
+            <span style="display:flex;align-items:center;gap:10px;">${ico('regle', 18)} Nouveau devis</span>
+            <span style="font-size:18px;opacity:.8;">›</span>
+        </button>
+        <div class="m-tuiles">
+            ${M_CALCULATEURS.map(c => `<div class="m-tuile" onclick="mOuvrirCalculateur('${c.cle}')">
+                ${ico(c.icone, 22)}<span>${c.nom}</span></div>`).join('')}
+        </div>
+        <div class="m-srt"><b>Dernier devis</b><a onclick="mAller('devis')">Voir tout ›</a></div>
+        <div id="m-dernier" class="m-carte"><p style="font-size:12px;color:var(--text-secondary);">Chargement...</p></div>
+        <div class="m-srt"><b>🏆 Classement de la semaine</b></div>
+        <div id="m-classement" class="m-carte"><p style="font-size:12px;color:var(--text-secondary);">Chargement...</p></div>`;
+    mDernierDevis();
+    mClassement();
+}
+
+async function mDernierDevis() {
+    const el = document.getElementById('m-dernier');
+    if (!el) return;
+    try {
+        const devis = await apiFetch('/devis');
+        if (!devis.length) {
+            el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Aucun devis enregistré pour l\'instant.</p>';
+            return;
+        }
+        const d = devis[0];
+        const st = d.statut || 'calcule';
+        const icones = { vehicule: 'vehicule', signaletique: 'signal', stickers: 'sticker', impression: 'print' };
+        el.innerHTML = `
+            <div style="display:flex;align-items:center;gap:11px;">
+                <div style="width:44px;height:44px;border-radius:11px;background:var(--bg-input);
+                     display:flex;align-items:center;justify-content:center;color:var(--primary);">
+                    ${ico(icones[d.type] || 'devis', 21)}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <span style="font-weight:600;font-size:13.5px;">${escapeHtml(d.client) || 'Sans nom'}</span>
+                        ${pastilleStatut(st)}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-secondary);margin-top:3px;">
+                        ${escapeHtml(d.type)} · ${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;
+                 padding-top:11px;border-top:1px solid var(--border);">
+                <span style="font-size:16px;font-weight:700;color:var(--primary);">${fmt(parseFloat(d.ht))} € HT</span>
+                ${st === 'valide' ? '' :
+                  `<span style="font-size:12px;color:var(--success);font-weight:600;cursor:pointer;"
+                     onclick="changerStatut(${d.id}, 'valide').then(mDernierDevis)">✅ Valider</span>`}
+            </div>`;
+    } catch (err) {
+        el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Devis indisponibles.</p>';
+    }
+}
+
+async function mClassement() {
+    const el = document.getElementById('m-classement');
+    if (!el) return;
+    try {
+        const d = await apiFetch('/classement?periode=semaine');
+        if (d.lignes.length < 2) {
+            el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Le classement démarre dès qu\'un collègue vous rejoint.</p>';
+            return;
+        }
+        const maxi = Math.max(...d.lignes.map(l => l.nb_valides), 1);
+        const medailles = ['🥇', '🥈', '🥉'];
+        el.innerHTML = d.lignes.slice(0, 4).map((l, i) => {
+            const moi = l.id === d.moi;
+            return `<div style="display:flex;align-items:center;gap:9px;font-size:12.5px;${i ? 'margin-top:10px;' : ''}">
+                <span>${medailles[i] || `<span style="color:var(--text-light);">${i + 1}.</span>`}</span>
+                <span style="width:58px;${moi ? 'color:var(--primary);font-weight:600;' : ''}">${moi ? 'Vous' : escapeHtml(l.nom)}</span>
+                <span style="flex:1;height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden;">
+                    <i style="display:block;height:100%;width:${Math.round(l.nb_valides / maxi * 100)}%;
+                       background:linear-gradient(90deg,var(--primary),#FF8A50);"></i></span>
+                <span style="font-size:11px;color:var(--text-secondary);min-width:56px;text-align:right;">
+                    ${l.nb_valides} signé${l.nb_valides > 1 ? 's' : ''}</span>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Classement indisponible.</p>';
+    }
+}
+
+function mRendreProfil() {
+    const lien = (libelle, action) => `<div class="m-lien" onclick="${action}"><span>${libelle}</span><span style="color:var(--text-light);">›</span></div>`;
+    document.getElementById('m-profil').innerHTML = `
+        <div class="m-titre" style="font-size:22px;margin-bottom:14px;">Profil</div>
+        <div class="m-carte" style="margin-bottom:16px;">
+            <div style="font-weight:600;font-size:14px;">${escapeHtml(user ? user.nom : '')}</div>
+            <div style="font-size:11.5px;color:var(--text-secondary);margin-top:3px;">${escapeHtml(user ? user.email : '')}</div>
+        </div>
+        ${lien('💬 Assistant', "mOuvrirCalculateur('chat')")}
+        ${lien('📈 Statistiques et classement', "mOuvrirCalculateur('stats')")}
+        ${lien('📖 Tarifs du moteur', "mOuvrirCalculateur('tarifs')")}
+        ${lien('🖨️ Impression Exaprint', "mOuvrirCalculateur('impression')")}
+        ${user && user.role === 'admin' ? lien('⚙️ Administration', "window.location.href='/admin'") : ''}
+        ${document.getElementById('btn-installer') && getComputedStyle(document.getElementById('btn-installer')).display !== 'none'
+            ? lien("⬇ Installer l'application", 'installerApp()') : ''}
+        <div class="m-lien" style="border-color:rgba(255,82,82,.4);color:var(--danger);" onclick="logout()">
+            <span>Déconnexion</span><span>›</span></div>`;
+}
+
+// La barre de prix mobile reprend le meme prix et les memes actions que le panneau Resultat :
+// une seule source, donc aucun risque que les deux affichages divergent.
+function mMajPrixBar() {
+    const bar = document.getElementById('m-prixbar');
+    if (!bar) return;
+    // Uniquement sur un onglet de chiffrage : sur l'historique, les clients ou le profil,
+    // un prix flottant n'aurait aucun rapport avec ce qui est affiche.
+    const ongletsChiffrage = M_CALCULATEURS.map(c => 'tab-' + c.cle);
+    const actif = document.querySelector('.tab-content.active');
+    const surCalculateur = !document.querySelector('.app').classList.contains('sur-vue')
+        && actif && ongletsChiffrage.includes(actif.id);
+    if (!devisCourant || !surMobile() || !surCalculateur) { bar.classList.remove('on'); bar.innerHTML = ''; return; }
+    const d = devisCourant, vente = prixVente(), ecart = vente - d.htCalcule;
+    const ajuste = Math.abs(ecart) > 0.005;
+    const pct = d.htCalcule > 0 ? (ecart / d.htCalcule) * 100 : 0;
+    bar.classList.add('on');
+    bar.innerHTML = `
+        <div class="m-prixbox">
+            <div class="m-prixhaut" onclick="document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'})">
+                <div>
+                    <div class="m-prixlb">${ajuste ? 'Prix de vente HT' : 'Total HT'}</div>
+                    <div class="m-prixht">${fmt(vente)} €</div>
+                    ${ajuste ? `<div class="ajust-ligne ${ecart < 0 ? 'neg' : ''}" style="margin-top:2px;">
+                        Calculé ${fmt(d.htCalcule)} € · ${ecart >= 0 ? '+' : '−'} ${Math.abs(pct).toFixed(1).replace('.', ',')} %</div>` : ''}
+                </div>
+                <span style="font-size:16px;color:var(--text-secondary);">⌃</span>
+            </div>
+            <div class="duo-actions">
+                <button class="btn-sec" onclick="ouvrirAjustement()">Ajuster</button>
+                <button class="btn-pri" onclick="saveDevis('${d.type}', ${d.qty}, ${vente.toFixed(2)}, ${(vente * (1 + d.tvaRate)).toFixed(2)}, this)">Enregistrer</button>
+            </div>
+        </div>`;
+}
 
 function showNotification(msg, type) {
     const el = document.createElement('div');

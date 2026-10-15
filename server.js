@@ -168,6 +168,11 @@ async function ensureV11Tables(existingConn) {
         `ALTER TABLE devis ADD COLUMN statut VARCHAR(20) NOT NULL DEFAULT 'calcule'`,
         `ALTER TABLE devis ADD COLUMN statut_le DATETIME DEFAULT NULL`,
         `ALTER TABLE devis ADD COLUMN statut_par INT DEFAULT NULL`,
+        // V17 — ajustement commercial. `ht` porte desormais le prix REELLEMENT VENDU (c'est lui
+        // qui compte dans le CA), et `ht_calcule` le prix sorti du moteur. Les devis anterieurs
+        // n'ont pas d'ajustement : ht_calcule reste NULL et vaut alors ht, ce qui est exact.
+        `ALTER TABLE devis ADD COLUMN ht_calcule DECIMAL(10, 2) DEFAULT NULL`,
+        `ALTER TABLE devis ADD COLUMN ajustement_pct DECIMAL(6, 2) DEFAULT NULL`,
         // V15 — trace des recapitulatifs deja envoyes. En base et non en memoire : un
         // redemarrage du serveur ne doit pas provoquer un second envoi.
         `CREATE TABLE IF NOT EXISTS recaps_envoyes (
@@ -694,7 +699,7 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
 app.post('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
-        const { type, qty, ht, ttc, details, client, client_id } = req.body;
+        const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct } = req.body;
         const conn = await pool.getConnection();
         // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
         // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
@@ -703,8 +708,12 @@ app.post('/api/devis', verifyToken, async (req, res) => {
             const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
             if (c.length) lien = c[0].id;
         }
-        await conn.query('INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-            [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId]);
+        await conn.query(
+            `INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId,
+             ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
+             ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
         await conn.release();
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1454,6 +1463,43 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// V19 — modification d'un compte : role et mot de passe. Il manquait tout moyen de promouvoir
+// un collegue ou de remplacer un mot de passe, ce qui obligeait a supprimer puis recreer.
+app.put('/api/admin/users/:id', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const { role, password } = req.body;
+        if (role && !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Rôle inconnu' });
+        if (password && String(password).length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+        if (!role && !password) return res.status(400).json({ error: 'Rien à modifier' });
+
+        const conn = await pool.getConnection();
+        const [cible] = await conn.query('SELECT id, role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
+        if (!cible.length) { await conn.release(); return res.status(404).json({ error: 'Utilisateur hors de votre équipe' }); }
+
+        if (role && role !== cible[0].role) {
+            // Le compte principal porte les donnees de l'equipe : le retrograder fermerait
+            // l'administration a tout le monde.
+            if (String(req.params.id) === String(req.userId) && role !== 'admin') {
+                await conn.release();
+                return res.status(400).json({ error: 'Le compte principal de l\'équipe doit rester administrateur' });
+            }
+            if (cible[0].role === 'admin' && role === 'user') {
+                const [[{ count }]] = await conn.query("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
+                if (count <= 1) { await conn.release(); return res.status(400).json({ error: 'Impossible de retirer le dernier administrateur' }); }
+            }
+            await conn.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
+        }
+        if (password) {
+            const bcrypt = require('bcrypt');
+            await conn.query('UPDATE users SET password = ? WHERE id = ?', [await bcrypt.hash(password, 10), req.params.id]);
+        }
+        await conn.release();
+        // Le jeton du compte modifie porte encore l'ancien role jusqu'a sa prochaine connexion.
+        res.json({ message: 'OK', reconnexion_requise: !!(role && role !== cible[0].role) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
@@ -1487,10 +1533,13 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
              FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
         // devis.user_id = l'equipe proprietaire, devis.auteur_id = la personne qui l'a saisi.
         const [parDevis] = await conn.query(
+            // COALESCE(ht_calcule, ht) : avant la V17 il n'y avait pas d'ajustement, le prix
+            // vendu etait le prix calcule. L'ecart est alors nul, ce qui est exact.
             `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
                     SUM(statut = 'valide') AS nb_valides,
                     SUM(statut = 'refuse') AS nb_refuses,
-                    COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide
+                    COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
+                    COALESCE(SUM(COALESCE(ht_calcule, ht)), 0) AS ca_calcule
              FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
         const [parClient] = await conn.query(
             `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
@@ -1504,13 +1553,21 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
 
         const devisPar = new Map(parDevis.map(r => [r.auteur_id, r]));
         const clientsPar = new Map(parClient.map(r => [r.auteur_id, r]));
-        const chiffres = (d) => ({
-            nb_devis: d ? Number(d.nb) : 0,
-            ca_devis: d ? Number(d.ca) : 0,
-            nb_valides: d ? Number(d.nb_valides) : 0,
-            nb_refuses: d ? Number(d.nb_refuses) : 0,
-            ca_valide: d ? Number(d.ca_valide) : 0
-        });
+        const chiffres = (d) => {
+            const ca = d ? Number(d.ca) : 0;
+            const calcule = d ? Number(d.ca_calcule) : 0;
+            return {
+                nb_devis: d ? Number(d.nb) : 0,
+                ca_devis: ca,
+                nb_valides: d ? Number(d.nb_valides) : 0,
+                nb_refuses: d ? Number(d.nb_refuses) : 0,
+                ca_valide: d ? Number(d.ca_valide) : 0,
+                ca_calcule: calcule,
+                // Ecart moyen entre ce qui est vendu et ce que le moteur chiffre. Un ecart
+                // positif durable signifie que le moteur est regle trop bas.
+                ecart_pct: calcule > 0 ? Math.round(((ca - calcule) / calcule) * 1000) / 10 : null
+            };
+        };
         const utilisateurs = membres.map(m => {
             const c = chiffres(devisPar.get(m.id));
             const tranches = c.nb_valides + c.nb_refuses;
