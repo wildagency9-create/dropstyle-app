@@ -1463,6 +1463,51 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// V20 — rattacher un compte existant a l'equipe. Un compte cree par l'onglet Inscription
+// devient sa propre equipe, isolee : il n'apparait dans aucune liste et ne voit aucune donnee
+// de l'entreprise. L'invitation refuse une adresse deja prise, et "Modifier" ne voit que
+// l'equipe : sans ce rattachement, un tel compte reste definitivement a l'ecart.
+app.post('/api/admin/equipe/rattacher', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        // Validee avant d'ouvrir une connexion : inutile de solliciter la base pour rien.
+        const email = (req.body.email || '').trim().toLowerCase();
+        if (!email) return res.status(400).json({ error: 'Adresse email requise' });
+        await ensureV11Tables();
+
+        const conn = await pool.getConnection();
+        try {
+            const [rows] = await conn.query('SELECT id, nom, email, role, COALESCE(equipe_id, id) AS eq FROM users WHERE LOWER(email) = ?', [email]);
+            if (!rows.length) return res.status(404).json({ error: "Aucun compte avec cette adresse. Utilisez « + Ajouter » pour le créer." });
+            const u = rows[0];
+            if (String(u.id) === String(req.userId)) return res.status(400).json({ error: 'Ce compte est déjà le compte principal de votre équipe.' });
+            if (String(u.eq) === String(req.userId)) return res.status(400).json({ error: 'Ce compte fait déjà partie de votre équipe.' });
+
+            // Si d'autres comptes dependent de lui, le deplacer les laisserait orphelins.
+            const [[{ membres }]] = await conn.query('SELECT COUNT(*) AS membres FROM users WHERE COALESCE(equipe_id, id) = ? AND id <> ?', [u.eq, u.id]);
+            if (membres > 0) return res.status(400).json({ error: `Ce compte dirige une équipe de ${membres} autre(s) personne(s). Le rattacher les laisserait sans équipe.` });
+
+            // Donnees lui appartenant en propre : les rattacher les rendrait invisibles sans
+            // explication, puisque tout est filtre par equipe.
+            const [[{ nbDevis }]] = await conn.query('SELECT COUNT(*) AS nbDevis FROM devis WHERE user_id = ?', [u.eq]);
+            const [[{ nbClients }]] = await conn.query('SELECT COUNT(*) AS nbClients FROM clients WHERE equipe_id = ?', [u.eq]);
+            if (nbDevis > 0 || nbClients > 0) {
+                return res.status(409).json({
+                    error: `Ce compte possède déjà ${nbDevis} devis et ${nbClients} client(s). `
+                         + `Le rattacher les rendrait invisibles. Contactez-moi avant de forcer.`,
+                    nb_devis: nbDevis, nb_clients: nbClients
+                });
+            }
+
+            await conn.query('UPDATE users SET equipe_id = ? WHERE id = ?', [req.userId, u.id]);
+            // Son jeton porte encore l'ancienne equipe : il doit se reconnecter.
+            res.json({ message: 'OK', nom: u.nom, email: u.email, role: u.role, reconnexion_requise: true });
+        } finally {
+            await conn.release();
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // V19 — modification d'un compte : role et mot de passe. Il manquait tout moyen de promouvoir
 // un collegue ou de remplacer un mot de passe, ce qui obligeait a supprimer puis recreer.
 app.put('/api/admin/users/:id', verifyToken, async (req, res) => {

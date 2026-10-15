@@ -334,7 +334,12 @@
 
     <!-- USERS -->
     <div class="tab-content active" id="tab-users">
-        <div class="section-header"><div class="section-title">Gestion Utilisateurs</div><button onclick="openModal('modal-user')">+ Ajouter</button></div>
+        <div class="section-header"><div class="section-title">Gestion Utilisateurs</div>
+            <div style="display:flex;gap:8px;">
+                <button class="calc-btn" onclick="openModal('modal-rattacher')">Rattacher un compte</button>
+                <button onclick="openModal('modal-user')">+ Ajouter</button>
+            </div>
+        </div>
 
         <!-- V13 — activite de l'equipe -->
         <div id="activite-equipe"></div>
@@ -575,6 +580,28 @@
             </div>
             <div id="test-result" style="margin-top:16px;"></div>
         </div>
+    </div>
+</div>
+
+<!-- V20 — RATTACHER UN COMPTE EXISTANT -->
+<div class="modal" id="modal-rattacher">
+    <div class="modal-content">
+        <div class="modal-header">Rattacher un compte existant</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+            Pour un compte créé par l'onglet « Inscription » de la page de connexion : il s'est
+            retrouvé dans sa propre équipe isolée, sans accès à vos tarifs ni à vos devis.
+            Le rattacher lui donne immédiatement accès à tout.
+        </p>
+        <form onsubmit="rattacherCompte(event)">
+            <div class="form-group"><label>Adresse email du compte</label>
+                <input type="email" id="rat-email" required placeholder="collegue@exemple.fr">
+            </div>
+            <div id="rat-resultat"></div>
+            <div class="modal-actions">
+                <button type="button" class="danger" onclick="closeModal('modal-rattacher')">Annuler</button>
+                <button type="submit" class="success">Rattacher</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -1167,6 +1194,26 @@ async function loadUsers() {
                 ${u.id !== user.id ? `<button class="danger small" onclick="deleteUser(${u.id})">Suppr</button>` : ''}
             </td>
         </tr>`).join('');
+}
+
+// ===== V20 — rattacher un compte existant =====
+async function rattacherCompte(ev) {
+    ev.preventDefault();
+    const email = document.getElementById('rat-email').value.trim();
+    const zone = document.getElementById('rat-resultat');
+    zone.innerHTML = '';
+    try {
+        const d = await apiAdmin('/admin/equipe/rattacher', 'POST', { email });
+        closeModal('modal-rattacher');
+        document.getElementById('rat-email').value = '';
+        showMessage(`${d.nom} (${d.email}) a rejoint votre équipe. `
+            + `La personne doit se reconnecter pour voir vos tarifs et vos devis.`, 'success');
+        loadUsers();
+    } catch (err) {
+        // Le detail est affiche dans la fenetre, pas en haut de page : on garde l'adresse
+        // saisie sous les yeux pour pouvoir la corriger.
+        zone.innerHTML = `<div class="message error" style="display:block;margin-bottom:0;">${escapeHtml(err.message)}</div>`;
+    }
 }
 
 // ===== V19 — modification d'un compte =====
