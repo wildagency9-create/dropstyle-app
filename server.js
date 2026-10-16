@@ -441,7 +441,12 @@ const DEFAULT_PARAMS = {
     seuil_stock_defaut: 2.00,    // seuil d'alerte stock par defaut (m²), hors codes P01-P24 — module stock independant
     marge_plotteur_mm: 50,       // marge technique du plotteur de decoupe (mm, de chaque cote) — plotteur laize 1600 remplace, 1500mm reellement utilisables
     coef_materiaux: 2.00,        // coefficient distinct pour les materiaux panneaux (achat-revente pur) — calibre sur facture reelle DE06433, hors codes P01-P24
-    coef_impression_interne: 3.75 // coefficient sur l'impression numerique interne (P23), distinct de P01 (vinyle/lamination) et P22 (Exaprint sous-traite) — calibre sur facture reelle, hors codes P01-P24
+    coef_impression_interne: 3.75, // coefficient sur l'impression numerique interne (P23), distinct de P01 (vinyle/lamination) et P22 (Exaprint sous-traite) — calibre sur facture reelle, hors codes P01-P24
+    // V23 — habillage saisonnier. Purement visuel : aucune de ces trois valeurs n'entre dans
+    // un calcul de prix. Elles sont ici pour etre reglables depuis l'admin comme le reste.
+    theme_mode: 1,               // 0 jamais · 1 automatique selon la date · 2 toujours
+    theme_intensite: 1,          // 0 discret · 1 normal · 2 fete
+    theme_anim: 2                // animation a l'enregistrement : 0 aucune · 1 clin d'oeil · 2 pluie de citrouilles · 3 lanterne · 4 eclat
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {

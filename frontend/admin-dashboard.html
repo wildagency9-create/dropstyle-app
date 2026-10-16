@@ -532,6 +532,42 @@
             </div>
         </div>
 
+        <!-- V23 — habillage saisonnier. Purement visuel : aucun de ces trois reglages n'entre
+             dans un calcul de prix, et le moteur ne les lit jamais. -->
+        <div class="section-header"><div class="section-title">🎃 Habillage saisonnier</div></div>
+        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;">
+                Décor de fête dans le calculateur. Strictement visuel : les prix, les coefficients
+                et les devis ne sont pas touchés. <b>Halloween est réglé du 15 au 31 octobre.</b>
+            </p>
+            <div class="row3">
+                <div class="form-group"><label>Quand l'afficher</label>
+                    <select id="param-theme_mode" onchange="saveParametres()">
+                        <option value="0">Jamais</option>
+                        <option value="1">Automatique selon la date</option>
+                        <option value="2">Toujours (pour essayer)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Intensité</label>
+                    <select id="param-theme_intensite" onchange="saveParametres()">
+                        <option value="0">Discret — citrouille et toiles</option>
+                        <option value="1">Normal — + lueur et chauves-souris</option>
+                        <option value="2">Fête — + araignée au fil</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>À l'enregistrement d'un devis</label>
+                    <select id="param-theme_anim" onchange="saveParametres()">
+                        <option value="0">Aucune animation</option>
+                        <option value="1">Clin d'œil — étincelles vers le bouton</option>
+                        <option value="2">Pluie de citrouilles</option>
+                        <option value="3">La lanterne s'allume</option>
+                        <option value="4">La citrouille éclate</option>
+                    </select>
+                </div>
+            </div>
+            <p id="theme-etat" style="font-size:11.5px;color:var(--text-light);margin:2px 0 0;"></p>
+        </div>
+
         <div class="section-header"><div class="section-title">Synchronisation Google Sheets</div><button onclick="syncPreview()">🔄 Synchroniser depuis Google Sheets</button></div>
         <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
             <p style="color:var(--text-secondary);font-size:12px;">Source : classeur « DropStyle moteur validation » partagé en lecture (feuilles <b>Paramètres</b> et <b>Tarifs matières</b>). La synchro met à jour les paramètres P01–P24 et les tables Vinyles, Laminations, Tapes et Panneaux. Un aperçu des changements est affiché avant application — rien n'est écrit sans confirmation.</p>
@@ -1523,7 +1559,25 @@ async function deleteImpression(id) {
 function mtNum(id) { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
 function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
 
-const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','marge_plotteur_mm','coef_materiaux','coef_impression_interne','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut'];
+const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','marge_plotteur_mm','coef_materiaux','coef_impression_interne','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut',
+    // V23 — habillage saisonnier (visuel uniquement, jamais lu par le moteur)
+    'theme_mode','theme_intensite','theme_anim'];
+
+// Dit a l'ecran ce qui est reellement affiche en ce moment : en mode automatique et hors
+// periode, rien ne s'affiche — sans cette ligne on croirait a une panne.
+function majEtatTheme() {
+    const el = document.getElementById('theme-etat');
+    if (!el) return;
+    const mode = mtNum('param-theme_mode');
+    const d = new Date();
+    const jour = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const dedans = jour >= '10-15' && jour <= '10-31';
+    if (mode === 0) el.textContent = '→ Actuellement : aucun décor dans le calculateur.';
+    else if (mode === 2) el.textContent = '→ Actuellement : décor Halloween affiché en permanence, même hors période.';
+    else el.textContent = dedans
+        ? '→ Actuellement : décor Halloween affiché, nous sommes dans la période.'
+        : '→ Actuellement : aucun décor, nous sommes hors période (15–31 octobre). Choisissez « Toujours » pour l\'essayer tout de suite.';
+}
 
 async function loadParametres() {
     try {
@@ -1533,6 +1587,7 @@ async function loadParametres() {
             const el = document.getElementById('param-' + k);
             if (el && p[k] !== undefined) el.value = p[k];
         });
+        majEtatTheme();
     } catch (err) { console.error(err); }
 }
 
@@ -1547,7 +1602,7 @@ async function saveParametres() {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    if (resp.ok) { coef = data.coefficient || 2; showMessage('Paramètres enregistrés', 'success'); loadImpressions(); testMoteur(); }
+    if (resp.ok) { coef = data.coefficient || 2; showMessage('Paramètres enregistrés', 'success'); loadImpressions(); testMoteur(); majEtatTheme(); }
     else showMessage('Erreur', 'error');
 }
 
