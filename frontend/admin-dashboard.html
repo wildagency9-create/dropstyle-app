@@ -4,19 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DropStyle — Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* V22 — memes reglages que le calculateur : les deux moities du logiciel doivent
+           se ressembler, sinon on a l'impression de changer de produit. */
         :root {
             --primary: #FF5722;
             --primary-dark: #E64A19;
             --primary-clair: #FF8A50;
-            --bg-dark: #07080b;
+            --bg-dark: #070809;
             --bg-card: #12141a;
-            --bg-input: #1b1e26;
-            --border: rgba(255,255,255,0.09);
-            --text-primary: #e8e9ee;
-            --text-secondary: #8b90a0;
-            --success: #4caf50;
-            --danger: #ff5252;
+            --bg-input: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.10);
+            --text-primary: #F2F3F5;
+            --text-secondary: #8A8F9C;
+            --text-light: #5A5F6B;
+            --success: #4ade80;
+            --danger: #ff5a5a;
             --gold: #d4af37;
             /* Surfaces en verre : translucides, posees sur le fond lumineux du body */
             --verre: rgba(255,255,255,0.035);
@@ -25,12 +31,14 @@
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg-dark);
             color: var(--text-primary);
             min-height: 100vh;
             position: relative;
+            -webkit-font-smoothing: antialiased;
         }
+        .stat-value, td, .chiffre { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
         /* Fond : deux halos orange et une grille fine. En position fixe et non cliquable,
            il ne gene ni le defilement ni les interactions. */
         body::before {

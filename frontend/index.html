@@ -4,17 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DropStyle — Connexion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* V22 — memes reglages que le calculateur et l'admin. */
         :root {
             --primary: #FF5722;
             --primary-dark: #E64A19;
-            --bg-dark: #0a0a0a;
-            --bg-card: #1a1a1a;
-            --bg-input: #2a2a2a;
-            --border: #404040;
-            --text-primary: #e0e0e0;
-            --text-secondary: #999;
+            --primary-clair: #FF8A50;
+            --bg-dark: #070809;
+            --bg-card: rgba(255,255,255,0.045);
+            --bg-input: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.10);
+            --text-primary: #F2F3F5;
+            --text-secondary: #8A8F9C;
             --gold: #d4af37;
+            --verre-haut: rgba(255,255,255,0.075);
+            --halo: rgba(255,87,34,0.42);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -22,15 +29,26 @@
         html, body { height: 100%; width: 100%; }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(255,87,34,0.1) 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
             color: var(--text-primary);
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            -webkit-font-smoothing: antialiased;
         }
+        /* Lueur de fond, identique au reste du logiciel */
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(620px 440px at 80% -8%, rgba(255,87,34,.28), transparent 64%),
+                radial-gradient(540px 400px at -8% 44%, rgba(255,87,34,.13), transparent 62%),
+                radial-gradient(760px 520px at 50% 118%, rgba(255,138,80,.08), transparent 60%);
+        }
+        .container { position: relative; z-index: 1; }
 
         .container {
             width: 100%;
@@ -38,11 +56,12 @@
         }
 
         .card {
-            background: var(--bg-card);
-            border: 2px solid var(--primary);
-            border-radius: 12px;
+            background: linear-gradient(158deg, var(--verre-haut), var(--bg-card));
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,87,34,0.3);
+            border-radius: 22px;
             padding: 40px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-shadow: 0 30px 70px -32px #000, 0 0 60px -34px var(--halo);
         }
 
         .logo-area {
@@ -143,7 +162,7 @@
             padding: 12px 14px;
             background: var(--bg-input);
             border: 1.5px solid var(--border);
-            border-radius: 6px;
+            border-radius: 12px;
             color: var(--text-primary);
             font-size: 13px;
             font-weight: 500;
@@ -167,7 +186,7 @@
             background: linear-gradient(135deg, var(--primary), #FF7043);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 12px;
             font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
