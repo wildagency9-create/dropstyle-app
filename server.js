@@ -1342,17 +1342,22 @@ const DEBUT_PERIODE = {
 };
 
 async function classementEquipe(conn, equipeId, periode, debutExplicite, finExplicite) {
+    // La clause de periode et ses parametres sont construits ensemble, et les parametres sont
+    // assembles dans l'ordre exact ou les "?" apparaissent dans la requete : l'equipe
+    // proprietaire, puis les bornes de date, puis l'equipe des membres. Ecrits separement,
+    // ils s'etaient decales — la date partait dans le filtre d'equipe et reciproquement,
+    // ce qui donnait un classement faux sans aucun message d'erreur.
     const borne = debutExplicite
-        ? 'd.created_at >= ? AND d.created_at < ?'
-        : `d.created_at >= ${DEBUT_PERIODE[periode] || DEBUT_PERIODE.semaine}`;
-    const params = debutExplicite ? [equipeId, equipeId, debutExplicite, finExplicite] : [equipeId, equipeId];
+        ? { sql: 'd.created_at >= ? AND d.created_at < ?', params: [debutExplicite, finExplicite] }
+        : { sql: `d.created_at >= ${DEBUT_PERIODE[periode] || DEBUT_PERIODE.semaine}`, params: [] };
+    const params = [equipeId, ...borne.params, equipeId];
     const [rows] = await conn.query(
         `SELECT u.id, u.nom,
                 COUNT(d.id) AS nb_devis,
                 COALESCE(SUM(d.statut = 'valide'), 0) AS nb_valides,
                 COALESCE(SUM(CASE WHEN d.statut = 'valide' THEN d.ht ELSE 0 END), 0) AS ca_valide
          FROM users u
-         LEFT JOIN devis d ON d.auteur_id = u.id AND d.user_id = ? AND ${borne}
+         LEFT JOIN devis d ON d.auteur_id = u.id AND d.user_id = ? AND ${borne.sql}
          WHERE COALESCE(u.equipe_id, u.id) = ?
          GROUP BY u.id, u.nom
          ORDER BY nb_valides DESC, ca_valide DESC, nb_devis DESC`, params);
