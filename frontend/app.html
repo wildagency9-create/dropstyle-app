@@ -277,6 +277,37 @@
         .conditional { display: none; padding-left: 16px; border-left: 2px solid var(--primary); margin-bottom: 12px; }
         .conditional.active { display: block; }
 
+        /* V26 — photos du vehicule. Une case par face : vide, elle invite a photographier ;
+           remplie, elle montre la vignette. Grille auto-ajustee, donc 2 colonnes sur telephone. */
+        .photo-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+        .photo-case {
+            position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 5px; aspect-ratio: 4 / 3; cursor: pointer; overflow: hidden;
+            background: var(--bg-input); border: 1px dashed var(--border); border-radius: 12px;
+            color: var(--text-light); text-align: center; margin-bottom: 0; transition: border-color .15s, color .15s;
+        }
+        .photo-case:hover { border-color: rgba(255,87,34,.45); color: var(--primary-clair); }
+        .photo-case.remplie { border-style: solid; border-color: rgba(255,87,34,.4); }
+        .photo-case.occupee { opacity: .55; pointer-events: none; }
+        .photo-case img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .photo-nom {
+            position: relative; font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+            text-transform: uppercase; line-height: 1.2; padding: 0 4px;
+        }
+        .photo-case.remplie .photo-nom {
+            position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 4px; color: #fff;
+            background: linear-gradient(transparent, rgba(0,0,0,.72)); text-transform: none; letter-spacing: 0;
+        }
+        .photo-plus { position: relative; font-size: 19px; line-height: 1; }
+        .photo-sup {
+            position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; z-index: 2;
+            border-radius: 50%; border: none; cursor: pointer; padding: 0;
+            background: rgba(7,8,9,.72); color: #fff; font-size: 13px; line-height: 1;
+            display: grid; place-items: center;
+        }
+        .photo-sup:hover { background: var(--danger); }
+        .photo-aide { font-size: 10px; color: var(--text-light); margin-top: 6px; }
+
         /* Le prix est le heros de l'ecran : halo derriere le chiffre, degrade blanc vers orange. */
         .price-display {
             background: linear-gradient(158deg, var(--verre-haut), var(--bg-card));
@@ -760,6 +791,14 @@
 
             <!-- VEHICULE (raccourci) -->
             <div class="tab-content active" id="tab-vehicule">
+                <!-- V26 — photos du vehicule. Facultatif et sans effet sur le prix a ce stade :
+                     les photos accompagnent le devis. Elles serviront ensuite a reconnaitre le
+                     vehicule et a poser les visuels. -->
+                <div class="form-group">
+                    <label>Photos du véhicule <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0;">— facultatif</span></label>
+                    <div class="photo-grille" id="photo-grille"></div>
+                    <p class="photo-aide" id="photo-aide">Une photo par face. Elles sont enregistrées avec le devis.</p>
+                </div>
                 <div class="form-group"><label>Type de véhicule</label>
                     <div class="dropdown" id="dd-v-type">
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-type')"><span class="dropdown-label">— Sélectionner —</span></button>
@@ -1371,6 +1410,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // V11 — clients, equipe et notifications. Charges en arriere-plan : un echec ici
     // ne doit jamais empecher de chiffrer un devis.
     chargerClientsEtSources();
+    // V26 — photos : en arriere-plan comme les clients, un echec ne doit pas empecher de chiffrer.
+    photosInit();
     chargerEquipe().then(chargerNotifs);
     setInterval(chargerNotifs, 45000);
 
@@ -2958,6 +2999,8 @@ async function confirmerSaveDevis() {
         // On enregistre le prix REELLEMENT VENDU dans `ht` — c'est lui le chiffre d'affaires —
         // et le prix du moteur a cote, pour pouvoir mesurer l'ecart et recalibrer plus tard.
         await apiSend('/devis', 'POST', {
+            // V26 — le serveur rattache au devis les photos prises sous ce brouillon.
+            brouillon_id: brouillonCourant(),
             type, qty, ht, ttc, details: lastDevisDetails || {}, client: clientNom, client_id: clientId,
             ht_calcule: devisCourant ? Number(devisCourant.htCalcule.toFixed(2)) : null,
             ajustement_pct: devisCourant && devisCourant.htCalcule > 0 && Math.abs(ht - devisCourant.htCalcule) > 0.005
@@ -2965,6 +3008,9 @@ async function confirmerSaveDevis() {
         });
         fermerModal('modal-devis');
         devisEnAttente = null;
+        // V26 — les photos appartiennent desormais au devis enregistre : on repart sur un
+        // brouillon neuf, sinon le prochain devis se les verrait rattacher aussi.
+        brouillonSuivant();
         showNotification('Devis sauvegardé ✓', 'success');
         themeSaisonFete(btn);   // V24 — habillage : le devis est deja enregistre, rien ne depend de ceci
         if (btn) { btn.disabled = true; btn.textContent = 'Devis enregistré ✓'; } // reste desactive : evite les doublons
@@ -3083,6 +3129,143 @@ async function envoyerNotif() {
         showNotification(err.message, 'error');
         ok.disabled = false; ok.textContent = 'Envoyer';
     }
+}
+
+// ===== V26 — PHOTOS DU VEHICULE =====
+// Les photos sont prises avant que le devis existe : elles partent donc au serveur sous un
+// identifiant de brouillon garde en memoire du navigateur, puis le serveur les rattache au
+// devis a l'enregistrement. Rien ici ne touche au calcul du prix.
+const PHOTO_FACES = [
+    { cle: 'gauche',  nom: 'Profil gauche' },
+    { cle: 'droite',  nom: 'Profil droit' },
+    { cle: 'avant',   nom: 'Avant' },
+    { cle: 'arriere', nom: 'Arrière' },
+    { cle: 'toit',    nom: 'Toit' }
+];
+const PHOTO_COTE_MAX = 1400;        // une photo de telephone fait 3000-4000 px : inutile de tout garder
+const PHOTO_POIDS_MAX = 900 * 1024; // doit rester aligne sur POIDS_MAX_PHOTO cote serveur
+let photosPrises = {};              // face -> { id, url }
+
+function brouillonCourant() {
+    let b = null;
+    try { b = localStorage.getItem('dropstyle_brouillon'); } catch (e) { /* navigation privee */ }
+    if (!b || !/^[a-z0-9-]{8,40}$/i.test(b)) {
+        b = 'br-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        try { localStorage.setItem('dropstyle_brouillon', b); } catch (e) { /* on garde la valeur en memoire */ }
+    }
+    return b;
+}
+
+// Nouveau brouillon : appele apres l'enregistrement d'un devis, pour que les photos
+// suivantes ne se rattachent pas au devis precedent.
+function brouillonSuivant() {
+    try { localStorage.removeItem('dropstyle_brouillon'); } catch (e) { /* rien a nettoyer */ }
+    Object.values(photosPrises).forEach(p => { if (p.url) URL.revokeObjectURL(p.url); });
+    photosPrises = {};
+    brouillonCourant();
+    renderPhotos();
+}
+
+function renderPhotos() {
+    const grille = document.getElementById('photo-grille');
+    if (!grille) return;
+    grille.innerHTML = PHOTO_FACES.map(f => {
+        const p = photosPrises[f.cle];
+        return `<label class="photo-case${p ? ' remplie' : ''}" for="photo-${f.cle}" title="${f.nom}">
+            <input type="file" id="photo-${f.cle}" accept="image/*" hidden onchange="photoChoisie('${f.cle}', this)">
+            ${p ? `<img src="${p.url}" alt="${f.nom}">` : '<span class="photo-plus">+</span>'}
+            <span class="photo-nom">${f.nom}</span>
+            ${p ? `<button type="button" class="photo-sup" title="Retirer cette photo"
+                     onclick="event.preventDefault();event.stopPropagation();photoSupprimer('${f.cle}')">✕</button>` : ''}
+        </label>`;
+    }).join('');
+    const n = Object.keys(photosPrises).length;
+    const aide = document.getElementById('photo-aide');
+    if (aide) {
+        aide.textContent = n === 0
+            ? 'Une photo par face. Elles sont enregistrées avec le devis.'
+            : `${n} photo${n > 1 ? 's' : ''} sur 5 — enregistrée${n > 1 ? 's' : ''} avec le devis.`;
+    }
+}
+
+// Recompression dans le navigateur : on n'envoie jamais le fichier brut du telephone.
+// imageOrientation reporte l'orientation EXIF, sinon les photos d'iPhone arrivent tournees.
+async function photoCompresser(fichier) {
+    let source;
+    try {
+        source = await createImageBitmap(fichier, { imageOrientation: 'from-image' });
+    } catch (e) {
+        source = await new Promise((ok, ko) => {
+            const img = new Image();
+            img.onload = () => ok(img);
+            img.onerror = () => ko(new Error("Fichier image illisible"));
+            img.src = URL.createObjectURL(fichier);
+        });
+    }
+    const cote = Math.max(source.width, source.height);
+    const ech = Math.min(1, PHOTO_COTE_MAX / cote);
+    const w = Math.max(1, Math.round(source.width * ech));
+    const h = Math.max(1, Math.round(source.height * ech));
+    const toile = document.createElement('canvas');
+    toile.width = w; toile.height = h;
+    toile.getContext('2d').drawImage(source, 0, 0, w, h);
+    // Une photo tres detaillee peut depasser la limite a qualite normale : on redescend
+    // par paliers plutot que de refuser la photo a l'utilisateur.
+    for (const qualite of [0.82, 0.7, 0.58, 0.45]) {
+        const data = toile.toDataURL('image/jpeg', qualite);
+        const poids = Math.ceil((data.length - data.indexOf(',') - 1) * 3 / 4);
+        if (poids <= PHOTO_POIDS_MAX) return { data, largeur: w, hauteur: h, poids };
+    }
+    throw new Error('Photo trop lourde même après compression — réessayez avec un cadrage plus simple');
+}
+
+async function photoChoisie(face, input) {
+    const fichier = input.files && input.files[0];
+    input.value = '';   // permet de reprendre deux fois la meme face
+    if (!fichier) return;
+    const cellule = document.querySelector(`.photo-case[for="photo-${face}"]`);
+    if (cellule) cellule.classList.add('occupee');
+    try {
+        const { data, largeur, hauteur } = await photoCompresser(fichier);
+        const r = await apiSend('/photos', 'POST', { brouillon_id: brouillonCourant(), face, data, largeur, hauteur });
+        const ancienne = photosPrises[face];
+        if (ancienne && ancienne.url) URL.revokeObjectURL(ancienne.url);
+        // La vignette vient du fichier local : inutile de retelecharger ce qu'on vient d'envoyer.
+        photosPrises[face] = { id: r.id, url: URL.createObjectURL(fichier) };
+        renderPhotos();
+        showNotification('Photo ajoutée ✓', 'success');
+    } catch (err) {
+        if (cellule) cellule.classList.remove('occupee');
+        showNotification(err.message, 'error');
+    }
+}
+
+async function photoSupprimer(face) {
+    const p = photosPrises[face];
+    if (!p) return;
+    try {
+        await apiSend(`/photos/${p.id}`, 'DELETE');
+        if (p.url) URL.revokeObjectURL(p.url);
+        delete photosPrises[face];
+        renderPhotos();
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+// Reprise apres rechargement : les photos deja envoyees pour ce brouillon sont reaffichees.
+// Le jeton passe par l'en-tete, donc on recupere les octets en fetch pour en faire une URL locale.
+async function photosInit() {
+    renderPhotos();
+    try {
+        const liste = await apiFetch('/photos?brouillon_id=' + encodeURIComponent(brouillonCourant()));
+        for (const ligne of liste) {
+            try {
+                const r = await fetch(`${API_URL}/photos/${ligne.id}/image`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!r.ok) continue;
+                photosPrises[ligne.face] = { id: ligne.id, url: URL.createObjectURL(await r.blob()) };
+            } catch (e) { /* une vignette manquante ne doit pas bloquer les autres */ }
+        }
+        renderPhotos();
+    } catch (err) { /* l'onglet reste utilisable sans les photos deja prises */ }
 }
 
 // ===== V16 — INSTALLATION DE L'APPLICATION =====

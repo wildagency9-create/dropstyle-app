@@ -19,7 +19,12 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
 app.set('trust proxy', 1);
 
 app.use(cors());
-app.use(express.json());
+// V26 — le corps d'une requete est plafonne a 100 ko par defaut : une photo de vehicule
+// ne passerait pas. Seule la route des photos accepte davantage ; inutile d'ouvrir la
+// porte sur tous les autres endpoints, qui n'echangent que de petits objets JSON.
+const jsonStandard = express.json();
+const jsonPhoto = express.json({ limit: '4mb' });
+app.use((req, res, next) => (req.path === '/api/photos' ? jsonPhoto : jsonStandard)(req, res, next));
 app.use(express.static(path.join(__dirname, 'frontend')));
 
 const pool = mysql.createPool({
@@ -227,6 +232,43 @@ async function ensureSourcesEquipe(conn, equipeId) {
     }
 }
 
+// V26 — photos du vehicule. Les photos sont prises AVANT que le devis existe : elles
+// arrivent donc avec un identifiant de brouillon genere par le navigateur, et sont
+// rattachees au devis au moment de son enregistrement. Les octets vivent en base et non
+// sur le disque : Railway efface le systeme de fichiers a chaque redeploiement.
+const FACES_PHOTO = ['gauche', 'droite', 'avant', 'arriere', 'toit'];
+const POIDS_MAX_PHOTO = 900 * 1024;   // large pour une photo recompressee a 1400 px par le navigateur
+const JOURS_BROUILLON = 7;            // au-dela, un brouillon sans devis est considere abandonne
+
+// Meme drapeau que la V11 : sans lui, chaque envoi de photo rejouerait un CREATE TABLE
+// pour rien. Il est propre au processus, un redemarrage refait la verification.
+let v26Prete = false;
+
+async function ensureV26Tables(existingConn) {
+    if (v26Prete && !existingConn) return;
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        try {
+            await conn.query(`CREATE TABLE IF NOT EXISTS devis_photos (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                devis_id INT DEFAULT NULL,
+                brouillon_id VARCHAR(40) DEFAULT NULL,
+                face VARCHAR(16) NOT NULL,
+                mime VARCHAR(40) NOT NULL,
+                octets MEDIUMBLOB NOT NULL,
+                largeur INT DEFAULT NULL,
+                hauteur INT DEFAULT NULL,
+                poids INT DEFAULT NULL,
+                auteur_id INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_brouillon (equipe_id, brouillon_id),
+                INDEX idx_devis (devis_id)
+            )`);
+            v26Prete = true;
+        } catch (e) { console.error('V26 init:', e.message); }
+    });
+}
+
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
     return avecConnexionPartagee(existingConn, async (conn) => {
@@ -261,6 +303,8 @@ async function initDB() {
         await ensureV9Tables(conn);
         // V11 — Equipe, clients/prospects, notifications
         await ensureV11Tables(conn);
+        // V26 — Photos du vehicule
+        await ensureV26Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -732,8 +776,8 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
 app.post('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
-        const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct } = req.body;
-        await avecConnexion(async (conn) => {
+        const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct, brouillon_id } = req.body;
+        const devisId = await avecConnexion(async (conn) => {
             // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
             // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
             let lien = null;
@@ -741,14 +785,28 @@ app.post('/api/devis', verifyToken, async (req, res) => {
                 const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
                 if (c.length) lien = c[0].id;
             }
-            await conn.query(
+            const [r] = await conn.query(
                 `INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
                 [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId,
                  ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
                  ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
+            return r.insertId;
         });
-        res.status(201).json({ message: 'OK' });
+        // V26 — rattachement des photos prises pendant le chiffrage. Volontairement hors du
+        // chemin critique : le devis est deja enregistre, et un echec ici ne doit surtout pas
+        // renvoyer une erreur, sinon l'utilisateur reessaie et cree un doublon.
+        let photos = 0;
+        if (/^[a-z0-9-]{8,40}$/i.test(String(brouillon_id || ''))) {
+            try {
+                await ensureV26Tables();
+                const [r] = await avecConnexion(conn => conn.query(
+                    'UPDATE devis_photos SET devis_id = ?, brouillon_id = NULL WHERE equipe_id = ? AND brouillon_id = ? AND devis_id IS NULL',
+                    [devisId, req.userId, brouillon_id]));
+                photos = r.affectedRows;
+            } catch (e) { console.error('Rattachement photos :', e.message); }
+        }
+        res.status(201).json({ message: 'OK', id: devisId, photos });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/devis', verifyToken, async (req, res) => {
@@ -782,6 +840,94 @@ app.put('/api/devis/:id/statut', verifyToken, async (req, res) => {
 
 app.delete('/api/devis/:id', verifyToken, async (req, res) => {
     try { await avecConnexion(conn => conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V26 — PHOTOS DU VEHICULE =====
+// Une photo par face et par brouillon : reprendre une face remplace la precedente, pour
+// qu'une photo ratee ne laisse pas deux versions en base.
+app.post('/api/photos', verifyToken, async (req, res) => {
+    try {
+        const face = String(req.body.face || '');
+        if (!FACES_PHOTO.includes(face)) return res.status(400).json({ error: 'Face inconnue' });
+        const brouillon = String(req.body.brouillon_id || '');
+        if (!/^[a-z0-9-]{8,40}$/i.test(brouillon)) return res.status(400).json({ error: 'Identifiant de brouillon invalide' });
+        // Le navigateur envoie une data-URL ; on n'accepte que des images, et on verifie le
+        // poids sur les octets decodes, seule mesure fiable.
+        const m = String(req.body.data || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+        if (!m) return res.status(400).json({ error: 'Image attendue en JPEG, PNG ou WebP' });
+        const octets = Buffer.from(m[2], 'base64');
+        if (!octets.length) return res.status(400).json({ error: 'Image vide' });
+        if (octets.length > POIDS_MAX_PHOTO) {
+            return res.status(413).json({ error: `Photo trop lourde (${Math.round(octets.length / 1024)} ko pour un maximum de ${Math.round(POIDS_MAX_PHOTO / 1024)} ko)` });
+        }
+        await ensureV26Tables();
+        const id = await avecConnexion(async (conn) => {
+            // Menage des brouillons abandonnes, limite a l'equipe appelante : on ne touche
+            // jamais aux donnees d'une autre entreprise, meme pour faire le menage.
+            await conn.query(
+                'DELETE FROM devis_photos WHERE equipe_id = ? AND devis_id IS NULL AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+                [req.userId, JOURS_BROUILLON]);
+            await conn.query(
+                'DELETE FROM devis_photos WHERE equipe_id = ? AND brouillon_id = ? AND face = ? AND devis_id IS NULL',
+                [req.userId, brouillon, face]);
+            const [r] = await conn.query(
+                `INSERT INTO devis_photos (equipe_id, brouillon_id, face, mime, octets, largeur, hauteur, poids, auteur_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [req.userId, brouillon, face, m[1], octets,
+                 parseInt(req.body.largeur, 10) || null, parseInt(req.body.hauteur, 10) || null,
+                 octets.length, req.authUserId]);
+            return r.insertId;
+        });
+        res.status(201).json({ id, face, poids: octets.length });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Liste les photos d'un brouillon ou d'un devis — sans les octets, qui se recuperent une
+// par une : renvoyer cinq images dans un meme JSON alourdirait chaque ouverture de devis.
+app.get('/api/photos', verifyToken, async (req, res) => {
+    try {
+        await ensureV26Tables();
+        const brouillon = String(req.query.brouillon_id || '');
+        const devisId = parseInt(req.query.devis_id, 10);
+        let rows = [];
+        if (devisId) {
+            [rows] = await avecConnexion(conn => conn.query(
+                'SELECT id, face, largeur, hauteur, poids, created_at FROM devis_photos WHERE equipe_id = ? AND devis_id = ? ORDER BY id',
+                [req.userId, devisId]));
+        } else if (/^[a-z0-9-]{8,40}$/i.test(brouillon)) {
+            [rows] = await avecConnexion(conn => conn.query(
+                'SELECT id, face, largeur, hauteur, poids, created_at FROM devis_photos WHERE equipe_id = ? AND brouillon_id = ? AND devis_id IS NULL ORDER BY id',
+                [req.userId, brouillon]));
+        } else {
+            return res.status(400).json({ error: 'Préciser brouillon_id ou devis_id' });
+        }
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Les octets d'une photo. Le jeton passe par l'en-tete Authorization, donc le navigateur
+// ne peut pas pointer un <img src> ici directement : il la recupere en fetch puis en fait
+// une URL locale. Mettre le jeton dans l'URL le ferait fuiter dans les journaux.
+app.get('/api/photos/:id/image', verifyToken, async (req, res) => {
+    try {
+        await ensureV26Tables();
+        const [rows] = await avecConnexion(conn => conn.query(
+            'SELECT mime, octets FROM devis_photos WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
+        if (!rows.length) return res.status(404).json({ error: 'Photo introuvable' });
+        res.set('Content-Type', rows[0].mime);
+        res.set('Cache-Control', 'private, max-age=86400');
+        res.send(rows[0].octets);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/photos/:id', verifyToken, async (req, res) => {
+    try {
+        await ensureV26Tables();
+        const [r] = await avecConnexion(conn => conn.query(
+            'DELETE FROM devis_photos WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
+        if (!r.affectedRows) return res.status(404).json({ error: 'Photo introuvable' });
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ===== V10 — ASSISTANT (Claude) =====
