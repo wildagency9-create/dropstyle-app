@@ -269,6 +269,143 @@ async function ensureV26Tables(existingConn) {
     });
 }
 
+// V28 — zones du vehicule. Le moteur ne connaissait qu'une surface globale par type de
+// marquage ; ces zones permettent de designer ce qu'on habille reellement.
+//
+// REGLE QUI TIENT TOUT : pour chaque type, la somme des zones retombe exactement sur la
+// surface « covering total » validee le 26/08 (citadine 20, berline 25, SUV 28, utilitaire
+// 25, fourgon 40, camion 35). Ce decoupage ne rediscute donc aucun chiffre deja valide, il
+// le repartit. Une zone « par cote » compte double (gauche + droit).
+//
+// Surfaces HORS chutes, comme la grille d'origine : le coefficient P10 s'applique ensuite.
+const ZONES_DEFAUT = {
+    citadine: [
+        { cle: 'aile_av',   nom: 'Aile avant',        face: 'cote',    par_cote: 1, m2: 0.60 },
+        { cle: 'porte_av',  nom: 'Portière avant',    face: 'cote',    par_cote: 1, m2: 1.20 },
+        { cle: 'porte_ar',  nom: 'Portière arrière',  face: 'cote',    par_cote: 1, m2: 1.00 },
+        { cle: 'aile_ar',   nom: 'Aile arrière',      face: 'cote',    par_cote: 1, m2: 0.70 },
+        { cle: 'vitres',    nom: 'Vitres latérales',  face: 'cote',    par_cote: 1, m2: 0.80 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 0.40 },
+        { cle: 'capot',     nom: 'Capot',             face: 'avant',   par_cote: 0, m2: 1.80 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 1.20 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 0.90 },
+        { cle: 'hayon',     nom: 'Hayon',             face: 'arriere', par_cote: 0, m2: 1.80 },
+        { cle: 'lunette',   nom: 'Lunette arrière',   face: 'arriere', par_cote: 0, m2: 0.60 },
+        { cle: 'pc_ar',     nom: 'Pare-chocs arrière',face: 'arriere', par_cote: 0, m2: 0.80 },
+        { cle: 'toit',      nom: 'Toit',              face: 'toit',    par_cote: 0, m2: 3.50 }
+    ],
+    berline: [
+        { cle: 'aile_av',   nom: 'Aile avant',        face: 'cote',    par_cote: 1, m2: 0.70 },
+        { cle: 'porte_av',  nom: 'Portière avant',    face: 'cote',    par_cote: 1, m2: 1.40 },
+        { cle: 'porte_ar',  nom: 'Portière arrière',  face: 'cote',    par_cote: 1, m2: 1.20 },
+        { cle: 'aile_ar',   nom: 'Aile arrière',      face: 'cote',    par_cote: 1, m2: 0.90 },
+        { cle: 'vitres',    nom: 'Vitres latérales',  face: 'cote',    par_cote: 1, m2: 1.00 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 0.50 },
+        { cle: 'capot',     nom: 'Capot',             face: 'avant',   par_cote: 0, m2: 2.20 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 1.40 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 1.00 },
+        { cle: 'coffre',    nom: 'Coffre',            face: 'arriere', par_cote: 0, m2: 1.80 },
+        { cle: 'lunette',   nom: 'Lunette arrière',   face: 'arriere', par_cote: 0, m2: 0.70 },
+        { cle: 'pc_ar',     nom: 'Pare-chocs arrière',face: 'arriere', par_cote: 0, m2: 0.90 },
+        { cle: 'toit',      nom: 'Toit',              face: 'toit',    par_cote: 0, m2: 5.60 }
+    ],
+    suv: [
+        { cle: 'aile_av',   nom: 'Aile avant',        face: 'cote',    par_cote: 1, m2: 0.80 },
+        { cle: 'porte_av',  nom: 'Portière avant',    face: 'cote',    par_cote: 1, m2: 1.50 },
+        { cle: 'porte_ar',  nom: 'Portière arrière',  face: 'cote',    par_cote: 1, m2: 1.30 },
+        { cle: 'aile_ar',   nom: 'Aile arrière',      face: 'cote',    par_cote: 1, m2: 1.00 },
+        { cle: 'vitres',    nom: 'Vitres latérales',  face: 'cote',    par_cote: 1, m2: 1.10 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 0.60 },
+        { cle: 'capot',     nom: 'Capot',             face: 'avant',   par_cote: 0, m2: 2.40 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 1.50 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 1.10 },
+        { cle: 'hayon',     nom: 'Hayon',             face: 'arriere', par_cote: 0, m2: 2.20 },
+        { cle: 'lunette',   nom: 'Lunette arrière',   face: 'arriere', par_cote: 0, m2: 0.80 },
+        { cle: 'pc_ar',     nom: 'Pare-chocs arrière',face: 'arriere', par_cote: 0, m2: 1.00 },
+        { cle: 'toit',      nom: 'Toit',              face: 'toit',    par_cote: 0, m2: 6.40 }
+    ],
+    utilitaire: [
+        { cle: 'aile_av',   nom: 'Aile avant',        face: 'cote',    par_cote: 1, m2: 0.80 },
+        { cle: 'porte_av',  nom: 'Portière avant',    face: 'cote',    par_cote: 1, m2: 1.60 },
+        { cle: 'flanc',     nom: 'Panneau latéral',   face: 'cote',    par_cote: 1, m2: 3.00 },
+        { cle: 'vitres',    nom: 'Vitre latérale',    face: 'cote',    par_cote: 1, m2: 0.50 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 0.60 },
+        { cle: 'capot',     nom: 'Capot',             face: 'avant',   par_cote: 0, m2: 2.20 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 1.10 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 0.90 },
+        { cle: 'portes_ar', nom: 'Portes arrière',    face: 'arriere', par_cote: 0, m2: 2.60 },
+        { cle: 'pc_ar',     nom: 'Pare-chocs arrière',face: 'arriere', par_cote: 0, m2: 0.80 },
+        { cle: 'toit',      nom: 'Toit',              face: 'toit',    par_cote: 0, m2: 4.40 }
+    ],
+    fourgon: [
+        { cle: 'aile_av',   nom: 'Aile avant',        face: 'cote',    par_cote: 1, m2: 0.90 },
+        { cle: 'porte_av',  nom: 'Portière avant',    face: 'cote',    par_cote: 1, m2: 1.80 },
+        { cle: 'flanc',     nom: 'Panneau latéral',   face: 'cote',    par_cote: 1, m2: 6.50 },
+        { cle: 'vitres',    nom: 'Vitre latérale',    face: 'cote',    par_cote: 1, m2: 0.60 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 0.90 },
+        { cle: 'capot',     nom: 'Capot',             face: 'avant',   par_cote: 0, m2: 1.60 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 1.60 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 1.20 },
+        { cle: 'portes_ar', nom: 'Portes arrière',    face: 'arriere', par_cote: 0, m2: 5.00 },
+        { cle: 'pc_ar',     nom: 'Pare-chocs arrière',face: 'arriere', par_cote: 0, m2: 1.00 },
+        { cle: 'toit',      nom: 'Toit',              face: 'toit',    par_cote: 0, m2: 8.20 }
+    ],
+    camion: [
+        { cle: 'porte_cab', nom: 'Portière cabine',   face: 'cote',    par_cote: 1, m2: 2.00 },
+        { cle: 'flanc',     nom: 'Flanc de caisse',   face: 'cote',    par_cote: 1, m2: 10.00 },
+        { cle: 'bas_caisse',nom: 'Bas de caisse',     face: 'cote',    par_cote: 1, m2: 1.20 },
+        { cle: 'calandre',  nom: 'Calandre',          face: 'avant',   par_cote: 0, m2: 2.00 },
+        { cle: 'parebrise', nom: 'Pare-brise',        face: 'avant',   par_cote: 0, m2: 2.20 },
+        { cle: 'pc_av',     nom: 'Pare-chocs avant',  face: 'avant',   par_cote: 0, m2: 1.40 },
+        { cle: 'portes_ar', nom: 'Portes arrière',    face: 'arriere', par_cote: 0, m2: 2.00 },
+        { cle: 'toit',      nom: 'Pavillon cabine',   face: 'toit',    par_cote: 0, m2: 1.00 }
+    ]
+};
+
+// Surface totale d'un type, zones « par cote » comptees deux fois.
+function surfaceTotaleZones(zones) {
+    return zones.reduce((s, z) => s + Number(z.m2 !== undefined ? z.m2 : z.surface_m2) * (z.par_cote ? 2 : 1), 0);
+}
+
+let v28Prete = false;
+
+async function ensureV28Tables(existingConn) {
+    if (v28Prete && !existingConn) return;
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        try {
+            await conn.query(`CREATE TABLE IF NOT EXISTS zones_vehicule (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                type_vehicule VARCHAR(20) NOT NULL,
+                cle VARCHAR(40) NOT NULL,
+                nom VARCHAR(80) NOT NULL,
+                face VARCHAR(16) NOT NULL,
+                par_cote TINYINT(1) DEFAULT 0,
+                surface_m2 DECIMAL(6, 2) NOT NULL,
+                ordre INT DEFAULT 0,
+                UNIQUE KEY uniq_equipe_zone (equipe_id, type_vehicule, cle),
+                INDEX idx_equipe_type (equipe_id, type_vehicule)
+            )`);
+            v28Prete = true;
+        } catch (e) { console.error('V28 init:', e.message); }
+    });
+}
+
+// Semees par equipe a la demande, comme les sources d'acquisition : une equipe qui a
+// ajuste ses surfaces ne les voit pas revenir aux valeurs d'origine.
+async function ensureZonesEquipe(conn, equipeId) {
+    const [[{ n }]] = await conn.query('SELECT COUNT(*) AS n FROM zones_vehicule WHERE equipe_id = ?', [equipeId]);
+    if (n > 0) return;
+    for (const [type, zones] of Object.entries(ZONES_DEFAUT)) {
+        for (let i = 0; i < zones.length; i++) {
+            const z = zones[i];
+            await conn.query(
+                'INSERT INTO zones_vehicule (equipe_id, type_vehicule, cle, nom, face, par_cote, surface_m2, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [equipeId, type, z.cle, z.nom, z.face, z.par_cote, z.m2, i]);
+        }
+    }
+}
+
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
     return avecConnexionPartagee(existingConn, async (conn) => {
@@ -305,6 +442,8 @@ async function initDB() {
         await ensureV11Tables(conn);
         // V26 — Photos du vehicule
         await ensureV26Tables(conn);
+        // V28 — Zones du vehicule
+        await ensureV28Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -927,6 +1066,60 @@ app.delete('/api/photos/:id', verifyToken, async (req, res) => {
             'DELETE FROM devis_photos WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
         if (!r.affectedRows) return res.status(404).json({ error: 'Photo introuvable' });
         res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V28 — ZONES DU VEHICULE =====
+app.get('/api/zones-vehicule', verifyToken, async (req, res) => {
+    try {
+        await ensureV28Tables();
+        const rows = await avecConnexion(async (conn) => {
+            await ensureZonesEquipe(conn, req.userId);
+            const [lignes] = await conn.query(
+                `SELECT type_vehicule, cle, nom, face, par_cote, surface_m2, ordre
+                 FROM zones_vehicule WHERE equipe_id = ? ORDER BY type_vehicule, ordre`, [req.userId]);
+            return lignes;
+        });
+        const parType = {};
+        for (const r of rows) {
+            (parType[r.type_vehicule] = parType[r.type_vehicule] || []).push({
+                cle: r.cle, nom: r.nom, face: r.face, par_cote: !!r.par_cote, surface_m2: Number(r.surface_m2)
+            });
+        }
+        // Le total accompagne chaque type : c'est lui qui doit rester cale sur la grille
+        // validee, et l'admin doit pouvoir le voir pendant qu'il ajuste une surface.
+        const totaux = {};
+        for (const [t, zones] of Object.entries(parType)) totaux[t] = Math.round(surfaceTotaleZones(zones) * 100) / 100;
+        res.json({ zones: parType, totaux });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/zones-vehicule', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        const zones = Array.isArray(req.body.zones) ? req.body.zones : [];
+        if (!zones.length) return res.status(400).json({ error: 'Aucune zone à enregistrer' });
+        // Verifie avant d'ecrire : une surface negative ou absurde fausserait tous les devis
+        // du type concerne, sans rien signaler a l'ecran.
+        for (const z of zones) {
+            const m2 = Number(z.surface_m2);
+            if (!isFinite(m2) || m2 < 0 || m2 > 200) {
+                return res.status(400).json({ error: `Surface invalide pour « ${String(z.cle || '?').slice(0, 40)} » : attendu entre 0 et 200 m²` });
+            }
+        }
+        await ensureV28Tables();
+        const maj = await avecConnexion(async (conn) => {
+            await ensureZonesEquipe(conn, req.userId);
+            let n = 0;
+            for (const z of zones) {
+                const [r] = await conn.query(
+                    'UPDATE zones_vehicule SET surface_m2 = ? WHERE equipe_id = ? AND type_vehicule = ? AND cle = ?',
+                    [Number(z.surface_m2), req.userId, String(z.type_vehicule || ''), String(z.cle || '')]);
+                n += r.affectedRows;
+            }
+            return n;
+        });
+        res.json({ message: 'OK', zones: maj });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
