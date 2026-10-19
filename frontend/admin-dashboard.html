@@ -162,6 +162,26 @@
             border-bottom: 1px solid var(--border);
             margin-bottom: 20px;
         }
+        /* V28 — reglage des zones. Le recapitulatif est le garde-fou : il dit en permanence
+           si le total s'ecarte de la surface validee le 26/08 pour ce type de vehicule. */
+        .zone-type-btn {
+            font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+            padding: 8px 14px; border-radius: 10px;
+            background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border);
+        }
+        .zone-type-btn:hover { border-color: rgba(255,87,34,.45); color: var(--primary-clair); }
+        .zone-type-btn.actif { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .zones-recap {
+            padding: 11px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 13px;
+            background: var(--verre); border: 1px solid var(--border);
+        }
+        .zones-recap .chiffre { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .zones-recap.conforme { border-color: rgba(74,222,128,.35); }
+        .zones-recap.conforme .chiffre { color: var(--success); }
+        .zones-recap.ecart { border-color: rgba(255,87,34,.4); }
+        .zones-recap.ecart .chiffre { color: var(--primary); }
+        .zone-surface { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+
         .tab-btn {
             padding: 12px 18px;
             background: transparent;
@@ -337,6 +357,7 @@
         <button class="tab-btn" onclick="switchTab('stock', this)">📦 Stock</button>
         <button class="tab-btn" onclick="switchTab('notifs', this); initNotifs()">📣 Notifications</button>
         <button class="tab-btn" onclick="switchTab('sources', this); loadSources()">🎯 Sources</button>
+        <button class="tab-btn" onclick="switchTab('zones', this); loadZones()">🚗 Zones</button>
         <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
         <button class="tab-btn" onclick="switchTab('habillage', this)">🎉 Habillage</button>
     </div>
@@ -436,6 +457,25 @@
         <div class="table-wrap"><table>
             <thead><tr><th>Source</th><th>Action</th></tr></thead>
             <tbody id="sources-list"><tr><td colspan="2" class="empty-state">Chargement...</td></tr></tbody>
+        </table></div>
+    </div>
+
+    <!-- V28 — ZONES DU VEHICULE -->
+    <div class="tab-content" id="tab-zones">
+        <div class="section-header">
+            <div class="section-title">Zones du véhicule</div>
+            <button onclick="enregistrerZones()" id="zones-btn-save">Enregistrer</button>
+        </div>
+        <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;max-width:640px;">
+            Surfaces utilisées par le mode « Par zones du véhicule » du calculateur, en m² et
+            <strong>hors chutes</strong> : le coefficient P10 s'applique ensuite, comme pour la grille d'origine.
+            Une zone « par côté » est comptée deux fois dans le total (gauche et droit).
+        </p>
+        <div id="zones-types" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+        <div id="zones-recap" class="zones-recap">Chargement...</div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Zone</th><th>Face</th><th>Surface (m²)</th><th>Comptée</th></tr></thead>
+            <tbody id="zones-list"><tr><td colspan="4" class="empty-state">Chargement...</td></tr></tbody>
         </table></div>
     </div>
 
@@ -1079,6 +1119,102 @@ async function supprimerInvitation(id) {
 }
 
 // ===== V11 — SOURCES D'ACQUISITION =====
+// ===== V28 — ZONES DU VEHICULE =====
+// Les surfaces entrent dans le prix : elles doivent donc etre reglables ici, comme les
+// parametres du moteur. Le garde-fou affiche en permanence l'ecart avec la grille validee.
+let zonesAdmin = {}, zoneTypeCourant = 'utilitaire';
+// Reference historique, validee par l'entreprise le 26/08. Ce n'est pas un parametre :
+// c'est le repere qui dit si un reglage fait deriver le total.
+const ZONES_REFERENCE = { citadine: 20, berline: 25, suv: 28, utilitaire: 25, fourgon: 40, camion: 35 };
+const ZONES_LIBELLE = {
+    citadine: 'Citadine', berline: 'Berline', suv: 'SUV', utilitaire: 'Utilitaire',
+    fourgon: 'Fourgon', camion: 'Camion'
+};
+const ZONES_FACES = { cote: 'Côté', avant: 'Avant', arriere: 'Arrière', toit: 'Toit' };
+
+async function loadZones() {
+    try {
+        const d = await fetch(`${API_URL}/zones-vehicule`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        zonesAdmin = d.zones || {};
+        if (!zonesAdmin[zoneTypeCourant]) zoneTypeCourant = Object.keys(zonesAdmin)[0] || 'utilitaire';
+        renderZones();
+    } catch (err) {
+        document.getElementById('zones-list').innerHTML = '<tr><td colspan="4" class="empty-state">Erreur de chargement</td></tr>';
+        document.getElementById('zones-recap').textContent = 'Impossible de charger les zones.';
+    }
+}
+
+function renderZones() {
+    document.getElementById('zones-types').innerHTML = Object.keys(ZONES_LIBELLE)
+        .filter(t => zonesAdmin[t])
+        .map(t => `<button type="button" class="zone-type-btn${t === zoneTypeCourant ? ' actif' : ''}" onclick="zonesChoisirType('${t}')">${ZONES_LIBELLE[t]}</button>`)
+        .join('');
+
+    const zones = zonesAdmin[zoneTypeCourant] || [];
+    document.getElementById('zones-list').innerHTML = zones.length ? zones.map((z, i) => `<tr>
+        <td>${escapeHtml(z.nom)}</td>
+        <td style="color:var(--text-secondary);">${ZONES_FACES[z.face] || z.face}</td>
+        <td><input type="number" class="zone-surface" id="zone-m2-${i}" value="${Number(z.surface_m2).toFixed(2)}"
+                   min="0" max="200" step="0.05" oninput="majRecapZones()"></td>
+        <td style="color:var(--text-secondary);">${z.par_cote ? '× 2 (gauche + droit)' : '× 1'}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="empty-state">Aucune zone</td></tr>';
+    majRecapZones();
+}
+
+function zonesChoisirType(t) { zoneTypeCourant = t; renderZones(); }
+
+// Total recalcule a chaque frappe : l'ecart doit se voir pendant qu'on regle, pas apres.
+function majRecapZones() {
+    const zones = zonesAdmin[zoneTypeCourant] || [];
+    let total = 0;
+    zones.forEach((z, i) => {
+        const champ = document.getElementById('zone-m2-' + i);
+        const v = champ ? parseFloat(champ.value) : NaN;
+        total += (isNaN(v) ? 0 : v) * (z.par_cote ? 2 : 1);
+    });
+    const reference = ZONES_REFERENCE[zoneTypeCourant];
+    const ecart = total - reference;
+    const el = document.getElementById('zones-recap');
+    const fmt = n => n.toFixed(2).replace('.', ',');
+    if (Math.abs(ecart) < 0.005) {
+        el.className = 'zones-recap conforme';
+        el.innerHTML = `Total <span class="chiffre">${fmt(total)} m²</span> — conforme à la grille validée du 26/08 (${reference} m²).`;
+    } else {
+        el.className = 'zones-recap ecart';
+        el.innerHTML = `Total <span class="chiffre">${fmt(total)} m²</span> — ${fmt(Math.abs(ecart))} m²`
+            + ` ${ecart > 0 ? 'au-dessus' : 'en dessous'} de la grille validée du 26/08 (${reference} m²).`
+            + ` <span style="color:var(--text-secondary);">Un covering complet ne donnera plus la même surface qu'avant.</span>`;
+    }
+}
+
+async function enregistrerZones() {
+    const zones = zonesAdmin[zoneTypeCourant] || [];
+    const btn = document.getElementById('zones-btn-save');
+    const charge = [];
+    for (let i = 0; i < zones.length; i++) {
+        const v = parseFloat(document.getElementById('zone-m2-' + i).value);
+        if (isNaN(v) || v < 0) { showMessage(`Surface invalide pour « ${zones[i].nom} »`, 'error'); return; }
+        charge.push({ type_vehicule: zoneTypeCourant, cle: zones[i].cle, surface_m2: v });
+    }
+    btn.disabled = true; btn.textContent = 'Enregistrement...';
+    try {
+        const r = await fetch(`${API_URL}/zones-vehicule`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zones: charge })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Erreur serveur');
+        // On relit depuis le serveur : c'est lui qui fait foi, pas ce qui est a l'ecran.
+        await loadZones();
+        showMessage(`${ZONES_LIBELLE[zoneTypeCourant]} : ${d.zones} zone${d.zones > 1 ? 's' : ''} enregistrée${d.zones > 1 ? 's' : ''} ✓`, 'success');
+    } catch (err) {
+        showMessage(err.message, 'error');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Enregistrer';
+    }
+}
+
 async function loadSources() {
     const el = document.getElementById('sources-list');
     try {
