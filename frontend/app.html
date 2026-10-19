@@ -308,6 +308,18 @@
         .photo-sup:hover { background: var(--danger); }
         .photo-aide { font-size: 10px; color: var(--text-light); margin-top: 6px; }
 
+        /* V27 — choix a deux options montre en clair. Le mode PAO etait dans un menu
+           deroulant ou l'option « A l'heure » passait inapercue. */
+        .choix { display: flex; gap: 6px; }
+        .choix-btn {
+            flex: 1; min-width: 0; font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer; padding: 12px 10px; border-radius: 12px;
+            background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border);
+            transition: border-color .15s, color .15s, background .15s;
+        }
+        .choix-btn:hover { border-color: rgba(255,87,34,.45); color: var(--primary-clair); }
+        .choix-btn.actif { background: var(--primary); border-color: var(--primary); color: #fff; }
+
         /* Le prix est le heros de l'ecran : halo derriere le chiffre, degrade blanc vers orange. */
         .price-display {
             background: linear-gradient(158deg, var(--verre-haut), var(--bg-card));
@@ -871,12 +883,11 @@
                 <div class="conditional" id="v-pao-cond">
                     <div class="row2">
                         <div class="form-group"><label>Mode PAO</label>
-                            <div class="dropdown" id="dd-v-pao-mode">
-                                <button class="dropdown-btn" onclick="toggleDropdown('dd-v-pao-mode')"><span class="dropdown-label">Forfait</span></button>
-                                <div class="dropdown-list">
-                                    <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait</div>
-                                    <div class="dropdown-item" data-value="horaire" onclick="selectDropdownItem(this)">À l'heure</div>
-                                </div>
+                            <!-- V27 — le conteneur garde son id et son data-value : le calcul lit
+                                 toujours le mode avec getDropdownValue, rien ne change au moteur. -->
+                            <div class="choix" id="dd-v-pao-mode" data-value="forfait" data-heures="v-pao-h-group">
+                                <button type="button" class="choix-btn actif" data-value="forfait" onclick="choisirPAO(this)">Forfait</button>
+                                <button type="button" class="choix-btn" data-value="horaire" onclick="choisirPAO(this)">À l'heure</button>
                             </div>
                         </div>
                         <div class="form-group" id="v-pao-h-group" style="display:none;"><label>Heures PAO</label><input type="number" id="v-pao-h" value="2" min="0.5" step="0.5"></div>
@@ -1004,12 +1015,9 @@
                 <div class="conditional" id="s-pao-cond">
                     <div class="row2">
                         <div class="form-group"><label>Mode PAO</label>
-                            <div class="dropdown" id="dd-s-pao-mode">
-                                <button class="dropdown-btn" onclick="toggleDropdown('dd-s-pao-mode')"><span class="dropdown-label">Forfait</span></button>
-                                <div class="dropdown-list">
-                                    <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait</div>
-                                    <div class="dropdown-item" data-value="horaire" onclick="selectDropdownItem(this)">À l'heure</div>
-                                </div>
+                            <div class="choix" id="dd-s-pao-mode" data-value="forfait" data-heures="s-pao-h-group">
+                                <button type="button" class="choix-btn actif" data-value="forfait" onclick="choisirPAO(this)">Forfait</button>
+                                <button type="button" class="choix-btn" data-value="horaire" onclick="choisirPAO(this)">À l'heure</button>
                             </div>
                         </div>
                         <div class="form-group" id="s-pao-h-group" style="display:none;"><label>Heures PAO</label><input type="number" id="s-pao-h" value="2" min="0.5" step="0.5"></div>
@@ -1457,8 +1465,7 @@ function selectDropdownItem(item) {
     if (dd.id.startsWith('dd-s-mat-line-')) refreshPlaqueSuggestion(dd.closest('.line-row'));
     if (dd.id.startsWith('dd-s-plaque-line-')) updatePlaqueSummary(dd.closest('.line-row'));
     if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
-    if (dd.id === 'dd-v-pao-mode') document.getElementById('v-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
-    if (dd.id === 'dd-s-pao-mode') document.getElementById('s-pao-h-group').style.display = item.dataset.value === 'horaire' ? 'block' : 'none';
+    // V27 — le mode PAO n'est plus un menu deroulant mais deux boutons : voir choisirPAO().
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
         document.getElementById('st-ech-temps-group').style.display = mode === 'temps' ? 'block' : 'none';
@@ -1554,6 +1561,15 @@ function switchTab(tab, btn) {
     btn.classList.add('active');
 }
 
+// V27 — choix du mode PAO. Le groupe porte le data-value que lit le calcul, et designe
+// lui-meme le champ d'heures a montrer : la meme fonction sert au vehicule et a la signaletique.
+function choisirPAO(btn) {
+    const groupe = btn.parentElement;
+    groupe.dataset.value = btn.dataset.value;
+    groupe.querySelectorAll('.choix-btn').forEach(b => b.classList.toggle('actif', b === btn));
+    document.getElementById(groupe.dataset.heures).style.display = btn.dataset.value === 'horaire' ? 'block' : 'none';
+}
+
 function togglePAO() {
     document.getElementById('v-pao-cond').classList.toggle('active', document.getElementById('v-pao-check').checked);
 }
@@ -1593,7 +1609,7 @@ function renderTarifs() {
         ['P11 Chute signalétique', '×' + num('chute_signaletique', 1.1)],
         ['P23 Impression numérique', eur(num('impression_m2', 12)) + '/m²'],
         ['P16 PAO forfait', eur(num('pao_forfait', 350))],
-        ['P17 PAO horaire', eur(num('pao_horaire', 75)) + '/h'],
+        ['P17 PAO horaire', eur(num('pao_horaire', 60)) + '/h'],
         ['P18 Pose atelier', eur(num('pose_atelier_jour', 525)) + '/j'],
         ['P20 Pose site', eur(num('pose_site_point', 300)) + '/point'],
         ['P21 Taux horaire atelier', eur(num('taux_horaire_atelier', 60)) + '/h'],
@@ -1913,7 +1929,7 @@ async function calcVehicule() {
         poseHT = tarif * (st ? num('coef_pose_st', 1.3) : 1) * qty;
         poseLabel = `Pose ${poseur.nom} (${poseDuration === 'jour' ? 'journée' : '½ journée'}${st ? ` · coût × ${num('coef_pose_st', 1.3).toFixed(2)}` : ''})`;
     }
-    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 75)) : 0;
+    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 60)) : 0;
     const ventes = poseHT + paoHT + echenillagePrice + venteImpression;
 
     const t = computeTotal(coutMatiereSupport, ventes, delai);
@@ -1924,7 +1940,7 @@ async function calcVehicule() {
         { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ` + lamination ${finition}` : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%`, stage: 1 } : null,
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
-        paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null,
+        paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 60)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null,
         imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²${qty > 1 ? ` × ${qty} véh.` : ''})`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
         imprime ? { label: `Vente impression (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
         echenillagePrice > 0 ? { label: 'Échenillage', val: `${echenillagePrice.toFixed(2)}€`, stage: 3 } : null,
@@ -2130,8 +2146,8 @@ async function calcSignaletique() {
     const paoCheck = document.getElementById('s-pao-check').checked;
     const paoMode = getDropdownValue('dd-s-pao-mode') || 'forfait';
     const paoHours = parseFloat(document.getElementById('s-pao-h').value) || 0;
-    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 75)) : 0;
-    const paoRow = paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 75)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null;
+    const paoHT = paoCheck ? (paoMode === 'forfait' ? num('pao_forfait', 350) : paoHours * num('pao_horaire', 60)) : 0;
+    const paoRow = paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 60)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null;
 
     if (!type) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un type de support</p></div>';

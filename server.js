@@ -343,7 +343,7 @@ async function initDB() {
             await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [adminId, 'coefficient', 2.00]);
             await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [adminId, 'lamination_m2', 12.00]);
             await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [adminId, 'pao_forfait', 350.00]);
-            await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [adminId, 'pao_horaire', 75.00]);
+            await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [adminId, 'pao_horaire', 60.00]);
 
             // V5 — Forfaits vehicule (depuis historique)
             await conn.query('INSERT INTO forfaits (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Petit semi-covering', 1092.00]);
@@ -499,7 +499,7 @@ const DEFAULT_PARAMS = {
     coef_forme_rond: 1.28,       // P14
     coef_forme_custom: 1.18,     // P15
     pao_forfait: 350.00,         // P16 - vente directe
-    pao_horaire: 75.00,          // P17 - vente directe
+    pao_horaire: 60.00,          // P17 - vente directe (cale sur les devis reels : 1 h 30 facturee 90 EUR)
     pose_atelier_jour: 525.00,   // P18 - vente directe
     pose_atelier_demi: 300.00,   // P19 - vente directe
     pose_site_point: 300.00,     // P20 - vente directe
