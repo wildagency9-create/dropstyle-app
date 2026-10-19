@@ -338,6 +338,7 @@
         <button class="tab-btn" onclick="switchTab('notifs', this); initNotifs()">📣 Notifications</button>
         <button class="tab-btn" onclick="switchTab('sources', this); loadSources()">🎯 Sources</button>
         <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
+        <button class="tab-btn" onclick="switchTab('habillage', this)">🎉 Habillage</button>
     </div>
 
     <!-- USERS -->
@@ -532,42 +533,6 @@
             </div>
         </div>
 
-        <!-- V23 — habillage saisonnier. Purement visuel : aucun de ces trois reglages n'entre
-             dans un calcul de prix, et le moteur ne les lit jamais. -->
-        <div class="section-header"><div class="section-title">🎃 Habillage saisonnier</div></div>
-        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
-            <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;">
-                Décor de fête dans le calculateur. Strictement visuel : les prix, les coefficients
-                et les devis ne sont pas touchés. <b>Halloween est réglé du 15 au 31 octobre.</b>
-            </p>
-            <div class="row3">
-                <div class="form-group"><label>Quand l'afficher</label>
-                    <select id="param-theme_mode" onchange="saveParametres()">
-                        <option value="0">Jamais</option>
-                        <option value="1">Automatique selon la date</option>
-                        <option value="2">Toujours (pour essayer)</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Intensité</label>
-                    <select id="param-theme_intensite" onchange="saveParametres()">
-                        <option value="0">Discret — citrouille et toiles</option>
-                        <option value="1">Normal — + lueur et chauves-souris</option>
-                        <option value="2">Fête — + araignée au fil</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>À l'enregistrement d'un devis</label>
-                    <select id="param-theme_anim" onchange="saveParametres()">
-                        <option value="0">Aucune animation</option>
-                        <option value="1">Clin d'œil — étincelles vers le bouton</option>
-                        <option value="2">Pluie de citrouilles</option>
-                        <option value="3">La lanterne s'allume</option>
-                        <option value="4">La citrouille éclate</option>
-                    </select>
-                </div>
-            </div>
-            <p id="theme-etat" style="font-size:11.5px;color:var(--text-light);margin:2px 0 0;"></p>
-        </div>
-
         <div class="section-header"><div class="section-title">Synchronisation Google Sheets</div><button onclick="syncPreview()">🔄 Synchroniser depuis Google Sheets</button></div>
         <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
             <p style="color:var(--text-secondary);font-size:12px;">Source : classeur « DropStyle moteur validation » partagé en lecture (feuilles <b>Paramètres</b> et <b>Tarifs matières</b>). La synchro met à jour les paramètres P01–P24 et les tables Vinyles, Laminations, Tapes et Panneaux. Un aperçu des changements est affiché avant application — rien n'est écrit sans confirmation.</p>
@@ -624,6 +589,67 @@
             </div>
             <div id="test-result" style="margin-top:16px;"></div>
         </div>
+    </div>
+
+    <!-- HABILLAGE SAISONNIER (V24). Purement visuel : aucun de ces reglages n'entre dans un
+         calcul de prix, et le moteur de prix ne les lit jamais. -->
+    <div class="tab-content" id="tab-habillage">
+        <div class="section-header"><div class="section-title">Décor de fête</div></div>
+        <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
+            <p style="color:var(--text-secondary);font-size:12px;margin-bottom:16px;">
+                Dans le calculateur : un emblème dans l'en-tête, un décor dans les coins, une lueur
+                colorée et une animation à l'enregistrement d'un devis. Strictement visuel — les prix,
+                les coefficients et les devis ne sont pas touchés. Les réglages s'enregistrent tout seuls ;
+                le calculateur les lit au chargement, donc rafraîchissez son onglet après un changement.
+            </p>
+            <div class="row3">
+                <div class="form-group"><label>Quand l'afficher</label>
+                    <select id="param-theme_mode" onchange="saveParametres()">
+                        <option value="0">Jamais</option>
+                        <option value="1">Automatique selon la date</option>
+                        <option value="2">Forcer une fête (pour essayer)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Fête à forcer</label>
+                    <select id="param-theme_force" onchange="saveParametres()">
+                        <option value="0">🎃 Halloween</option>
+                        <option value="1">🎄 Noël</option>
+                        <option value="2">🎆 Jour de l'an</option>
+                        <option value="3">❤️ Saint-Valentin</option>
+                        <option value="4">🥚 Pâques</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Intensité</label>
+                    <select id="param-theme_intensite" onchange="saveParametres()">
+                        <option value="0">Discret — emblème et coins</option>
+                        <option value="1">Normal — + lueur et passages</option>
+                        <option value="2">Fête — deux fois plus de passages</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row3">
+                <div class="form-group"><label>À l'enregistrement d'un devis</label>
+                    <select id="param-theme_anim" onchange="saveParametres()">
+                        <option value="0">Aucune animation</option>
+                        <option value="1">Clin d'œil — étincelles vers le bouton</option>
+                        <option value="2">Une pluie d'emblèmes</option>
+                        <option value="3">La grande apparition au centre</option>
+                        <option value="4">L'éclat au-dessus du bouton</option>
+                    </select>
+                </div>
+            </div>
+            <p id="theme-etat" style="font-size:12px;color:var(--text-light);margin:4px 0 0;"></p>
+        </div>
+
+        <div class="section-header"><div class="section-title">Les fêtes de l'année</div></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Fête</th><th>Période</th><th>Décor</th><th>État</th></tr></thead>
+            <tbody id="fetes-list"><tr><td colspan="4" class="empty-state">Chargement...</td></tr></tbody>
+        </table></div>
+        <p style="color:var(--text-light);font-size:11.5px;margin-top:10px;">
+            Pâques tombe à une date différente chaque année : elle est calculée, pas écrite en dur.
+            Le Jour de l'an est la seule période à cheval sur deux années.
+        </p>
     </div>
 </div>
 
@@ -1560,23 +1586,110 @@ function mtNum(id) { const e = document.getElementById(id); return e ? (parseFlo
 function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.selectedOptions.length) return 0; return parseFloat(s.selectedOptions[0].getAttribute(attr)) || 0; }
 
 const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','marge_plotteur_mm','coef_materiaux','coef_impression_interne','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut',
-    // V23 — habillage saisonnier (visuel uniquement, jamais lu par le moteur)
-    'theme_mode','theme_intensite','theme_anim'];
+    // V24 — habillage saisonnier (visuel uniquement, jamais lu par le moteur)
+    'theme_mode','theme_force','theme_intensite','theme_anim'];
 
-// Dit a l'ecran ce qui est reellement affiche en ce moment : en mode automatique et hors
-// periode, rien ne s'affiche — sans cette ligne on croirait a une panne.
+// --- V24 : habillage saisonnier ---
+// Les periodes sont redites ici pour l'affichage de l'admin ; la reference reste
+// SAISON_FETES dans app.html, c'est elle qui decide de ce qui s'affiche reellement.
+// L'ordre doit rester le meme : il sert d'index au reglage "fete a forcer".
+const FETES_ADMIN = [
+    { nom: '🎃 Halloween',      du: '10-15', au: '10-31', decor: 'Citrouille, toiles d\'araignée, chauves-souris' },
+    { nom: '🎄 Noël',           du: '12-01', au: '12-26', decor: 'Boule, branches de sapin, flocons' },
+    { nom: '🎆 Jour de l\'an',  du: '12-27', au: '01-02', decor: 'Gerbe d\'étincelles, confettis' },
+    { nom: '❤️ Saint-Valentin', du: '02-10', au: '02-15', decor: 'Cœur, guirlande, cœurs qui tombent' },
+    { nom: '🥚 Pâques',         mobile: true,             decor: 'Œuf décoré, brins fleuris, pétales' }
+];
+const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+// Date de Paques (Meeus/Jones/Butcher) : elle change chaque annee, on la calcule.
+function paquesAdmin(an) {
+    const a = an % 19, b = Math.floor(an / 100), c = an % 100, d = Math.floor(b / 4), e = b % 4,
+        f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+        h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4,
+        l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    return new Date(Date.UTC(an, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1));
+}
+const jjmm = (d) => String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+
+function fenetreFete(f, an) {
+    if (!f.mobile) return [f.du, f.au];
+    const p = paquesAdmin(an);
+    const debut = new Date(p); debut.setUTCDate(p.getUTCDate() - 7);
+    const fin = new Date(p); fin.setUTCDate(p.getUTCDate() + 1);
+    return [jjmm(debut), jjmm(fin)];
+}
+// Une periode qui enjambe le 31 decembre reste valide.
+function dedansFete(du, au, jour) {
+    return du <= au ? (jour >= du && jour <= au) : (jour >= du || jour <= au);
+}
+function enClair(s) {
+    const [m, j] = s.split('-');
+    const n = Number(j);
+    return (n === 1 ? '1er' : n) + ' ' + MOIS_FR[Number(m) - 1];
+}
+
+function feteDuJour(an, jour) {
+    return FETES_ADMIN.find(f => { const [du, au] = fenetreFete(f, an); return dedansFete(du, au, jour); }) || null;
+}
+
+// Dit a l'ecran ce qui est reellement affiche : en mode automatique et hors periode,
+// rien ne s'affiche — sans cette ligne on croirait a une panne.
 function majEtatTheme() {
     const el = document.getElementById('theme-etat');
     if (!el) return;
     const mode = mtNum('param-theme_mode');
-    const d = new Date();
+    const d = new Date(), an = d.getFullYear();
     const jour = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    const dedans = jour >= '10-15' && jour <= '10-31';
-    if (mode === 0) el.textContent = '→ Actuellement : aucun décor dans le calculateur.';
-    else if (mode === 2) el.textContent = '→ Actuellement : décor Halloween affiché en permanence, même hors période.';
-    else el.textContent = dedans
-        ? '→ Actuellement : décor Halloween affiché, nous sommes dans la période.'
-        : '→ Actuellement : aucun décor, nous sommes hors période (15–31 octobre). Choisissez « Toujours » pour l\'essayer tout de suite.';
+
+    if (mode === 0) {
+        el.textContent = '→ Actuellement : aucun décor dans le calculateur.';
+    } else if (mode === 2) {
+        const f = FETES_ADMIN[mtNum('param-theme_force')] || FETES_ADMIN[0];
+        el.textContent = '→ Actuellement : ' + f.nom + ' est forcée, elle s\'affiche en permanence.';
+    } else {
+        const f = feteDuJour(an, jour);
+        if (f) {
+            el.textContent = '→ Actuellement : ' + f.nom + ' est affichée, nous sommes dans la période.';
+        } else {
+            // La prochaine fete : utile pour savoir quand ca reviendra tout seul.
+            let proche = null, ecart = Infinity;
+            FETES_ADMIN.forEach(x => {
+                [an, an + 1].forEach(a => {
+                    const [du] = fenetreFete(x, a);
+                    const dt = new Date(Date.UTC(a, Number(du.slice(0, 2)) - 1, Number(du.slice(3))));
+                    const diff = (dt - Date.UTC(an, d.getMonth(), d.getDate())) / 86400000;
+                    if (diff > 0 && diff < ecart) { ecart = diff; proche = { x, du }; }
+                });
+            });
+            el.textContent = '→ Actuellement : aucun décor, nous sommes hors période.'
+                + (proche ? ' Prochaine fête : ' + proche.x.nom + ', le ' + enClair(proche.du)
+                    + ' (dans ' + Math.round(ecart) + ' jours).' : '')
+                + ' Choisissez « Forcer une fête » pour en essayer une tout de suite.';
+        }
+    }
+    rendreFetes();
+}
+
+function rendreFetes() {
+    const el = document.getElementById('fetes-list');
+    if (!el) return;
+    const d = new Date(), an = d.getFullYear();
+    const jour = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const mode = mtNum('param-theme_mode');
+    const forcee = mode === 2 ? mtNum('param-theme_force') : -1;
+
+    el.innerHTML = FETES_ADMIN.map((f, i) => {
+        const [du, au] = fenetreFete(f, an);
+        const active = mode === 1 && dedansFete(du, au, jour);
+        const etat = forcee === i
+            ? '<span style="color:var(--primary);font-weight:700;">forcée</span>'
+            : active ? '<span style="color:var(--success);font-weight:700;">en cours</span>'
+            : '<span style="color:var(--text-light);">—</span>';
+        return `<tr><td>${f.nom}</td><td>${enClair(du)} → ${enClair(au)}${f.mobile ? ' <span style="color:var(--text-light);">(calculée)</span>' : ''}</td>`
+            + `<td style="color:var(--text-secondary);font-size:11.5px;">${f.decor}</td><td>${etat}</td></tr>`;
+    }).join('');
 }
 
 async function loadParametres() {
