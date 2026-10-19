@@ -320,6 +320,50 @@
         .choix-btn:hover { border-color: rgba(255,87,34,.45); color: var(--primary-clair); }
         .choix-btn.actif { background: var(--primary); border-color: var(--primary); color: #fff; }
 
+        /* V28 — selection des zones a habiller. Le dessin sert de reperage, la liste sert a
+           cocher : sur telephone, viser une vitre laterale au doigt serait impossible. */
+        /* Les onglets passent a la ligne plutot que de defiler : un conteneur a defilement
+           horizontal imposait sa largeur au panneau et faisait deborder la page sur telephone. */
+        .zone-faces { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; max-width: 100%; }
+        .zone-face-btn {
+            flex: none; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+            padding: 7px 12px; border-radius: 99px; white-space: nowrap;
+            background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border);
+        }
+        .zone-face-btn:hover { border-color: rgba(255,87,34,.45); color: var(--primary-clair); }
+        .zone-face-btn.actif { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .zone-face-btn .pastille { font-size: 10px; opacity: .85; }
+        .zone-scene {
+            position: relative; width: 100%; aspect-ratio: 480 / 200; border-radius: 14px;
+            overflow: hidden; margin-bottom: 10px; border: 1px solid var(--border);
+            background: radial-gradient(120% 90% at 50% 15%, #22252a 0%, #141619 55%, #0d0e10 100%);
+        }
+        .zone-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        .zone-poly {
+            fill: rgba(255,255,255,.02); stroke: rgba(255,255,255,.28); stroke-width: 1.2;
+            stroke-dasharray: 4 3; cursor: pointer; transition: fill .14s, stroke .14s;
+        }
+        .zone-poly:hover { fill: rgba(255,87,34,.16); stroke: var(--primary-clair); }
+        .zone-poly.on { fill: rgba(255,87,34,.42); stroke: var(--primary); stroke-dasharray: none; stroke-width: 1.6; }
+        .zone-liste { display: flex; flex-direction: column; gap: 5px; }
+        .zone-ligne {
+            display: flex; align-items: center; gap: 9px; cursor: pointer; margin-bottom: 0;
+            padding: 9px 11px; border-radius: 11px; font-size: 13px;
+            background: var(--bg-input); border: 1px solid var(--border); transition: border-color .14s;
+        }
+        .zone-ligne:hover { border-color: rgba(255,87,34,.4); }
+        .zone-ligne.on { border-color: rgba(255,87,34,.55); background: rgba(255,87,34,.09); }
+        .zone-ligne input { width: 17px; height: 17px; accent-color: var(--primary); flex: none; margin: 0; }
+        .zone-ligne .nom { flex: 1; min-width: 0; }
+        .zone-ligne .m2 { color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .zone-ligne.on .m2 { color: var(--primary-clair); font-weight: 600; }
+        .zone-total {
+            display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px;
+        }
+        .zone-total .valeur { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+        .zone-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
         /* Le prix est le heros de l'ecran : halo derriere le chiffre, degrade blanc vers orange. */
         .price-display {
             background: linear-gradient(158deg, var(--verre-haut), var(--bg-card));
@@ -841,6 +885,7 @@
                         <button class="dropdown-btn" onclick="toggleDropdown('dd-v-mode')"><span class="dropdown-label">Calcul au m² (avancé)</span></button>
                         <div class="dropdown-list">
                             <div class="dropdown-item" data-value="m2" onclick="selectDropdownItem(this)">Calcul au m² (avancé)</div>
+                            <div class="dropdown-item" data-value="zones" onclick="selectDropdownItem(this)">Par zones du véhicule</div>
                             <div class="dropdown-item" data-value="forfait" onclick="selectDropdownItem(this)">Forfait fixe (historique)</div>
                         </div>
                     </div>
@@ -853,6 +898,18 @@
                         </div>
                     </div>
                     <p style="font-size:10px;color:var(--text-light);margin-top:4px;">💡 Prix issus de tes factures historiques. Le forfait remplace matière + pose + PAO ; délai, frais de dossier et arrondi s'appliquent ensuite.</p>
+                </div>
+                <!-- V28 — selection des zones. Remplace le « type de marquage » : la surface
+                     vient de ce qu'on coche, au lieu d'une valeur unique par type de marquage. -->
+                <div class="conditional" id="v-zones-cond">
+                    <div class="zone-faces" id="zone-faces" role="group" aria-label="Face du véhicule"></div>
+                    <div class="zone-scene" id="zone-scene"><svg viewBox="0 0 480 200" id="zone-dessin" aria-label="Silhouette du véhicule"></svg></div>
+                    <div class="zone-liste" id="zone-liste"></div>
+                    <div class="zone-actions">
+                        <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutCocher()">Covering complet</button>
+                        <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutDecocher()">Tout décocher</button>
+                    </div>
+                    <div class="zone-total"><span>Surface retenue</span><span class="valeur" id="zone-total">0,00 m²</span></div>
                 </div>
                 <div class="form-group"><label>Vinyle</label>
                     <div class="dropdown" id="dd-v-vinyle">
@@ -1420,6 +1477,8 @@ window.addEventListener('DOMContentLoaded', () => {
     chargerClientsEtSources();
     // V26 — photos : en arriere-plan comme les clients, un echec ne doit pas empecher de chiffrer.
     photosInit();
+    // V28 — zones du vehicule, chargees une fois pour les six types.
+    chargerZones();
     chargerEquipe().then(chargerNotifs);
     setInterval(chargerNotifs, 45000);
 
@@ -1464,7 +1523,15 @@ function selectDropdownItem(item) {
     if (dd.id === 'dd-s-type') updateSignaletiqueFields(item.dataset.value);
     if (dd.id.startsWith('dd-s-mat-line-')) refreshPlaqueSuggestion(dd.closest('.line-row'));
     if (dd.id.startsWith('dd-s-plaque-line-')) updatePlaqueSummary(dd.closest('.line-row'));
-    if (dd.id === 'dd-v-mode') document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
+    if (dd.id === 'dd-v-mode') {
+        document.getElementById('v-forfait-cond').classList.toggle('active', item.dataset.value === 'forfait');
+        // V28 — le mode par zones remplace le type de marquage : la surface vient des cases cochees.
+        document.getElementById('v-zones-cond').classList.toggle('active', item.dataset.value === 'zones');
+        if (item.dataset.value === 'zones') zonesRender();
+    }
+    // V28 — changer de vehicule change les zones et leurs surfaces : la selection precedente
+    // ne veut plus rien dire, on repart a zero plutot que de garder des cases d'un autre type.
+    if (dd.id === 'dd-v-type') { zonesChoisies.clear(); zonesRender(); }
     // V27 — le mode PAO n'est plus un menu deroulant mais deux boutons : voir choisirPAO().
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
@@ -1889,10 +1956,17 @@ async function calcVehicule() {
         return;
     }
 
-    // ===== MODE M2 (avance) =====
+    // ===== MODE M2 (avance) ET MODE PAR ZONES =====
+    // Les deux partagent tout le calcul : seule l'origine de la surface change. En mode
+    // zones, le type de marquage n'est pas demande, puisque c'est la selection qui le dit.
+    const parZones = mode === 'zones';
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-v-vinyle'));
-    if (!type || !marquage || !vinyle) {
+    if (!type || !vinyle || (!parZones && !marquage)) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
+        return;
+    }
+    if (parZones && surfaceZonesChoisies() <= 0) {
+        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Cochez au moins une zone à habiller</p></div>';
         return;
     }
     const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-v-lam'));
@@ -1910,7 +1984,7 @@ async function calcVehicule() {
     const echenillagePrice = echenillageCheck ? parseFloat(getDropdownValue('dd-v-echenillage')) || 0 : 0;
 
     // Part matiere (× coefficient) — support (vinyle+lamination+tape) et impression separes pour l'affichage par etape
-    const surface = surfaces[type][marquage];
+    const surface = parZones ? surfaceZonesChoisies() : surfaces[type][marquage];
     const conso = surface * num('chute_vehicule', 1.25);
     const tapePrix = tape ? (allTapes.length ? parseFloat(allTapes[0].prix) : 1.21) : 0;
     const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0) + tapePrix;
@@ -1936,7 +2010,7 @@ async function calcVehicule() {
     const venteSupport = coutMatiereSupport * t.coefficient;
 
     const rows = [
-        { label: `Surface ${surface}m² × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
+        { label: `Surface ${parZones ? surface.toFixed(2) : surface}m²${parZones ? ` (${zonesChoisies.size} zone${zonesChoisies.size > 1 ? 's' : ''})` : ''} × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
         { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ` + lamination ${finition}` : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%`, stage: 1 } : null,
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
@@ -3146,6 +3220,164 @@ async function envoyerNotif() {
         ok.disabled = false; ok.textContent = 'Envoyer';
     }
 }
+
+// ===== V28 — SELECTION DES ZONES DU VEHICULE =====
+// La surface ne vient plus d'une valeur unique par type de marquage, mais de ce que
+// l'utilisateur coche. Les surfaces viennent du serveur (reglables dans l'admin), jamais
+// d'une valeur ecrite ici : c'est la regle du projet pour tout ce qui entre dans un prix.
+let toutesZones = {};      // type de vehicule -> [ { cle, nom, face, par_cote, surface_m2 } ]
+let totauxZones = {};      // type -> surface totale, pour rappeler la grille validee
+let zonesChoisies = new Set();
+let zoneFace = 'gauche';
+
+const ZONE_FACES = [
+    { cle: 'gauche',  nom: 'Profil gauche',  source: 'cote',    cote: 'g' },
+    { cle: 'droite',  nom: 'Profil droit',   source: 'cote',    cote: 'd' },
+    { cle: 'avant',   nom: 'Avant',          source: 'avant',   cote: '' },
+    { cle: 'arriere', nom: 'Arrière',        source: 'arriere', cote: '' },
+    { cle: 'toit',    nom: 'Toit',           source: 'toit',    cote: '' }
+];
+
+// Silhouettes de profil, dessinees ici meme : aucun fichier sous licence n'est utilise,
+// ce qui etait le point bloquant de l'ancien selecteur de vehicule.
+const ZONE_FAMILLE = { citadine: 'voiture', berline: 'voiture', suv: 'voiture', utilitaire: 'fourgon', fourgon: 'fourgon', camion: 'camion' };
+const ZONE_SILHOUETTES = {
+    voiture: {
+        fond: `<path d="M40 150 L42 112 Q44 104 54 101 L120 96 L168 58 Q172 54 182 54 L300 54 Q312 54 318 60 L396 100 L420 108 Q430 112 430 122 L430 150 Z" fill="#3a3e45" stroke="#4d525b" stroke-width="1.5"/>
+               <path d="M146 92 L176 64 L232 64 L232 92 Z" fill="#23262b"/><path d="M240 64 L296 64 L312 92 L240 92 Z" fill="#23262b"/>
+               <circle cx="120" cy="152" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="120" cy="152" r="9" fill="#2e3238"/>
+               <circle cx="360" cy="152" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="360" cy="152" r="9" fill="#2e3238"/>`,
+        zones: {
+            aile_av: '42,112 120,96 140,96 140,150 42,150', porte_av: '142,94 234,94 234,150 142,150',
+            porte_ar: '236,94 300,94 300,150 236,150', aile_ar: '302,96 396,100 428,112 428,150 302,150',
+            vitres: '146,62 312,62 312,92 146,92', bas_caisse: '60,152 420,152 420,166 60,166'
+        }
+    },
+    fourgon: {
+        fond: `<path d="M36 150 L36 116 Q36 110 44 108 L92 99 L128 56 Q131 52 139 52 L424 52 Q432 52 433 60 L436 148 Q436 154 428 154 L44 154 Q36 154 36 150 Z" fill="#3a3e45" stroke="#4d525b" stroke-width="1.5"/>
+               <path d="M136 64 L192 64 L192 94 L136 94 Z" fill="#23262b"/>
+               <circle cx="110" cy="156" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="110" cy="156" r="9" fill="#2e3238"/>
+               <circle cx="378" cy="156" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="378" cy="156" r="9" fill="#2e3238"/>`,
+        zones: {
+            aile_av: '36,116 92,99 128,99 128,150 36,150', porte_av: '130,60 196,60 196,150 130,150',
+            flanc: '198,60 420,60 420,150 198,150', vitres: '136,64 192,64 192,94 136,94',
+            bas_caisse: '96,152 432,152 432,166 96,166'
+        }
+    },
+    camion: {
+        fond: `<path d="M44 150 L44 96 Q44 88 54 86 L74 84 L96 48 Q99 44 108 44 L156 44 Q164 44 164 52 L164 150 Z" fill="#3a3e45" stroke="#4d525b" stroke-width="1.5"/>
+               <path d="M172 36 Q172 30 180 30 L438 30 Q446 30 446 38 L446 150 L172 150 Z" fill="#3a3e45" stroke="#4d525b" stroke-width="1.5"/>
+               <path d="M104 52 L156 52 L156 82 L104 82 Z" fill="#23262b"/>
+               <circle cx="92" cy="152" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="92" cy="152" r="9" fill="#2e3238"/>
+               <circle cx="330" cy="152" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="330" cy="152" r="9" fill="#2e3238"/>
+               <circle cx="392" cy="152" r="24" fill="#191b1f" stroke="#4d525b" stroke-width="2"/><circle cx="392" cy="152" r="9" fill="#2e3238"/>`,
+        zones: {
+            porte_cab: '46,50 162,50 162,150 46,150', flanc: '174,34 444,34 444,148 174,148',
+            bas_caisse: '60,152 440,152 440,166 60,166'
+        }
+    }
+};
+
+async function chargerZones() {
+    try {
+        const d = await apiFetch('/zones-vehicule');
+        toutesZones = d.zones || {};
+        totauxZones = d.totaux || {};
+    } catch (err) { toutesZones = {}; totauxZones = {}; }
+    zonesRender();
+}
+
+// Clef d'une zone cochee : la meme zone gauche et droite compte deux fois.
+const zoneClef = (z, cote) => z.par_cote ? `${z.cle}@${cote}` : z.cle;
+const zonesDuType = () => toutesZones[getDropdownValue('dd-v-type')] || [];
+
+function zonesDeLaFace() {
+    const f = ZONE_FACES.find(x => x.cle === zoneFace) || ZONE_FACES[0];
+    return { def: f, liste: zonesDuType().filter(z => z.face === f.source) };
+}
+
+function surfaceZonesChoisies() {
+    let total = 0;
+    for (const z of zonesDuType()) {
+        if (z.par_cote) {
+            if (zonesChoisies.has(`${z.cle}@g`)) total += Number(z.surface_m2);
+            if (zonesChoisies.has(`${z.cle}@d`)) total += Number(z.surface_m2);
+        } else if (zonesChoisies.has(z.cle)) total += Number(z.surface_m2);
+    }
+    return total;
+}
+
+function zonesRender() {
+    const cond = document.getElementById('v-zones-cond');
+    if (!cond) return;
+    const type = getDropdownValue('dd-v-type');
+    const liste = document.getElementById('zone-liste');
+
+    if (!type) {
+        document.getElementById('zone-faces').innerHTML = '';
+        document.getElementById('zone-dessin').innerHTML = '';
+        liste.innerHTML = '<p style="font-size:12px;color:var(--text-light);">Choisissez d\'abord un type de véhicule.</p>';
+        document.getElementById('zone-total').textContent = '0,00 m²';
+        return;
+    }
+
+    // Onglets de face, avec le nombre de zones cochees sur chacune.
+    document.getElementById('zone-faces').innerHTML = ZONE_FACES.map(f => {
+        const n = (toutesZones[type] || []).filter(z => z.face === f.source)
+            .filter(z => zonesChoisies.has(zoneClef(z, f.cote))).length;
+        return `<button type="button" class="zone-face-btn${f.cle === zoneFace ? ' actif' : ''}" onclick="zonesAllerFace('${f.cle}')">`
+             + `${f.nom}${n ? ` <span class="pastille">· ${n}</span>` : ''}</button>`;
+    }).join('');
+
+    const { def, liste: zones } = zonesDeLaFace();
+    // Le dessin n'existe que pour les profils : de face ou de dessus, une silhouette
+    // n'apprendrait rien de plus que la liste.
+    const scene = document.getElementById('zone-scene');
+    const silhouette = ZONE_SILHOUETTES[ZONE_FAMILLE[type]];
+    if (def.source === 'cote' && silhouette) {
+        scene.style.display = '';
+        scene.style.transform = def.cote === 'd' ? 'scaleX(-1)' : '';
+        document.getElementById('zone-dessin').innerHTML = silhouette.fond + zones.map(z => {
+            const pts = silhouette.zones[z.cle];
+            if (!pts) return '';
+            const coche = zonesChoisies.has(zoneClef(z, def.cote));
+            return `<polygon class="zone-poly${coche ? ' on' : ''}" points="${pts}" role="button" tabindex="0"
+                      aria-pressed="${coche}" aria-label="${z.nom}, ${z.surface_m2} m²"
+                      onclick="zonesBasculer('${zoneClef(z, def.cote)}')"
+                      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();zonesBasculer('${zoneClef(z, def.cote)}')}"/>`;
+        }).join('');
+    } else {
+        scene.style.display = 'none';
+    }
+
+    liste.innerHTML = zones.length ? zones.map(z => {
+        const clef = zoneClef(z, def.cote);
+        const coche = zonesChoisies.has(clef);
+        return `<label class="zone-ligne${coche ? ' on' : ''}">
+            <input type="checkbox" ${coche ? 'checked' : ''} onchange="zonesBasculer('${clef}')">
+            <span class="nom">${z.nom}</span><span class="m2">${Number(z.surface_m2).toFixed(2)} m²</span>
+        </label>`;
+    }).join('') : '<p style="font-size:12px;color:var(--text-light);">Aucune zone sur cette face.</p>';
+
+    const total = surfaceZonesChoisies();
+    const reference = totauxZones[type];
+    document.getElementById('zone-total').textContent = total.toFixed(2).replace('.', ',') + ' m²'
+        + (reference ? ` sur ${Number(reference).toFixed(2).replace('.', ',')}` : '');
+}
+
+function zonesBasculer(clef) {
+    zonesChoisies.has(clef) ? zonesChoisies.delete(clef) : zonesChoisies.add(clef);
+    zonesRender();
+}
+function zonesAllerFace(f) { zoneFace = f; zonesRender(); }
+function zonesToutCocher() {
+    for (const z of zonesDuType()) {
+        if (z.par_cote) { zonesChoisies.add(`${z.cle}@g`); zonesChoisies.add(`${z.cle}@d`); }
+        else zonesChoisies.add(z.cle);
+    }
+    zonesRender();
+}
+function zonesToutDecocher() { zonesChoisies.clear(); zonesRender(); }
 
 // ===== V26 — PHOTOS DU VEHICULE =====
 // Les photos sont prises avant que le devis existe : elles partent donc au serveur sous un
