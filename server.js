@@ -32,57 +32,78 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// V25 — filet de securite sur les connexions. Rend TOUJOURS la connexion au pool : que la
+// requete reussisse, qu'elle echoue, ou que le handler sorte par un return anticipe
+// (res.status(404) et compagnie), le finally s'execute. Sans ce filet, chaque erreur SQL
+// gardait une connexion pour elle ; au bout de 10 (la taille du pool) plus aucune requete
+// n'aboutissait et l'application restait muette jusqu'au redemarrage.
+async function avecConnexion(travail) {
+    const conn = await pool.getConnection();
+    try {
+        return await travail(conn);
+    } finally {
+        await conn.release();
+    }
+}
+
+// Variante pour les fonctions qui acceptent une connexion deja ouverte par l'appelant :
+// dans ce cas c'est a lui de la rendre, on n'y touche pas.
+async function avecConnexionPartagee(connexionExistante, travail) {
+    if (connexionExistante) return await travail(connexionExistante);
+    return await avecConnexion(travail);
+}
+
 // V6 — creation idempotente des tables/colonnes du moteur unifie.
 // Chaque requete est independante : un echec n'empeche pas les suivantes, et la fonction
 // est rappelee par les endpoints concernes, donc les tables finissent toujours par exister.
 async function ensureV6Tables(existingConn) {
-    const conn = existingConn || await pool.getConnection();
-    const queries = [
-        `CREATE TABLE IF NOT EXISTS laminations (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
-        `CREATE TABLE IF NOT EXISTS tapes (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
-        `ALTER TABLE vinyles ADD COLUMN laizes VARCHAR(100)`,
-        `ALTER TABLE materiaux ADD COLUMN format_plaque VARCHAR(50)`,
-        `ALTER TABLE poseurs ADD COLUMN type_prix VARCHAR(10) DEFAULT 'vente'`
-    ];
-    for (const q of queries) {
-        try { await conn.query(q); }
-        catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V6 init:', e.message); }
-    }
-    if (!existingConn) await conn.release();
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        const queries = [
+            `CREATE TABLE IF NOT EXISTS laminations (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
+            `CREATE TABLE IF NOT EXISTS tapes (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, laizes VARCHAR(100))`,
+            `ALTER TABLE vinyles ADD COLUMN laizes VARCHAR(100)`,
+            `ALTER TABLE materiaux ADD COLUMN format_plaque VARCHAR(50)`,
+            `ALTER TABLE poseurs ADD COLUMN type_prix VARCHAR(10) DEFAULT 'vente'`
+        ];
+        for (const q of queries) {
+            try { await conn.query(q); }
+            catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V6 init:', e.message); }
+        }
+    });
 }
 
 // V8 — suivi de stock (m²) sur les tables matiere, independant du moteur de prix.
 // stock_m2 NULL = article non suivi. seuil_alerte NULL = utilise le seuil par defaut (parametres).
 async function ensureV8Tables(existingConn) {
-    const conn = existingConn || await pool.getConnection();
-    const queries = [
-        `ALTER TABLE vinyles ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE vinyles ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE vinyles ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
-        `ALTER TABLE materiaux ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE materiaux ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE materiaux ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
-        `ALTER TABLE laminations ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE laminations ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE laminations ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
-        `ALTER TABLE tapes ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE tapes ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
-        `ALTER TABLE tapes ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`
-    ];
-    for (const q of queries) {
-        try { await conn.query(q); }
-        catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V8 init:', e.message); }
-    }
-    if (!existingConn) await conn.release();
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        const queries = [
+            `ALTER TABLE vinyles ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE vinyles ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE vinyles ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+            `ALTER TABLE materiaux ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE materiaux ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE materiaux ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+            `ALTER TABLE laminations ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE laminations ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE laminations ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`,
+            `ALTER TABLE tapes ADD COLUMN stock_m2 DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE tapes ADD COLUMN seuil_alerte DECIMAL(10, 2) DEFAULT NULL`,
+            `ALTER TABLE tapes ADD COLUMN alerte_envoyee TINYINT(1) DEFAULT 0`
+        ];
+        for (const q of queries) {
+            try { await conn.query(q); }
+            catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V8 init:', e.message); }
+        }
+    });
 }
 
 // V9 — nom du client sur les devis (saisi au moment de l'enregistrement), pour retrouver
 // un devis dans l'historique autrement que par son montant.
 async function ensureV9Tables(existingConn) {
-    const conn = existingConn || await pool.getConnection();
-    try { await conn.query(`ALTER TABLE devis ADD COLUMN client VARCHAR(255) DEFAULT NULL`); }
-    catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V9 init:', e.message); }
-    if (!existingConn) await conn.release();
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        try { await conn.query(`ALTER TABLE devis ADD COLUMN client VARCHAR(255) DEFAULT NULL`); }
+        catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V9 init:', e.message); }
+    });
 }
 
 // V11 — equipe, clients/prospects et notifications internes.
@@ -103,8 +124,9 @@ let v11Prete = false;
 
 async function ensureV11Tables(existingConn) {
     if (v11Prete && !existingConn) return;
-    const conn = existingConn || await pool.getConnection();
     let echec = false;
+    // Le tableau est construit avant d'ouvrir la connexion : inutile d'en retenir une
+    // pendant ce temps.
     const queries = [
         `ALTER TABLE users ADD COLUMN equipe_id INT DEFAULT NULL`,
         `UPDATE users SET equipe_id = id WHERE equipe_id IS NULL`,
@@ -183,15 +205,16 @@ async function ensureV11Tables(existingConn) {
             UNIQUE KEY uniq_equipe_periode (equipe_id, periode)
         )`
     ];
-    for (const q of queries) {
-        try { await conn.query(q); }
-        catch (e) {
-            // "Duplicate column" = migration deja appliquee, ce n'est pas un echec.
-            if (!/Duplicate column/i.test(e.message)) { echec = true; console.error('V11 init:', e.message); }
+    await avecConnexionPartagee(existingConn, async (conn) => {
+        for (const q of queries) {
+            try { await conn.query(q); }
+            catch (e) {
+                // "Duplicate column" = migration deja appliquee, ce n'est pas un echec.
+                if (!/Duplicate column/i.test(e.message)) { echec = true; console.error('V11 init:', e.message); }
+            }
         }
-    }
+    });
     if (!echec) v11Prete = true;
-    if (!existingConn) await conn.release();
 }
 
 // Les sources sont creees a la demande, par equipe, et restent modifiables depuis l'admin :
@@ -206,15 +229,18 @@ async function ensureSourcesEquipe(conn, equipeId) {
 
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
 async function ensureV7Tables(existingConn) {
-    const conn = existingConn || await pool.getConnection();
-    try { await conn.query(`CREATE TABLE IF NOT EXISTS kits_signaletique (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`); }
-    catch (e) { console.error('V7 init:', e.message); }
-    if (!existingConn) await conn.release();
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        try { await conn.query(`CREATE TABLE IF NOT EXISTS kits_signaletique (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`); }
+        catch (e) { console.error('V7 init:', e.message); }
+    });
 }
 
 async function initDB() {
+    // Meme motif que verifierRecaps : la connexion est rendue dans le finally, donc une
+    // requete en echec (table verrouillee, base indisponible) ne la retient pas.
+    let conn;
     try {
-        const conn = await pool.getConnection();
+        conn = await pool.getConnection();
         await conn.query(`CREATE TABLE IF NOT EXISTS users (id INT PRIMARY KEY AUTO_INCREMENT, email VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, nom VARCHAR(255) NOT NULL, role ENUM('user', 'admin') DEFAULT 'user', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS vinyles (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, name VARCHAR(255) NOT NULL, price DECIMAL(10, 2) NOT NULL, type VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
         await conn.query(`CREATE TABLE IF NOT EXISTS materiaux (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, support VARCHAR(255) NOT NULL, price DECIMAL(10, 2) NOT NULL, categorie VARCHAR(50), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
@@ -283,9 +309,10 @@ async function initDB() {
             await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Roll-up 85×200 standard', 89.00]);
             await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [adminId, 'Roll-up 85×200 premium (housse rigide)', 129.00]);
         }
-        await conn.release();
     } catch (err) {
         console.error('DB Error:', err.message);
+    } finally {
+        if (conn) await conn.release();
     }
 }
 
@@ -321,13 +348,15 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     try {
         const { email, password, nom } = req.body;
         const bcrypt = require('bcrypt');
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
-        if (rows.length > 0) { await conn.release(); return res.status(400).json({ error: 'Email déjà utilisé' }); }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, 'user']);
-        await conn.release();
-        res.status(201).json({ message: 'Utilisateur créé' });
+        await avecConnexion(async (conn) => {
+            const [rows] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
+            if (rows.length > 0) return res.status(400).json({ error: 'Email déjà utilisé' });
+            // bcrypt echoue si le mot de passe est absent : la connexion doit etre rendue
+            // quand meme, sinon dix appels suffisaient a bloquer toute l'application.
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await conn.query('INSERT INTO users (email, password, nom, role) VALUES (?, ?, ?, ?)', [email, hashedPassword, nom, 'user']);
+            res.status(201).json({ message: 'Utilisateur créé' });
+        });
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
@@ -336,9 +365,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         const { email, password } = req.body;
         const bcrypt = require('bcrypt');
         const jwt = require('jsonwebtoken');
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM users WHERE email = ?', [email]);
-        await conn.release();
+        const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM users WHERE email = ?', [email]));
         if (rows.length === 0) return res.status(401).json({ error: 'Identifiants invalides' });
         const user = rows[0];
         const valid = await bcrypt.compare(password, user.password);
@@ -346,9 +373,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         // V13 — suivi des connexions. Hors du chemin critique : si la colonne n'existe pas
         // encore au premier demarrage, la connexion doit reussir quand meme.
         try {
-            const c = await pool.getConnection();
-            await c.query('UPDATE users SET derniere_connexion = NOW(), nb_connexions = COALESCE(nb_connexions, 0) + 1 WHERE id = ?', [user.id]);
-            await c.release();
+            await avecConnexion(conn => conn.query('UPDATE users SET derniere_connexion = NOW(), nb_connexions = COALESCE(nb_connexions, 0) + 1 WHERE id = ?', [user.id]));
         } catch (e) { console.error('Suivi connexion :', e.message); }
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role, equipe_id: user.equipe_id || user.id }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
@@ -357,58 +382,58 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
 // VINYLES CRUD
 app.get('/api/tarifs/vinyles', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM vinyles WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM vinyles WHERE user_id = ?', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/vinyles', verifyToken, async (req, res) => {
-    try { const { name, price, type } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [req.userId, name, price, type]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { name, price, type } = req.body; await avecConnexion(conn => conn.query('INSERT INTO vinyles (user_id, name, price, type) VALUES (?, ?, ?, ?)', [req.userId, name, price, type])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
-    try { const { name, price, type } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE vinyles SET name = ?, price = ?, type = ? WHERE id = ? AND user_id = ?', [name, price, type, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { name, price, type } = req.body; await avecConnexion(conn => conn.query('UPDATE vinyles SET name = ?, price = ?, type = ? WHERE id = ? AND user_id = ?', [name, price, type, req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/vinyles/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM vinyles WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM vinyles WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // MATERIAUX CRUD
 app.get('/api/tarifs/materiaux', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM materiaux WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM materiaux WHERE user_id = ?', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/materiaux', verifyToken, async (req, res) => {
-    try { const { support, price, categorie } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [req.userId, support, price, categorie]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { support, price, categorie } = req.body; await avecConnexion(conn => conn.query('INSERT INTO materiaux (user_id, support, price, categorie) VALUES (?, ?, ?, ?)', [req.userId, support, price, categorie])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/materiaux/:id', verifyToken, async (req, res) => {
-    try { const { support, price, categorie } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE materiaux SET support = ?, price = ?, categorie = ? WHERE id = ? AND user_id = ?', [support, price, categorie, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { support, price, categorie } = req.body; await avecConnexion(conn => conn.query('UPDATE materiaux SET support = ?, price = ?, categorie = ? WHERE id = ? AND user_id = ?', [support, price, categorie, req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/materiaux/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM materiaux WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM materiaux WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POSEURS CRUD
 app.get('/api/tarifs/poseurs', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM poseurs WHERE user_id = ?', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/poseurs', verifyToken, async (req, res) => {
-    try { const { nom, jour, demijour, type_prix } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour, type_prix) VALUES (?, ?, ?, ?, ?)', [req.userId, nom, jour, demijour, type_prix || 'vente']); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, jour, demijour, type_prix } = req.body; await avecConnexion(conn => conn.query('INSERT INTO poseurs (user_id, nom, jour, demijour, type_prix) VALUES (?, ?, ?, ?, ?)', [req.userId, nom, jour, demijour, type_prix || 'vente'])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
-    try { const { nom, jour, demijour } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE poseurs SET nom = ?, jour = ?, demijour = ?, type_prix = ? WHERE id = ? AND user_id = ?', [nom, jour, demijour, req.body.type_prix || 'vente', req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, jour, demijour } = req.body; await avecConnexion(conn => conn.query('UPDATE poseurs SET nom = ?, jour = ?, demijour = ?, type_prix = ? WHERE id = ? AND user_id = ?', [nom, jour, demijour, req.body.type_prix || 'vente', req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/poseurs/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM poseurs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM poseurs WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // IMPRESSIONS CRUD
 app.get('/api/tarifs/impressions', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM impressions WHERE user_id = ? ORDER BY type, format, grammage, finition, quantite', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM impressions WHERE user_id = ? ORDER BY type, format, grammage, finition, quantite', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/impressions', verifyToken, async (req, res) => {
-    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [req.userId, type, format, grammage, finition, quantite, prix_exa]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; await avecConnexion(conn => conn.query('INSERT INTO impressions (user_id, type, format, grammage, finition, quantite, prix_exa) VALUES (?, ?, ?, ?, ?, ?, ?)', [req.userId, type, format, grammage, finition, quantite, prix_exa])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
-    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE impressions SET type = ?, format = ?, grammage = ?, finition = ?, quantite = ?, prix_exa = ? WHERE id = ? AND user_id = ?', [type, format, grammage, finition, quantite, prix_exa, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { type, format, grammage, finition, quantite, prix_exa } = req.body; await avecConnexion(conn => conn.query('UPDATE impressions SET type = ?, format = ?, grammage = ?, finition = ?, quantite = ?, prix_exa = ? WHERE id = ? AND user_id = ?', [type, format, grammage, finition, quantite, prix_exa, req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/impressions/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM impressions WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM impressions WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // V5 — PARAMETRES MOTEUR (cle/valeur)
@@ -451,15 +476,16 @@ const DEFAULT_PARAMS = {
 };
 app.get('/api/parametres', verifyToken, async (req, res) => {
     try {
-        const conn = await pool.getConnection();
-let [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
-        const have = new Set(rows.map(r => r.cle));
-        let added = false;
-        for (const [cle, valeur] of Object.entries(DEFAULT_PARAMS)) {
-            if (!have.has(cle)) { await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [req.userId, cle, valeur]); added = true; }
-        }
-        if (added) [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
-        await conn.release();
+        const rows = await avecConnexion(async (conn) => {
+            let [lignes] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+            const have = new Set(lignes.map(r => r.cle));
+            let added = false;
+            for (const [cle, valeur] of Object.entries(DEFAULT_PARAMS)) {
+                if (!have.has(cle)) { await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?)', [req.userId, cle, valeur]); added = true; }
+            }
+            if (added) [lignes] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+            return lignes;
+        });
         const obj = {};
         rows.forEach(r => { obj[r.cle] = parseFloat(r.valeur); });
         res.json(obj);
@@ -468,50 +494,50 @@ let [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id 
 app.put('/api/parametres', verifyToken, async (req, res) => {
     try {
         const updates = req.body || {};
-        const conn = await pool.getConnection();
-        for (const [cle, valeur] of Object.entries(updates)) {
-            await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valeur = ?', [req.userId, cle, valeur, valeur]);
-        }
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            for (const [cle, valeur] of Object.entries(updates)) {
+                await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valeur = ?', [req.userId, cle, valeur, valeur]);
+            }
+        });
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // V5 — FORFAITS VEHICULE CRUD
 app.get('/api/tarifs/forfaits', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM forfaits WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM forfaits WHERE user_id = ? ORDER BY prix', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/forfaits', verifyToken, async (req, res) => {
-    try { const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO forfaits (user_id, nom, prix) VALUES (?, ?, ?)', [req.userId, nom, prix]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, prix } = req.body; await avecConnexion(conn => conn.query('INSERT INTO forfaits (user_id, nom, prix) VALUES (?, ?, ?)', [req.userId, nom, prix])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
-    try { const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE forfaits SET nom = ?, prix = ? WHERE id = ? AND user_id = ?', [nom, prix, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, prix } = req.body; await avecConnexion(conn => conn.query('UPDATE forfaits SET nom = ?, prix = ? WHERE id = ? AND user_id = ?', [nom, prix, req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/forfaits/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM forfaits WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM forfaits WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // V7 — KITS ROLL-UP (signaletique) CRUD
 app.get('/api/tarifs/kits-signaletique', verifyToken, async (req, res) => {
-    try { await ensureV7Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM kits_signaletique WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV7Tables(); const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM kits_signaletique WHERE user_id = ? ORDER BY prix', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/tarifs/kits-signaletique', verifyToken, async (req, res) => {
-    try { await ensureV7Tables(); const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [req.userId, nom, prix]); await conn.release(); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV7Tables(); const { nom, prix } = req.body; await avecConnexion(conn => conn.query('INSERT INTO kits_signaletique (user_id, nom, prix) VALUES (?, ?, ?)', [req.userId, nom, prix])); res.status(201).json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/tarifs/kits-signaletique/:id', verifyToken, async (req, res) => {
-    try { const { nom, prix } = req.body; const conn = await pool.getConnection(); await conn.query('UPDATE kits_signaletique SET nom = ?, prix = ? WHERE id = ? AND user_id = ?', [nom, prix, req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const { nom, prix } = req.body; await avecConnexion(conn => conn.query('UPDATE kits_signaletique SET nom = ?, prix = ? WHERE id = ? AND user_id = ?', [nom, prix, req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/tarifs/kits-signaletique/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM kits_signaletique WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM kits_signaletique WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // DEVIS
 // ===== V6 — LAMINATIONS & TAPES =====
 app.get('/api/tarifs/laminations', verifyToken, async (req, res) => {
-    try { await ensureV6Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM laminations WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV6Tables(); const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM laminations WHERE user_id = ? ORDER BY prix', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/tarifs/tapes', verifyToken, async (req, res) => {
-    try { await ensureV6Tables(); const conn = await pool.getConnection(); const [rows] = await conn.query('SELECT * FROM tapes WHERE user_id = ? ORDER BY prix', [req.userId]); await conn.release(); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await ensureV6Tables(); const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM tapes WHERE user_id = ? ORDER BY prix', [req.userId])); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ===== V6 — SYNCHRONISATION GOOGLE SHEETS =====
@@ -641,13 +667,14 @@ app.get('/api/sync-sheets/preview', verifyToken, async (req, res) => {
     try {
         await ensureV6Tables();
         const data = await fetchSheetsData();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
-        const [vin] = await conn.query('SELECT COUNT(*) AS n FROM vinyles WHERE user_id = ?', [req.userId]);
-        const [lam] = await conn.query('SELECT COUNT(*) AS n FROM laminations WHERE user_id = ?', [req.userId]);
-        const [tap] = await conn.query('SELECT COUNT(*) AS n FROM tapes WHERE user_id = ?', [req.userId]);
-        const [mat] = await conn.query('SELECT COUNT(*) AS n FROM materiaux WHERE user_id = ?', [req.userId]);
-        await conn.release();
+        const { rows, vin, lam, tap, mat } = await avecConnexion(async (conn) => {
+            const [rows] = await conn.query('SELECT cle, valeur FROM parametres WHERE user_id = ?', [req.userId]);
+            const [vin] = await conn.query('SELECT COUNT(*) AS n FROM vinyles WHERE user_id = ?', [req.userId]);
+            const [lam] = await conn.query('SELECT COUNT(*) AS n FROM laminations WHERE user_id = ?', [req.userId]);
+            const [tap] = await conn.query('SELECT COUNT(*) AS n FROM tapes WHERE user_id = ?', [req.userId]);
+            const [mat] = await conn.query('SELECT COUNT(*) AS n FROM materiaux WHERE user_id = ?', [req.userId]);
+            return { rows, vin, lam, tap, mat };
+        });
         const actuels = {};
         rows.forEach(r => actuels[r.cle] = parseFloat(r.valeur));
         const diffParams = [];
@@ -674,27 +701,27 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
     try {
         await ensureV6Tables();
         const data = await fetchSheetsData();
-        const conn = await pool.getConnection();
-        for (const [cle, valeur] of Object.entries(data.parametres)) {
-            await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valeur = ?', [req.userId, cle, valeur, valeur]);
-        }
-        if (data.tables.vinyles.length) {
-            await conn.query('DELETE FROM vinyles WHERE user_id = ?', [req.userId]);
-            for (const v of data.tables.vinyles) await conn.query('INSERT INTO vinyles (user_id, name, price, type, laizes) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'sheets', v.laizes]);
-        }
-        if (data.tables.laminations.length) {
-            await conn.query('DELETE FROM laminations WHERE user_id = ?', [req.userId]);
-            for (const v of data.tables.laminations) await conn.query('INSERT INTO laminations (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
-        }
-        if (data.tables.tapes.length) {
-            await conn.query('DELETE FROM tapes WHERE user_id = ?', [req.userId]);
-            for (const v of data.tables.tapes) await conn.query('INSERT INTO tapes (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
-        }
-        if (data.tables.materiaux.length) {
-            await conn.query('DELETE FROM materiaux WHERE user_id = ?', [req.userId]);
-            for (const v of data.tables.materiaux) await conn.query('INSERT INTO materiaux (user_id, support, price, categorie, format_plaque) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'panneau', v.laizes]);
-        }
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            for (const [cle, valeur] of Object.entries(data.parametres)) {
+                await conn.query('INSERT INTO parametres (user_id, cle, valeur) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valeur = ?', [req.userId, cle, valeur, valeur]);
+            }
+            if (data.tables.vinyles.length) {
+                await conn.query('DELETE FROM vinyles WHERE user_id = ?', [req.userId]);
+                for (const v of data.tables.vinyles) await conn.query('INSERT INTO vinyles (user_id, name, price, type, laizes) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'sheets', v.laizes]);
+            }
+            if (data.tables.laminations.length) {
+                await conn.query('DELETE FROM laminations WHERE user_id = ?', [req.userId]);
+                for (const v of data.tables.laminations) await conn.query('INSERT INTO laminations (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
+            }
+            if (data.tables.tapes.length) {
+                await conn.query('DELETE FROM tapes WHERE user_id = ?', [req.userId]);
+                for (const v of data.tables.tapes) await conn.query('INSERT INTO tapes (user_id, nom, prix, laizes) VALUES (?, ?, ?, ?)', [req.userId, v.nom, v.prix, v.laizes]);
+            }
+            if (data.tables.materiaux.length) {
+                await conn.query('DELETE FROM materiaux WHERE user_id = ?', [req.userId]);
+                for (const v of data.tables.materiaux) await conn.query('INSERT INTO materiaux (user_id, support, price, categorie, format_plaque) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'panneau', v.laizes]);
+            }
+        });
         res.json({ message: 'Synchronisation appliquée', parametres: Object.keys(data.parametres).length, vinyles: data.tables.vinyles.length, laminations: data.tables.laminations.length, tapes: data.tables.tapes.length, materiaux: data.tables.materiaux.length });
     } catch (err) {
         if (err.message === 'ACCES' || /^HTTP (401|403|404)/.test(err.message)) return res.status(502).json({ error: 'Accès refusé au Google Sheets — vérifier le partage : « Toute personne disposant du lien : Lecteur ».' });
@@ -706,32 +733,30 @@ app.post('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
         const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct } = req.body;
-        const conn = await pool.getConnection();
-        // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
-        // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
-        let lien = null;
-        if (client_id) {
-            const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
-            if (c.length) lien = c[0].id;
-        }
-        await conn.query(
-            `INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId,
-             ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
-             ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
+            // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
+            let lien = null;
+            if (client_id) {
+                const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
+                if (c.length) lien = c[0].id;
+            }
+            await conn.query(
+                `INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId,
+                 ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
+                 ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
+        });
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
+        const [rows] = await avecConnexion(conn => conn.query(
             `SELECT d.*, u.nom AS auteur_nom FROM devis d LEFT JOIN users u ON u.id = d.auteur_id
-             WHERE d.user_id = ? ORDER BY d.created_at DESC LIMIT 50`, [req.userId]);
-        await conn.release();
+             WHERE d.user_id = ? ORDER BY d.created_at DESC LIMIT 50`, [req.userId]));
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -747,18 +772,16 @@ app.put('/api/devis/:id/statut', verifyToken, async (req, res) => {
         const statut = String(req.body.statut || '');
         if (!STATUTS_DEVIS.includes(statut)) return res.status(400).json({ error: 'Statut inconnu' });
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [r] = await conn.query(
+        const [r] = await avecConnexion(conn => conn.query(
             'UPDATE devis SET statut = ?, statut_le = NOW(), statut_par = ? WHERE id = ? AND user_id = ?',
-            [statut, req.authUserId, req.params.id, req.userId]);
-        await conn.release();
+            [statut, req.authUserId, req.params.id, req.userId]));
         if (!r.affectedRows) return res.status(404).json({ error: 'Devis introuvable' });
         res.json({ message: 'OK', statut });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/devis/:id', verifyToken, async (req, res) => {
-    try { const conn = await pool.getConnection(); await conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId]); await conn.release(); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await avecConnexion(conn => conn.query('DELETE FROM devis WHERE id = ? AND user_id = ?', [req.params.id, req.userId])); res.json({ message: 'OK' }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ===== V10 — ASSISTANT (Claude) =====
@@ -810,14 +833,14 @@ const OUTIL_DEVIS = {
 };
 
 async function contexteAssistant(userId) {
-    const conn = await pool.getConnection();
-    const [vinyles] = await conn.query('SELECT id, name, price FROM vinyles WHERE user_id = ?', [userId]);
-    const [materiaux] = await conn.query('SELECT id, support, price, format_plaque FROM materiaux WHERE user_id = ?', [userId]);
-    const [laminations] = await conn.query('SELECT id, nom, prix FROM laminations WHERE user_id = ?', [userId]);
-    const [kits] = await conn.query('SELECT id, nom, prix FROM kits_signaletique WHERE user_id = ?', [userId]);
-    const [devis] = await conn.query('SELECT id, client, type, qty, ht, ttc, created_at FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [userId]);
-    await conn.release();
-    return { vinyles, materiaux, laminations, kits, devis };
+    return avecConnexion(async (conn) => {
+        const [vinyles] = await conn.query('SELECT id, name, price FROM vinyles WHERE user_id = ?', [userId]);
+        const [materiaux] = await conn.query('SELECT id, support, price, format_plaque FROM materiaux WHERE user_id = ?', [userId]);
+        const [laminations] = await conn.query('SELECT id, nom, prix FROM laminations WHERE user_id = ?', [userId]);
+        const [kits] = await conn.query('SELECT id, nom, prix FROM kits_signaletique WHERE user_id = ?', [userId]);
+        const [devis] = await conn.query('SELECT id, client, type, qty, ht, ttc, created_at FROM devis WHERE user_id = ? ORDER BY created_at DESC LIMIT 50', [userId]);
+        return { vinyles, materiaux, laminations, kits, devis };
+    });
 }
 
 app.post('/api/chat', verifyToken, async (req, res) => {
@@ -942,9 +965,7 @@ function sendBrevoEmail(to, subject, text, nomExpediteur) {
 }
 
 async function sendStockAlertEmail(nom, stock, seuil) {
-    const conn = await pool.getConnection();
-    const [admins] = await conn.query("SELECT email FROM users WHERE role = 'admin'");
-    await conn.release();
+    const [admins] = await avecConnexion(conn => conn.query("SELECT email FROM users WHERE role = 'admin'"));
     if (!admins.length) return;
     const envoi = await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
         `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`,
@@ -955,19 +976,20 @@ async function sendStockAlertEmail(nom, stock, seuil) {
 app.get('/api/stock', verifyToken, async (req, res) => {
     try {
         await ensureV8Tables();
-        const conn = await pool.getConnection();
-        const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
-        const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
-        const items = [];
-        for (const [type, cfg] of Object.entries(STOCK_TABLES)) {
-            const [rows] = await conn.query(`SELECT id, ${cfg.nameCol} AS nom, stock_m2, seuil_alerte FROM ${cfg.table} WHERE user_id = ?`, [req.userId]);
-            rows.forEach(r => {
-                const seuil = r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : seuilDefaut;
-                const stock = r.stock_m2 !== null ? parseFloat(r.stock_m2) : null;
-                items.push({ type, id: r.id, nom: r.nom, stock_m2: stock, seuil_alerte: r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : null, seuil_effectif: seuil, low: stock !== null && stock <= seuil });
-            });
-        }
-        await conn.release();
+        const items = await avecConnexion(async (conn) => {
+            const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
+            const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
+            const liste = [];
+            for (const [type, cfg] of Object.entries(STOCK_TABLES)) {
+                const [rows] = await conn.query(`SELECT id, ${cfg.nameCol} AS nom, stock_m2, seuil_alerte FROM ${cfg.table} WHERE user_id = ?`, [req.userId]);
+                rows.forEach(r => {
+                    const seuil = r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : seuilDefaut;
+                    const stock = r.stock_m2 !== null ? parseFloat(r.stock_m2) : null;
+                    liste.push({ type, id: r.id, nom: r.nom, stock_m2: stock, seuil_alerte: r.seuil_alerte !== null ? parseFloat(r.seuil_alerte) : null, seuil_effectif: seuil, low: stock !== null && stock <= seuil });
+                });
+            }
+            return liste;
+        });
         res.json(items);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -979,26 +1001,26 @@ app.put('/api/stock/:type/:id', verifyToken, async (req, res) => {
         await ensureV8Tables();
         const stockVal = req.body.stock_m2 === '' || req.body.stock_m2 === undefined ? null : parseFloat(req.body.stock_m2);
         const seuilVal = req.body.seuil_alerte === '' || req.body.seuil_alerte === undefined ? null : parseFloat(req.body.seuil_alerte);
-        const conn = await pool.getConnection();
-        const [before] = await conn.query(`SELECT alerte_envoyee, ${cfg.nameCol} AS nom FROM ${cfg.table} WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
-        if (!before.length) { await conn.release(); return res.status(404).json({ error: 'Introuvable' }); }
-        await conn.query(`UPDATE ${cfg.table} SET stock_m2 = ?, seuil_alerte = ? WHERE id = ? AND user_id = ?`, [stockVal, seuilVal, req.params.id, req.userId]);
+        await avecConnexion(async (conn) => {
+            const [before] = await conn.query(`SELECT alerte_envoyee, ${cfg.nameCol} AS nom FROM ${cfg.table} WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+            if (!before.length) return res.status(404).json({ error: 'Introuvable' });
+            await conn.query(`UPDATE ${cfg.table} SET stock_m2 = ?, seuil_alerte = ? WHERE id = ? AND user_id = ?`, [stockVal, seuilVal, req.params.id, req.userId]);
 
-        const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
-        const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
-        const seuilEffectif = seuilVal !== null ? seuilVal : seuilDefaut;
-        const etaitBas = before[0].alerte_envoyee === 1;
-        const estBas = stockVal !== null && stockVal <= seuilEffectif;
+            const [paramRows] = await conn.query('SELECT valeur FROM parametres WHERE user_id = ? AND cle = ?', [req.userId, 'seuil_stock_defaut']);
+            const seuilDefaut = paramRows.length ? parseFloat(paramRows[0].valeur) : DEFAULT_PARAMS.seuil_stock_defaut;
+            const seuilEffectif = seuilVal !== null ? seuilVal : seuilDefaut;
+            const etaitBas = before[0].alerte_envoyee === 1;
+            const estBas = stockVal !== null && stockVal <= seuilEffectif;
 
-        if (estBas && !etaitBas) {
-            await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
-            sendStockAlertEmail(before[0].nom, stockVal, seuilEffectif).catch(e => console.error('Email stock:', e.message));
-        } else if (!estBas && etaitBas) {
-            await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 0 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
-        }
+            if (estBas && !etaitBas) {
+                await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+                sendStockAlertEmail(before[0].nom, stockVal, seuilEffectif).catch(e => console.error('Email stock:', e.message));
+            } else if (!estBas && etaitBas) {
+                await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 0 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
+            }
 
-        await conn.release();
-        res.json({ message: 'OK', low: estBas });
+            res.json({ message: 'OK', low: estBas });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1006,10 +1028,11 @@ app.put('/api/stock/:type/:id', verifyToken, async (req, res) => {
 app.get('/api/sources-client', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        await ensureSourcesEquipe(conn, req.userId);
-        const [rows] = await conn.query('SELECT id, nom FROM sources_client WHERE equipe_id = ? ORDER BY ordre, nom', [req.userId]);
-        await conn.release();
+        const rows = await avecConnexion(async (conn) => {
+            await ensureSourcesEquipe(conn, req.userId);
+            const [lignes] = await conn.query('SELECT id, nom FROM sources_client WHERE equipe_id = ? ORDER BY ordre, nom', [req.userId]);
+            return lignes;
+        });
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1018,19 +1041,17 @@ app.post('/api/sources-client', verifyToken, async (req, res) => {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         const nom = (req.body.nom || '').trim();
         if (!nom) return res.status(400).json({ error: 'Nom requis' });
-        const conn = await pool.getConnection();
-        const [[{ maxi }]] = await conn.query('SELECT COALESCE(MAX(ordre), 0) AS maxi FROM sources_client WHERE equipe_id = ?', [req.userId]);
-        await conn.query('INSERT INTO sources_client (equipe_id, nom, ordre) VALUES (?, ?, ?)', [req.userId, nom, maxi + 1]);
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            const [[{ maxi }]] = await conn.query('SELECT COALESCE(MAX(ordre), 0) AS maxi FROM sources_client WHERE equipe_id = ?', [req.userId]);
+            await conn.query('INSERT INTO sources_client (equipe_id, nom, ordre) VALUES (?, ?, ?)', [req.userId, nom, maxi + 1]);
+        });
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/sources-client/:id', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        await conn.query('DELETE FROM sources_client WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
-        await conn.release();
+        await avecConnexion(conn => conn.query('DELETE FROM sources_client WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
         // Les clients gardent la source deja saisie : supprimer la source de la liste ne
         // reecrit pas l'historique, sinon les statistiques passees deviendraient fausses.
         res.json({ message: 'OK' });
@@ -1041,23 +1062,21 @@ app.delete('/api/sources-client/:id', verifyToken, async (req, res) => {
 app.get('/api/clients', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
+        const [rows] = await avecConnexion(conn => conn.query(
             `SELECT c.*, COUNT(d.id) AS nb_devis, COALESCE(SUM(d.ht), 0) AS ca_devis
              FROM clients c LEFT JOIN devis d ON d.client_id = c.id
-             WHERE c.equipe_id = ? GROUP BY c.id ORDER BY c.nom`, [req.userId]);
-        await conn.release();
+             WHERE c.equipe_id = ? GROUP BY c.id ORDER BY c.nom`, [req.userId]));
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/clients/:id', verifyToken, async (req, res) => {
     try {
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
-        if (!rows.length) { await conn.release(); return res.status(404).json({ error: 'Client introuvable' }); }
-        const [devis] = await conn.query('SELECT id, type, qty, ht, ttc, created_at FROM devis WHERE client_id = ? ORDER BY created_at DESC', [req.params.id]);
-        await conn.release();
-        res.json({ client: rows[0], devis });
+        await avecConnexion(async (conn) => {
+            const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            if (!rows.length) return res.status(404).json({ error: 'Client introuvable' });
+            const [devis] = await conn.query('SELECT id, type, qty, ht, ttc, created_at FROM devis WHERE client_id = ? ORDER BY created_at DESC', [req.params.id]);
+            res.json({ client: rows[0], devis });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/clients', verifyToken, async (req, res) => {
@@ -1065,35 +1084,31 @@ app.post('/api/clients', verifyToken, async (req, res) => {
         await ensureV11Tables();
         const { nom, type, source, email, telephone, notes } = req.body;
         if (!(nom || '').trim()) return res.status(400).json({ error: 'Nom requis' });
-        const conn = await pool.getConnection();
-        const [r] = await conn.query(
+        const [r] = await avecConnexion(conn => conn.query(
             'INSERT INTO clients (equipe_id, nom, type, source, email, telephone, notes, auteur_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [req.userId, nom.trim(), type === 'client' ? 'client' : 'prospect', (source || '').trim() || null,
-             (email || '').trim() || null, (telephone || '').trim() || null, (notes || '').trim() || null, req.authUserId]);
-        await conn.release();
+             (email || '').trim() || null, (telephone || '').trim() || null, (notes || '').trim() || null, req.authUserId]));
         res.status(201).json({ id: r.insertId });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/clients/:id', verifyToken, async (req, res) => {
     try {
         const { nom, type, source, email, telephone, notes } = req.body;
-        const conn = await pool.getConnection();
-        await conn.query(
+        await avecConnexion(conn => conn.query(
             'UPDATE clients SET nom = ?, type = ?, source = ?, email = ?, telephone = ?, notes = ? WHERE id = ? AND equipe_id = ?',
             [(nom || '').trim(), type === 'client' ? 'client' : 'prospect', (source || '').trim() || null,
              (email || '').trim() || null, (telephone || '').trim() || null, (notes || '').trim() || null,
-             req.params.id, req.userId]);
-        await conn.release();
+             req.params.id, req.userId]));
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/clients/:id', verifyToken, async (req, res) => {
     try {
-        const conn = await pool.getConnection();
-        // Les devis sont conserves : on detache seulement le lien, le nom saisi reste lisible.
-        await conn.query('UPDATE devis SET client_id = NULL WHERE client_id = ?', [req.params.id]);
-        await conn.query('DELETE FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            // Les devis sont conserves : on detache seulement le lien, le nom saisi reste lisible.
+            await conn.query('UPDATE devis SET client_id = NULL WHERE client_id = ?', [req.params.id]);
+            await conn.query('DELETE FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+        });
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1104,8 +1119,7 @@ app.delete('/api/clients/:id', verifyToken, async (req, res) => {
 app.get('/api/stats/sources', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
+        const [rows] = await avecConnexion(conn => conn.query(
             `SELECT COALESCE(NULLIF(c.source, ''), 'Non renseignée') AS source,
                     COUNT(DISTINCT c.id) AS total,
                     COUNT(DISTINCT CASE WHEN c.type = 'client' THEN c.id END) AS clients,
@@ -1113,8 +1127,7 @@ app.get('/api/stats/sources', verifyToken, async (req, res) => {
                     COUNT(d.id) AS nb_devis,
                     COALESCE(SUM(d.ht), 0) AS ca_devis
              FROM clients c LEFT JOIN devis d ON d.client_id = c.id
-             WHERE c.equipe_id = ? GROUP BY source ORDER BY ca_devis DESC, total DESC`, [req.userId]);
-        await conn.release();
+             WHERE c.equipe_id = ? GROUP BY source ORDER BY ca_devis DESC, total DESC`, [req.userId]));
         res.json(rows.map(r => ({
             ...r,
             ca_devis: Number(r.ca_devis),
@@ -1127,23 +1140,21 @@ app.get('/api/stats/sources', verifyToken, async (req, res) => {
 app.get('/api/equipe', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT id, nom, email, role FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom', [req.userId]);
-        await conn.release();
+        const [rows] = await avecConnexion(conn => conn.query('SELECT id, nom, email, role FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom', [req.userId]));
         res.json({ moi: req.authUserId, membres: rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/notifications', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
-            `SELECT n.*, u.nom AS de_nom FROM notifications n
-             LEFT JOIN users u ON u.id = n.de_user_id
-             WHERE n.vers_user_id = ? ORDER BY n.lu, n.created_at DESC LIMIT 50`, [req.authUserId]);
-        const [[{ nonLus }]] = await conn.query('SELECT COUNT(*) AS nonLus FROM notifications WHERE vers_user_id = ? AND lu = 0', [req.authUserId]);
-        await conn.release();
-        res.json({ nonLus, notifications: rows });
+        await avecConnexion(async (conn) => {
+            const [rows] = await conn.query(
+                `SELECT n.*, u.nom AS de_nom FROM notifications n
+                 LEFT JOIN users u ON u.id = n.de_user_id
+                 WHERE n.vers_user_id = ? ORDER BY n.lu, n.created_at DESC LIMIT 50`, [req.authUserId]);
+            const [[{ nonLus }]] = await conn.query('SELECT COUNT(*) AS nonLus FROM notifications WHERE vers_user_id = ? AND lu = 0', [req.authUserId]);
+            res.json({ nonLus, notifications: rows });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/notifications', verifyToken, async (req, res) => {
@@ -1151,17 +1162,22 @@ app.post('/api/notifications', verifyToken, async (req, res) => {
         await ensureV11Tables();
         const { vers_user_id, type, titre, message, ref_type, ref_id, date_rdv, envoyer_email } = req.body;
         if (!(titre || '').trim()) return res.status(400).json({ error: 'Titre requis' });
-        const conn = await pool.getConnection();
-        // Le destinataire doit appartenir a la meme equipe : sans ce controle, n'importe quel
-        // compte pourrait ecrire a n'importe quel utilisateur du logiciel.
-        const [dest] = await conn.query('SELECT id, nom, email FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [vers_user_id, req.userId]);
-        if (!dest.length) { await conn.release(); return res.status(400).json({ error: 'Destinataire hors de votre équipe' }); }
-        await conn.query(
-            'INSERT INTO notifications (equipe_id, de_user_id, vers_user_id, type, titre, message, ref_type, ref_id, date_rdv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.userId, req.authUserId, vers_user_id, type || 'message', titre.trim(), (message || '').trim() || null,
-             ref_type || null, ref_id || null, date_rdv || null]);
-        const [expediteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
-        await conn.release();
+        // La connexion est rendue avant l'envoi de l'email : garder une connexion du pool
+        // pendant un appel au serveur de mail la retirerait aux autres utilisateurs.
+        const enregistre = await avecConnexion(async (conn) => {
+            // Le destinataire doit appartenir a la meme equipe : sans ce controle, n'importe quel
+            // compte pourrait ecrire a n'importe quel utilisateur du logiciel.
+            const [dest] = await conn.query('SELECT id, nom, email FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [vers_user_id, req.userId]);
+            if (!dest.length) return null;
+            await conn.query(
+                'INSERT INTO notifications (equipe_id, de_user_id, vers_user_id, type, titre, message, ref_type, ref_id, date_rdv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [req.userId, req.authUserId, vers_user_id, type || 'message', titre.trim(), (message || '').trim() || null,
+                 ref_type || null, ref_id || null, date_rdv || null]);
+            const [expediteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
+            return { dest, expediteur };
+        });
+        if (!enregistre) return res.status(400).json({ error: 'Destinataire hors de votre équipe' });
+        const { dest, expediteur } = enregistre;
         // La notification est deja enregistree : elle apparaitra sur la cloche meme si l'email
         // echoue. On attend seulement pour pouvoir signaler cet echec a l'ecran.
         let envoi = null;
@@ -1179,17 +1195,13 @@ app.post('/api/notifications', verifyToken, async (req, res) => {
 });
 app.put('/api/notifications/toutes-lues', verifyToken, async (req, res) => {
     try {
-        const conn = await pool.getConnection();
-        await conn.query('UPDATE notifications SET lu = 1 WHERE vers_user_id = ?', [req.authUserId]);
-        await conn.release();
+        await avecConnexion(conn => conn.query('UPDATE notifications SET lu = 1 WHERE vers_user_id = ?', [req.authUserId]));
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/notifications/:id/lu', verifyToken, async (req, res) => {
     try {
-        const conn = await pool.getConnection();
-        await conn.query('UPDATE notifications SET lu = 1 WHERE id = ? AND vers_user_id = ?', [req.params.id, req.authUserId]);
-        await conn.release();
+        await avecConnexion(conn => conn.query('UPDATE notifications SET lu = 1 WHERE id = ? AND vers_user_id = ?', [req.params.id, req.authUserId]));
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1204,11 +1216,9 @@ app.get('/api/invitations', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
+        const [rows] = await avecConnexion(conn => conn.query(
             `SELECT id, email, role, expire_le, utilise_le, created_at FROM invitations
-             WHERE equipe_id = ? ORDER BY created_at DESC LIMIT 50`, [req.userId]);
-        await conn.release();
+             WHERE equipe_id = ? ORDER BY created_at DESC LIMIT 50`, [req.userId]));
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1222,20 +1232,25 @@ app.post('/api/invitations', verifyToken, async (req, res) => {
         const message = (req.body.message || '').trim();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide' });
 
-        const conn = await pool.getConnection();
-        const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
-        if (existant.length) { await conn.release(); return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse' }); }
+        // La connexion est rendue avant l'envoi de l'email : garder une connexion du pool
+        // pendant un appel au serveur de mail la retirerait aux autres utilisateurs.
+        const cree = await avecConnexion(async (conn) => {
+            const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
+            if (existant.length) return null;
 
-        // Une nouvelle invitation pour la meme adresse annule les precedentes encore valides :
-        // sinon un ancien lien resterait utilisable apres un changement d'avis.
-        await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE equipe_id = ? AND email = ? AND utilise_le IS NULL', [req.userId, email]);
+            // Une nouvelle invitation pour la meme adresse annule les precedentes encore valides :
+            // sinon un ancien lien resterait utilisable apres un changement d'avis.
+            await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE equipe_id = ? AND email = ? AND utilise_le IS NULL', [req.userId, email]);
 
-        const token = require('crypto').randomBytes(24).toString('hex');
-        await conn.query(
-            'INSERT INTO invitations (equipe_id, email, token, role, cree_par, expire_le) VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
-            [req.userId, email, token, role, req.authUserId, DUREE_INVITATION_JOURS]);
-        const [inviteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
-        await conn.release();
+            const token = require('crypto').randomBytes(24).toString('hex');
+            await conn.query(
+                'INSERT INTO invitations (equipe_id, email, token, role, cree_par, expire_le) VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
+                [req.userId, email, token, role, req.authUserId, DUREE_INVITATION_JOURS]);
+            const [inviteur] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
+            return { token, inviteur };
+        });
+        if (!cree) return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse' });
+        const { token, inviteur } = cree;
 
         const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
         const lien = `${base}/invitation?token=${token}`;
@@ -1254,9 +1269,7 @@ app.post('/api/invitations', verifyToken, async (req, res) => {
 app.delete('/api/invitations/:id', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        await conn.query('DELETE FROM invitations WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
-        await conn.release();
+        await avecConnexion(conn => conn.query('DELETE FROM invitations WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
         res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1265,12 +1278,10 @@ app.delete('/api/invitations/:id', verifyToken, async (req, res) => {
 app.get('/api/invitations/verifier/:token', async (req, res) => {
     try {
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query(
+        const [rows] = await avecConnexion(conn => conn.query(
             `SELECT i.email, i.expire_le, i.utilise_le, u.nom AS inviteur
              FROM invitations i LEFT JOIN users u ON u.id = i.cree_par
-             WHERE i.token = ?`, [req.params.token]);
-        await conn.release();
+             WHERE i.token = ?`, [req.params.token]));
         if (!rows.length) return res.status(404).json({ error: "Cette invitation n'existe pas." });
         if (rows[0].utilise_le) return res.status(410).json({ error: 'Cette invitation a déjà été utilisée.' });
         if (new Date(rows[0].expire_le) < new Date()) return res.status(410).json({ error: 'Cette invitation a expiré. Demandez-en une nouvelle.' });
@@ -1285,29 +1296,29 @@ app.post('/api/invitations/accepter', authLimiter, async (req, res) => {
         if (!token || !(nom || '').trim() || !password) return res.status(400).json({ error: 'Nom et mot de passe requis' });
         if (String(password).length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
 
-        const conn = await pool.getConnection();
-        const [rows] = await conn.query('SELECT * FROM invitations WHERE token = ?', [token]);
-        if (!rows.length) { await conn.release(); return res.status(404).json({ error: "Cette invitation n'existe pas." }); }
-        const inv = rows[0];
-        if (inv.utilise_le) { await conn.release(); return res.status(410).json({ error: 'Cette invitation a déjà été utilisée.' }); }
-        if (new Date(inv.expire_le) < new Date()) { await conn.release(); return res.status(410).json({ error: 'Cette invitation a expiré.' }); }
+        await avecConnexion(async (conn) => {
+            const [rows] = await conn.query('SELECT * FROM invitations WHERE token = ?', [token]);
+            if (!rows.length) return res.status(404).json({ error: "Cette invitation n'existe pas." });
+            const inv = rows[0];
+            if (inv.utilise_le) return res.status(410).json({ error: 'Cette invitation a déjà été utilisée.' });
+            if (new Date(inv.expire_le) < new Date()) return res.status(410).json({ error: 'Cette invitation a expiré.' });
 
-        const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [inv.email]);
-        if (existant.length) { await conn.release(); return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse.' }); }
+            const [existant] = await conn.query('SELECT id FROM users WHERE email = ?', [inv.email]);
+            if (existant.length) return res.status(400).json({ error: 'Un compte existe déjà avec cette adresse.' });
 
-        const bcrypt = require('bcrypt');
-        const hash = await bcrypt.hash(password, 10);
-        // L'invite est connecte dans la foulee : c'est bien une premiere connexion.
-        const [r] = await conn.query('INSERT INTO users (email, password, nom, role, equipe_id, derniere_connexion, nb_connexions) VALUES (?, ?, ?, ?, ?, NOW(), 1)',
-            [inv.email, hash, nom.trim(), inv.role, inv.equipe_id]);
-        await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE id = ?', [inv.id]);
-        await conn.release();
+            const bcrypt = require('bcrypt');
+            const hash = await bcrypt.hash(password, 10);
+            // L'invite est connecte dans la foulee : c'est bien une premiere connexion.
+            const [r] = await conn.query('INSERT INTO users (email, password, nom, role, equipe_id, derniere_connexion, nb_connexions) VALUES (?, ?, ?, ?, ?, NOW(), 1)',
+                [inv.email, hash, nom.trim(), inv.role, inv.equipe_id]);
+            await conn.query('UPDATE invitations SET utilise_le = NOW() WHERE id = ?', [inv.id]);
 
-        // Connexion immediate : l'invite vient de choisir son mot de passe, lui redemander
-        // de se connecter n'apporte rien.
-        const jwt = require('jsonwebtoken');
-        const jeton = jwt.sign({ id: r.insertId, email: inv.email, role: inv.role, equipe_id: inv.equipe_id }, JWT_SECRET, { expiresIn: '7d' });
-        res.status(201).json({ token: jeton, user: { id: r.insertId, email: inv.email, nom: nom.trim(), role: inv.role } });
+            // Connexion immediate : l'invite vient de choisir son mot de passe, lui redemander
+            // de se connecter n'apporte rien.
+            const jwt = require('jsonwebtoken');
+            const jeton = jwt.sign({ id: r.insertId, email: inv.email, role: inv.role, equipe_id: inv.equipe_id }, JWT_SECRET, { expiresIn: '7d' });
+            res.status(201).json({ token: jeton, user: { id: r.insertId, email: inv.email, nom: nom.trim(), role: inv.role } });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1347,9 +1358,7 @@ app.get('/api/classement', verifyToken, async (req, res) => {
     try {
         await ensureV11Tables();
         const periode = DEBUT_PERIODE[req.query.periode] ? req.query.periode : 'semaine';
-        const conn = await pool.getConnection();
-        const lignes = await classementEquipe(conn, req.userId, periode);
-        await conn.release();
+        const lignes = await avecConnexion(conn => classementEquipe(conn, req.userId, periode));
         res.json({ periode, moi: req.authUserId, lignes });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1447,10 +1456,11 @@ async function verifierRecaps() {
 app.get('/api/admin/users', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        await ensureV11Tables(conn);
-        const [rows] = await conn.query('SELECT id, email, nom, role, created_at FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
-        await conn.release();
+        const rows = await avecConnexion(async (conn) => {
+            await ensureV11Tables(conn);
+            const [lignes] = await conn.query('SELECT id, email, nom, role, created_at FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
+            return lignes;
+        });
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1460,12 +1470,12 @@ app.post('/api/admin/users', verifyToken, async (req, res) => {
         const { email, password, nom, role } = req.body;
         const bcrypt = require('bcrypt');
         const hashedPassword = await bcrypt.hash(password, 10);
-        const conn = await pool.getConnection();
-        await ensureV11Tables(conn);
-        // Le nouveau compte rejoint l'equipe de l'admin qui le cree : il partage donc
-        // immediatement les tarifs, les devis et les clients de l'entreprise.
-        await conn.query('INSERT INTO users (email, password, nom, role, equipe_id) VALUES (?, ?, ?, ?, ?)', [email, hashedPassword, nom, role, req.userId]);
-        await conn.release();
+        await avecConnexion(async (conn) => {
+            await ensureV11Tables(conn);
+            // Le nouveau compte rejoint l'equipe de l'admin qui le cree : il partage donc
+            // immediatement les tarifs, les devis et les clients de l'entreprise.
+            await conn.query('INSERT INTO users (email, password, nom, role, equipe_id) VALUES (?, ?, ?, ?, ?)', [email, hashedPassword, nom, role, req.userId]);
+        });
         res.status(201).json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1524,30 +1534,29 @@ app.put('/api/admin/users/:id', verifyToken, async (req, res) => {
         if (password && String(password).length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
         if (!role && !password) return res.status(400).json({ error: 'Rien à modifier' });
 
-        const conn = await pool.getConnection();
-        const [cible] = await conn.query('SELECT id, role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
-        if (!cible.length) { await conn.release(); return res.status(404).json({ error: 'Utilisateur hors de votre équipe' }); }
+        await avecConnexion(async (conn) => {
+            const [cible] = await conn.query('SELECT id, role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
+            if (!cible.length) return res.status(404).json({ error: 'Utilisateur hors de votre équipe' });
 
-        if (role && role !== cible[0].role) {
-            // Le compte principal porte les donnees de l'equipe : le retrograder fermerait
-            // l'administration a tout le monde.
-            if (String(req.params.id) === String(req.userId) && role !== 'admin') {
-                await conn.release();
-                return res.status(400).json({ error: 'Le compte principal de l\'équipe doit rester administrateur' });
+            if (role && role !== cible[0].role) {
+                // Le compte principal porte les donnees de l'equipe : le retrograder fermerait
+                // l'administration a tout le monde.
+                if (String(req.params.id) === String(req.userId) && role !== 'admin') {
+                    return res.status(400).json({ error: 'Le compte principal de l\'équipe doit rester administrateur' });
+                }
+                if (cible[0].role === 'admin' && role === 'user') {
+                    const [[{ count }]] = await conn.query("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
+                    if (count <= 1) return res.status(400).json({ error: 'Impossible de retirer le dernier administrateur' });
+                }
+                await conn.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
             }
-            if (cible[0].role === 'admin' && role === 'user') {
-                const [[{ count }]] = await conn.query("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
-                if (count <= 1) { await conn.release(); return res.status(400).json({ error: 'Impossible de retirer le dernier administrateur' }); }
+            if (password) {
+                const bcrypt = require('bcrypt');
+                await conn.query('UPDATE users SET password = ? WHERE id = ?', [await bcrypt.hash(password, 10), req.params.id]);
             }
-            await conn.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
-        }
-        if (password) {
-            const bcrypt = require('bcrypt');
-            await conn.query('UPDATE users SET password = ? WHERE id = ?', [await bcrypt.hash(password, 10), req.params.id]);
-        }
-        await conn.release();
-        // Le jeton du compte modifie porte encore l'ancien role jusqu'a sa prochaine connexion.
-        res.json({ message: 'OK', reconnexion_requise: !!(role && role !== cible[0].role) });
+            // Le jeton du compte modifie porte encore l'ancien role jusqu'a sa prochaine connexion.
+            res.json({ message: 'OK', reconnexion_requise: !!(role && role !== cible[0].role) });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1557,18 +1566,18 @@ app.delete('/api/admin/users/:id', verifyToken, async (req, res) => {
         // Comparaison sur la personne connectee, pas sur le proprietaire des donnees :
         // un second admin de l'equipe doit rester protege contre sa propre suppression.
         if (String(req.params.id) === String(req.authUserId)) return res.status(400).json({ error: 'Impossible de supprimer son propre compte' });
-        const conn = await pool.getConnection();
-        const [target] = await conn.query('SELECT role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
-        if (!target.length) { await conn.release(); return res.status(404).json({ error: 'Utilisateur hors de votre équipe' }); }
-        if (target[0].role === 'admin') {
-            const [[{ count }]] = await conn.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
-            if (count <= 1) { await conn.release(); return res.status(400).json({ error: 'Impossible de supprimer le dernier compte admin' }); }
-        }
-        // Le compte proprietaire porte toutes les donnees de l'equipe : le supprimer les effacerait.
-        if (String(req.params.id) === String(req.userId)) { await conn.release(); return res.status(400).json({ error: 'Impossible de supprimer le compte principal de l\'équipe' }); }
-        await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-        await conn.release();
-        res.json({ message: 'OK' });
+        await avecConnexion(async (conn) => {
+            const [target] = await conn.query('SELECT role FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [req.params.id, req.userId]);
+            if (!target.length) return res.status(404).json({ error: 'Utilisateur hors de votre équipe' });
+            if (target[0].role === 'admin') {
+                const [[{ count }]] = await conn.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [req.userId]);
+                if (count <= 1) return res.status(400).json({ error: 'Impossible de supprimer le dernier compte admin' });
+            }
+            // Le compte proprietaire porte toutes les donnees de l'equipe : le supprimer les effacerait.
+            if (String(req.params.id) === String(req.userId)) return res.status(400).json({ error: 'Impossible de supprimer le compte principal de l\'équipe' });
+            await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+            res.json({ message: 'OK' });
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 // V13 — activite par utilisateur. Les devis et clients crees avant la V11 n'ont pas
@@ -1577,30 +1586,30 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         await ensureV11Tables();
-        const conn = await pool.getConnection();
-
-        const [membres] = await conn.query(
-            `SELECT id, nom, email, role, created_at, derniere_connexion, COALESCE(nb_connexions, 0) AS nb_connexions
-             FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
-        // devis.user_id = l'equipe proprietaire, devis.auteur_id = la personne qui l'a saisi.
-        const [parDevis] = await conn.query(
-            // COALESCE(ht_calcule, ht) : avant la V17 il n'y avait pas d'ajustement, le prix
-            // vendu etait le prix calcule. L'ecart est alors nul, ce qui est exact.
-            `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
-                    SUM(statut = 'valide') AS nb_valides,
-                    SUM(statut = 'refuse') AS nb_refuses,
-                    COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
-                    COALESCE(SUM(COALESCE(ht_calcule, ht)), 0) AS ca_calcule
-             FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
-        const [parClient] = await conn.query(
-            `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
-        // Activite hebdomadaire : lundi de chaque semaine, sur 12 semaines.
-        const [activite] = await conn.query(
-            `SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS semaine,
-                    COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
-             FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
-             GROUP BY semaine ORDER BY semaine`, [req.userId]);
-        await conn.release();
+        const { membres, parDevis, parClient, activite } = await avecConnexion(async (conn) => {
+            const [membres] = await conn.query(
+                `SELECT id, nom, email, role, created_at, derniere_connexion, COALESCE(nb_connexions, 0) AS nb_connexions
+                 FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
+            // devis.user_id = l'equipe proprietaire, devis.auteur_id = la personne qui l'a saisi.
+            const [parDevis] = await conn.query(
+                // COALESCE(ht_calcule, ht) : avant la V17 il n'y avait pas d'ajustement, le prix
+                // vendu etait le prix calcule. L'ecart est alors nul, ce qui est exact.
+                `SELECT auteur_id, COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
+                        SUM(statut = 'valide') AS nb_valides,
+                        SUM(statut = 'refuse') AS nb_refuses,
+                        COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
+                        COALESCE(SUM(COALESCE(ht_calcule, ht)), 0) AS ca_calcule
+                 FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
+            const [parClient] = await conn.query(
+                `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
+            // Activite hebdomadaire : lundi de chaque semaine, sur 12 semaines.
+            const [activite] = await conn.query(
+                `SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS semaine,
+                        COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
+                 FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                 GROUP BY semaine ORDER BY semaine`, [req.userId]);
+            return { membres, parDevis, parClient, activite };
+        });
 
         const devisPar = new Map(parDevis.map(r => [r.auteur_id, r]));
         const clientsPar = new Map(parClient.map(r => [r.auteur_id, r]));
@@ -1643,18 +1652,19 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
 app.get('/api/admin/stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
-        const conn = await pool.getConnection();
-        await ensureV11Tables(conn);
-        const [users] = await conn.query('SELECT COUNT(*) as count FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
-        const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis WHERE user_id = ?', [req.userId]);
-        // "revenue" = tous les devis chiffres, valides ou non : ce n'est pas un revenu, d'ou
-        // "revenu_valide", qui ne compte que les devis devenus commandes.
-        const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis WHERE user_id = ?', [req.userId]);
-        const [valides] = await conn.query(
-            "SELECT COUNT(*) AS n, COALESCE(SUM(ttc), 0) AS total FROM devis WHERE user_id = ? AND statut = 'valide'", [req.userId]);
-        const [refuses] = await conn.query(
-            "SELECT COUNT(*) AS n FROM devis WHERE user_id = ? AND statut = 'refuse'", [req.userId]);
-        await conn.release();
+        const { users, devis, revenue, valides, refuses } = await avecConnexion(async (conn) => {
+            await ensureV11Tables(conn);
+            const [users] = await conn.query('SELECT COUNT(*) as count FROM users WHERE COALESCE(equipe_id, id) = ?', [req.userId]);
+            const [devis] = await conn.query('SELECT COUNT(*) as count FROM devis WHERE user_id = ?', [req.userId]);
+            // "revenue" = tous les devis chiffres, valides ou non : ce n'est pas un revenu, d'ou
+            // "revenu_valide", qui ne compte que les devis devenus commandes.
+            const [revenue] = await conn.query('SELECT SUM(ttc) as total FROM devis WHERE user_id = ?', [req.userId]);
+            const [valides] = await conn.query(
+                "SELECT COUNT(*) AS n, COALESCE(SUM(ttc), 0) AS total FROM devis WHERE user_id = ? AND statut = 'valide'", [req.userId]);
+            const [refuses] = await conn.query(
+                "SELECT COUNT(*) AS n FROM devis WHERE user_id = ? AND statut = 'refuse'", [req.userId]);
+            return { users, devis, revenue, valides, refuses };
+        });
         const tranches = Number(valides[0].n) + Number(refuses[0].n);
         res.json({
             users: users[0].count,
