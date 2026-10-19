@@ -337,7 +337,18 @@
             position: relative; width: 100%; aspect-ratio: 480 / 200; border-radius: 14px;
             overflow: hidden; margin-bottom: 10px; border: 1px solid var(--border);
             background: radial-gradient(120% 90% at 50% 15%, #22252a 0%, #141619 55%, #0d0e10 100%);
+            /* Sans cette borne, le dessin occupe 400 px de haut sur un ecran large. */
+            max-width: 620px;
         }
+        /* Tant qu'aucun vehicule n'est choisi, il n'y a rien a montrer : on le dit clairement
+           plutot que de laisser un grand cadre vide et un message gris en dessous. */
+        .zone-invite {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 16px; border-radius: 14px; font-size: 13px;
+            background: rgba(255,87,34,.07); border: 1px dashed rgba(255,87,34,.45);
+            color: var(--primary-clair);
+        }
+        .zone-invite .fleche { font-size: 18px; line-height: 1; flex: none; }
         .zone-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         .zone-poly {
             fill: rgba(255,255,255,.02); stroke: rgba(255,255,255,.28); stroke-width: 1.2;
@@ -3278,12 +3289,20 @@ const ZONE_SILHOUETTES = {
     }
 };
 
+let zonesErreur = null;   // message du dernier echec de chargement, affiche a l'ecran
+
 async function chargerZones() {
     try {
         const d = await apiFetch('/zones-vehicule');
         toutesZones = d.zones || {};
         totauxZones = d.totaux || {};
-    } catch (err) { toutesZones = {}; totauxZones = {}; }
+        zonesErreur = null;
+    } catch (err) {
+        // Un echec silencieux afficherait « aucune zone » sans dire pourquoi : on garde le
+        // message pour le montrer, avec de quoi reessayer.
+        toutesZones = {}; totauxZones = {};
+        zonesErreur = err.message || 'chargement impossible';
+    }
     zonesRender();
 }
 
@@ -3313,10 +3332,31 @@ function zonesRender() {
     const type = getDropdownValue('dd-v-type');
     const liste = document.getElementById('zone-liste');
 
-    if (!type) {
+    // Les surfaces n'ont pas pu etre chargees : on le dit, plutot que de laisser croire
+    // que ce vehicule n'a aucune zone.
+    if (zonesErreur) {
+        document.getElementById('zone-scene').style.display = 'none';
+        document.querySelector('#v-zones-cond .zone-actions').style.display = 'none';
+        document.querySelector('#v-zones-cond .zone-total').style.display = 'none';
+        document.getElementById('zone-faces').innerHTML = '';
+        liste.innerHTML = '<div class="zone-invite" style="border-color:rgba(255,90,90,.5);background:rgba(255,90,90,.08);color:#ffa5a5;">'
+            + '<span class="fleche" aria-hidden="true">⚠</span><span>Les surfaces des zones n\'ont pas pu être chargées '
+            + `(${escapeHtml(zonesErreur)}). <button type="button" class="choix-btn" style="flex:none;margin-left:8px;padding:5px 10px;" onclick="chargerZones()">Réessayer</button></span></div>`;
+        return;
+    }
+
+    // Sans type de vehicule, il n'y a ni zone ni silhouette a montrer : on masque tout le
+    // reste pour ne pas laisser un cadre vide, et on dit ou aller.
+    const vide = !type;
+    document.getElementById('zone-scene').style.display = vide ? 'none' : '';
+    document.querySelector('#v-zones-cond .zone-actions').style.display = vide ? 'none' : '';
+    document.querySelector('#v-zones-cond .zone-total').style.display = vide ? 'none' : '';
+    if (vide) {
         document.getElementById('zone-faces').innerHTML = '';
         document.getElementById('zone-dessin').innerHTML = '';
-        liste.innerHTML = '<p style="font-size:12px;color:var(--text-light);">Choisissez d\'abord un type de véhicule.</p>';
+        liste.innerHTML = '<div class="zone-invite"><span class="fleche" aria-hidden="true">↑</span>'
+            + '<span>Choisissez le <strong>type de véhicule</strong> plus haut dans le formulaire : '
+            + 'ce sont ses zones et leurs surfaces qui s\'afficheront ici.</span></div>';
         document.getElementById('zone-total').textContent = '0,00 m²';
         return;
     }
