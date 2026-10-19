@@ -964,8 +964,12 @@ function sendBrevoEmail(to, subject, text, nomExpediteur) {
     });
 }
 
-async function sendStockAlertEmail(nom, stock, seuil) {
-    const [admins] = await avecConnexion(conn => conn.query("SELECT email FROM users WHERE role = 'admin'"));
+// equipeId est obligatoire : sans filtre d'equipe, l'alerte partait a TOUS les
+// administrateurs du logiciel, qui recevaient par mail le nom des matieres et les stocks
+// d'une entreprise qui n'est pas la leur.
+async function sendStockAlertEmail(equipeId, nom, stock, seuil) {
+    const [admins] = await avecConnexion(conn => conn.query(
+        "SELECT email FROM users WHERE role = 'admin' AND COALESCE(equipe_id, id) = ?", [equipeId]));
     if (!admins.length) return;
     const envoi = await sendBrevoEmail(admins.map(a => a.email), `⚠️ Stock faible : ${nom}`,
         `Le stock de "${nom}" est passé à ${stock}m² (seuil d'alerte : ${seuil}m²). Pensez à réapprovisionner.`,
@@ -1014,7 +1018,7 @@ app.put('/api/stock/:type/:id', verifyToken, async (req, res) => {
 
             if (estBas && !etaitBas) {
                 await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
-                sendStockAlertEmail(before[0].nom, stockVal, seuilEffectif).catch(e => console.error('Email stock:', e.message));
+                sendStockAlertEmail(req.userId, before[0].nom, stockVal, seuilEffectif).catch(e => console.error('Email stock:', e.message));
             } else if (!estBas && etaitBas) {
                 await conn.query(`UPDATE ${cfg.table} SET alerte_envoyee = 0 WHERE id = ? AND user_id = ?`, [req.params.id, req.userId]);
             }
