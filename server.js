@@ -1105,11 +1105,18 @@ app.put('/api/clients/:id', verifyToken, async (req, res) => {
 app.delete('/api/clients/:id', verifyToken, async (req, res) => {
     try {
         await avecConnexion(async (conn) => {
+            // L'appartenance est verifiee AVANT de toucher aux devis. Sans ce controle, et
+            // sans le filtre d'equipe sur l'UPDATE ci-dessous, n'importe quel compte connecte
+            // pouvait detacher les devis d'une AUTRE entreprise de leurs clients : les liens
+            // etaient perdus et les statistiques par source de cette entreprise faussees.
+            const [client] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            if (!client.length) return res.status(404).json({ error: 'Client introuvable' });
             // Les devis sont conserves : on detache seulement le lien, le nom saisi reste lisible.
-            await conn.query('UPDATE devis SET client_id = NULL WHERE client_id = ?', [req.params.id]);
+            // devis.user_id porte l'equipe proprietaire : c'est lui qui borne la mise a jour.
+            await conn.query('UPDATE devis SET client_id = NULL WHERE client_id = ? AND user_id = ?', [req.params.id, req.userId]);
             await conn.query('DELETE FROM clients WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            res.json({ message: 'OK' });
         });
-        res.json({ message: 'OK' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
