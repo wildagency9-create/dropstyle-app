@@ -380,7 +380,22 @@
         .bloc-visuel {
             position: absolute; border: 1.5px solid var(--primary-clair); border-radius: 5px;
             background: rgba(255,87,34,.22); cursor: grab; touch-action: none;
-            display: grid; place-items: center; overflow: hidden;
+            display: grid; place-items: center;
+            /* Taille minimale d'affichage : en dessous, la croix et la poignee ne seraient
+               plus atteignables au doigt. Les centimetres, eux, restent ceux saisis. */
+            min-width: 44px; min-height: 34px;
+        }
+        .bloc-visuel .bloc-sup {
+            position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; z-index: 2;
+            border-radius: 50%; border: 1.5px solid var(--bg-dark); cursor: pointer; padding: 0;
+            background: #2a2d33; color: #fff; font-size: 12px; line-height: 1;
+            display: grid; place-items: center; font-family: inherit;
+        }
+        .bloc-visuel .bloc-sup:hover { background: var(--danger); }
+        .bloc-visuel .bloc-poignee {
+            position: absolute; right: -8px; bottom: -8px; width: 18px; height: 18px; z-index: 2;
+            border-radius: 5px; background: var(--primary); border: 2px solid var(--bg-dark);
+            cursor: nwse-resize; touch-action: none;
         }
         .bloc-visuel.pris { cursor: grabbing; box-shadow: 0 0 0 3px var(--halo); }
         .bloc-visuel.actif { border-width: 2px; box-shadow: 0 0 0 2px rgba(255,138,80,.5); }
@@ -3479,48 +3494,76 @@ function majBloc(id, champ, valeur) {
     majTotalZones();
 }
 
+const surfaceDunBloc = b => (b.l / 100) * (b.h / 100) * b.q;
+const texteBloc = b => `${b.type}${b.q > 1 ? ' ×' + b.q : ''}<br>${surfaceDunBloc(b).toFixed(2).replace('.', ',')} m²`;
+// Echelle de la silhouette : la scene fait 480 x 200 unites pour cette longueur de vehicule.
+function echelleScene() {
+    const longueur = LONGUEUR_AFFICHAGE[ZONE_FAMILLE[getDropdownValue('dd-v-type')]] || 5;
+    return { longueur, hauteur: longueur * 200 / 480 };
+}
+
 function rendreBlocs() {
     const scene = document.getElementById('zone-scene');
     scene.querySelectorAll('.bloc-visuel').forEach(e => e.remove());
     if (!facePorteDessin()) return;
-    const famille = ZONE_FAMILLE[getDropdownValue('dd-v-type')];
-    const longueur = LONGUEUR_AFFICHAGE[famille] || 5;
-    const hauteurScene = longueur * 200 / 480;   // la scene fait 480 x 200 unites
+    const ech = echelleScene();
     for (const b of blocsVisuels.filter(x => x.face === zoneFace)) {
         const el = document.createElement('div');
         el.className = 'bloc-visuel';
-        const larg = Math.min(100 - b.x, (b.l / 100) / longueur * 100);
-        const haut = Math.min(100 - b.y, (b.h / 100) / hauteurScene * 100);
-        el.style.cssText = `left:${b.x}%;top:${b.y}%;width:${Math.max(larg, 2)}%;height:${Math.max(haut, 2)}%`;
-        el.innerHTML = `<span>${b.type}${b.q > 1 ? ' ×' + b.q : ''}</span>`;
-        glisserBloc(el, b);
+        el.style.cssText = `left:${b.x}%;top:${b.y}%;`
+            + `width:${Math.max(Math.min(100 - b.x, (b.l / 100) / ech.longueur * 100), 2)}%;`
+            + `height:${Math.max(Math.min(100 - b.y, (b.h / 100) / ech.hauteur * 100), 2)}%`;
+        el.innerHTML = `<span>${texteBloc(b)}</span>`
+            + `<button type="button" class="bloc-sup" aria-label="Retirer ce visuel">✕</button>`
+            + `<span class="bloc-poignee" role="presentation" aria-hidden="true"></span>`;
+        el.querySelector('.bloc-sup').addEventListener('pointerdown', e => e.stopPropagation());
+        el.querySelector('.bloc-sup').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); retirerBloc(b.id); });
+        glisserBloc(el, b, ech);
         scene.appendChild(el);
     }
 }
 
-// Deplacement au doigt comme a la souris. Seule la position bouge : les dimensions, donc
-// le prix, ne changent jamais par glissement.
-function glisserBloc(el, b) {
-    el.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        const scene = document.getElementById('zone-scene');
-        const r = scene.getBoundingClientRect();
-        const dep = { x: e.clientX, y: e.clientY, bx: b.x, by: b.y };
+// Deplacement et redimensionnement, au doigt comme a la souris. Etirer le bloc change ses
+// dimensions donc sa surface : les centimetres sont recalcules a l'echelle de la silhouette,
+// et restent corrigeables au chiffre pres dans la liste en dessous.
+function glisserBloc(el, b, ech) {
+    const prendre = (e, mode) => {
+        e.preventDefault(); e.stopPropagation();
+        const r = document.getElementById('zone-scene').getBoundingClientRect();
+        // Scene de largeur nulle (onglet masque, ecran en cours de rotation) : on ne divise
+        // pas par zero, sinon la surface devient « Infinity » et le devis avec elle.
+        if (!(r.width > 0 && r.height > 0)) return;
+        const dep = { x: e.clientX, y: e.clientY, bx: b.x, by: b.y, l: b.l, h: b.h };
         el.classList.add('pris');
         const bouger = (ev) => {
-            const larg = parseFloat(el.style.width), haut = parseFloat(el.style.height);
-            b.x = Math.min(100 - larg, Math.max(0, dep.bx + ((ev.clientX - dep.x) / r.width) * 100));
-            b.y = Math.min(100 - haut, Math.max(0, dep.by + ((ev.clientY - dep.y) / r.height) * 100));
-            el.style.left = b.x + '%'; el.style.top = b.y + '%';
+            const dx = ((ev.clientX - dep.x) / r.width) * 100;
+            const dy = ((ev.clientY - dep.y) / r.height) * 100;
+            if (mode === 'deplacer') {
+                b.x = Math.min(100 - parseFloat(el.style.width), Math.max(0, dep.bx + dx));
+                b.y = Math.min(100 - parseFloat(el.style.height), Math.max(0, dep.by + dy));
+                el.style.left = b.x + '%'; el.style.top = b.y + '%';
+            } else {
+                // Les pourcentages de la scene redeviennent des centimetres reels, bornes :
+                // aucun visuel de vehicule ne fait moins de 5 cm ni plus de 20 m.
+                b.l = Math.min(2000, Math.max(5, Math.round(dep.l + dx / 100 * ech.longueur * 100)));
+                b.h = Math.min(2000, Math.max(5, Math.round(dep.h + dy / 100 * ech.hauteur * 100)));
+                el.style.width = Math.min(100 - b.x, (b.l / 100) / ech.longueur * 100) + '%';
+                el.style.height = Math.min(100 - b.y, (b.h / 100) / ech.hauteur * 100) + '%';
+                el.querySelector('span').innerHTML = texteBloc(b);
+                majTotalSeul();
+            }
         };
         const lacher = () => {
             el.classList.remove('pris');
             window.removeEventListener('pointermove', bouger);
             window.removeEventListener('pointerup', lacher);
+            if (mode !== 'deplacer') rendreListeBlocs();   // la liste reprend les nouvelles valeurs
         };
         window.addEventListener('pointermove', bouger);
         window.addEventListener('pointerup', lacher);
-    });
+    };
+    el.addEventListener('pointerdown', (e) => { if (!e.target.closest('.bloc-poignee, .bloc-sup')) prendre(e, 'deplacer'); });
+    el.querySelector('.bloc-poignee').addEventListener('pointerdown', (e) => prendre(e, 'redim'));
 }
 
 function rendreListeBlocs() {
@@ -3544,14 +3587,19 @@ function rendreListeBlocs() {
     }
 }
 
-function majTotalZones() {
-    const type = getDropdownValue('dd-v-type');
+// Pendant un etirement, seul le total est rafraichi : reecrire la liste a chaque pixel
+// la ferait clignoter sous le doigt.
+function majTotalSeul() {
     const zones = surfaceZonesChoisies(), blocs = surfaceBlocs();
-    const reference = totauxZones[type];
+    const reference = totauxZones[getDropdownValue('dd-v-type')];
     const fmt = n => n.toFixed(2).replace('.', ',');
     document.getElementById('zone-total').textContent = fmt(zones + blocs) + ' m²'
         + (blocs > 0 ? ` (dont ${fmt(blocs)} de visuels)` : '')
         + (reference ? ` sur ${fmt(Number(reference))}` : '');
+}
+
+function majTotalZones() {
+    majTotalSeul();
     rendreListeBlocs();
 }
 
