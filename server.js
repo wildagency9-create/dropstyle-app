@@ -127,6 +127,10 @@ const SOURCES_PAR_DEFAUT = [
 // Le drapeau est propre au processus : un redemarrage rejoue la verification.
 let v11Prete = false;
 
+// Faux tant que la verification n'a pas eu lieu : mieux vaut un devis sans saisie qu'un
+// devis qu'on ne peut pas enregistrer.
+let devisPorteLaSaisie = false;
+
 async function ensureV11Tables(existingConn) {
     if (v11Prete && !existingConn) return;
     let echec = false;
@@ -223,6 +227,13 @@ async function ensureV11Tables(existingConn) {
                 if (!/Duplicate column/i.test(e.message)) { echec = true; console.error('V11 init:', e.message); }
             }
         }
+        // V33 — on ne SUPPOSE pas que la colonne existe : une migration avalee par le
+        // catch ci-dessus ferait echouer tous les enregistrements de devis.
+        try {
+            const [cols] = await conn.query("SHOW COLUMNS FROM devis LIKE 'saisie'");
+            devisPorteLaSaisie = cols.length > 0;
+            if (!devisPorteLaSaisie) console.error('V33 : colonne saisie absente — les devis ne seront pas reprenables.');
+        } catch (e) { devisPorteLaSaisie = false; console.error('V33 verif colonne :', e.message); }
     });
     if (!echec) v11Prete = true;
 }
@@ -947,10 +958,13 @@ app.post('/api/devis', verifyToken, async (req, res) => {
                 const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
                 if (c.length) lien = c[0].id;
             }
+            const colSaisie = devisPorteLaSaisie ? 'saisie, ' : '';
+            const valSaisie = devisPorteLaSaisie ? '?, ' : '';
+            const argSaisie = devisPorteLaSaisie ? [saisie ? JSON.stringify(saisie) : null] : [];
             const [r] = await conn.query(
-                `INSERT INTO devis (user_id, type, qty, ht, ttc, details, saisie, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [req.userId, type, qty, ht, ttc, JSON.stringify(details), saisie ? JSON.stringify(saisie) : null,
+                `INSERT INTO devis (user_id, type, qty, ht, ttc, details, ${colSaisie}client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ${valSaisie}?, ?, ?, ?, ?, NOW())`,
+                [req.userId, type, qty, ht, ttc, JSON.stringify(details), ...argSaisie,
                  (client || '').trim() || null, lien, req.authUserId,
                  ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
                  ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
@@ -986,11 +1000,13 @@ app.put('/api/devis/:id', verifyToken, async (req, res) => {
                 const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
                 if (c.length) lien = c[0].id;
             }
+            const majSaisie = devisPorteLaSaisie ? 'saisie = ?, ' : '';
+            const argSaisie = devisPorteLaSaisie ? [saisie ? JSON.stringify(saisie) : null] : [];
             const [r] = await conn.query(
-                `UPDATE devis SET type = ?, qty = ?, ht = ?, ttc = ?, details = ?, saisie = ?,
+                `UPDATE devis SET type = ?, qty = ?, ht = ?, ttc = ?, details = ?, ${majSaisie}
                         client = ?, client_id = ?, ht_calcule = ?, ajustement_pct = ?, modifie_le = NOW(), modifie_par = ?
                  WHERE id = ? AND user_id = ?`,
-                [type, qty, ht, ttc, JSON.stringify(details), saisie ? JSON.stringify(saisie) : null,
+                [type, qty, ht, ttc, JSON.stringify(details), ...argSaisie,
                  (client || '').trim() || null, lien,
                  ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
                  ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct,
