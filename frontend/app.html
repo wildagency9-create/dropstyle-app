@@ -381,10 +381,16 @@
             position: absolute; border: 1.5px solid var(--primary-clair); border-radius: 5px;
             background: rgba(255,87,34,.22); cursor: grab; touch-action: none;
             display: grid; place-items: center;
-            /* Taille minimale d'affichage : en dessous, la croix et la poignee ne seraient
-               plus atteignables au doigt. Les centimetres, eux, restent ceux saisis. */
-            min-width: 44px; min-height: 34px;
+            /* Pas de hauteur minimale : un bandeau de 20 cm doit s'afficher fin, comme en
+               vrai. Une hauteur minimale le bridait, et tirer la poignee ne produisait rien
+               de visible tant qu'on n'avait pas rattrape l'ecart. La croix et la poignee
+               debordent du bloc, elles restent donc attrapables meme sur un bloc fin. */
+            min-width: 26px;
         }
+        /* Bloc trop bas pour deux lignes : on garde la surface seule, sur une ligne.
+           Trop bas meme pour ca : plus rien, le chiffre reste lisible dans la liste. */
+        .bloc-visuel.compact span { font-size: 8.5px; line-height: 1; white-space: nowrap; }
+        .bloc-visuel.minuscule span { display: none; }
         .bloc-visuel .bloc-sup {
             position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; z-index: 2;
             border-radius: 50%; border: 1.5px solid var(--bg-dark); cursor: pointer; padding: 0;
@@ -3520,6 +3526,13 @@ function rendreBlocs() {
         el.querySelector('.bloc-sup').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); retirerBloc(b.id); });
         glisserBloc(el, b, ech);
         scene.appendChild(el);
+        // Mesure apres insertion : le libelle s'adapte a la place reellement disponible.
+        const haut = el.getBoundingClientRect().height;
+        if (haut < 13) el.classList.add('minuscule');
+        else if (haut < 26) {
+            el.classList.add('compact');
+            el.querySelector('span').innerHTML = surfaceDunBloc(b).toFixed(2).replace('.', ',') + ' m²';
+        }
     }
 }
 
@@ -3534,6 +3547,13 @@ function glisserBloc(el, b, ech) {
         // pas par zero, sinon la surface devient « Infinity » et le devis avec elle.
         if (!(r.width > 0 && r.height > 0)) return;
         const dep = { x: e.clientX, y: e.clientY, bx: b.x, by: b.y, l: b.l, h: b.h };
+        if (mode !== 'deplacer') {
+            // Le glissement part de ce que l'utilisateur VOIT : si une largeur minimale a
+            // elargi le bloc, repartir de sa valeur theorique ferait tirer dans le vide.
+            const rb = el.getBoundingClientRect();
+            dep.l = Math.round(rb.width / r.width * ech.longueur * 100);
+            dep.h = Math.round(rb.height / r.height * ech.hauteur * 100);
+        }
         el.classList.add('pris');
         const bouger = (ev) => {
             const dx = ((ev.clientX - dep.x) / r.width) * 100;
