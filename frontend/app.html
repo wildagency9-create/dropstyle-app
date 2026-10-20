@@ -1521,6 +1521,7 @@ let allImpressions = [];
 let PARAMS = {};
 let allVinyles = [], allMateriaux = [], allLaminations = [], allTapes = [], allPoseurs = [], allForfaits = [], allKits = [];
 let lastDevisDetails = null; // detail du dernier calcul affiche (titre + lignes), sauvegarde avec le devis pour l'historique
+let lastDevisSaisie = null;  // V33 — etat du formulaire ayant produit ce calcul, pour pouvoir rouvrir le devis
 
 function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2576,6 +2577,167 @@ function coutRevientDepuisRows(rows) {
     }, 0);
 }
 
+/* ===== V33 — reprise d'un devis =====
+   Un devis ne gardait que son resultat affiche : impossible de le rouvrir pour en
+   changer un metre carre. On memorise donc l'etat du formulaire au moment du calcul.
+   La capture est VOLONTAIREMENT generique — tous les champs de l'onglet, par identifiant —
+   pour qu'un champ ajoute plus tard soit repris sans qu'on ait a y penser. */
+const SAISIE_VERSION = 1;
+const SAISIE_LIGNES = {
+    signaletique: [
+        { conteneur: 's-panneau-lines', ajouter: 'addPanneauLine' },
+        { conteneur: 's-direct-lines', ajouter: 'addDirectLine' },
+        { conteneur: 's-rollup-lines', ajouter: 'addRollupLine' }
+    ]
+};
+const SAISIE_CALCUL = {
+    vehicule: 'calcVehicule', signaletique: 'calcSignaletique',
+    impression: 'calcImpression', stickers: 'calcStickers'
+};
+
+function valeurChamp(el) {
+    return el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value;
+}
+function poserChamp(el, v) {
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!v;
+    else el.value = v === null || v === undefined ? '' : v;
+}
+
+// Une liste deroulante maison porte sa valeur dans data-value, et son choix declenche
+// des effets (filtres, laizes, champs affiches) : on repasse par selectDropdownItem
+// plutot que d'ecrire data-value a la main, sinon ces effets ne se produisent pas.
+function poserListe(dd, valeur) {
+    if (!dd) return;
+    const item = [...dd.querySelectorAll('.dropdown-item')].find(i => i.dataset.value === valeur);
+    if (item) selectDropdownItem(item);
+    else dd.dataset.value = valeur;
+}
+
+function capturerLignes(type) {
+    const groupes = SAISIE_LIGNES[type];
+    if (!groupes) return null;
+    const out = {};
+    groupes.forEach(g => {
+        out[g.conteneur] = [...document.querySelectorAll('#' + g.conteneur + ' .line-row')].map(row => ({
+            champs: [...row.querySelectorAll('input, select, textarea')].map(valeurChamp),
+            listes: [...row.querySelectorAll('.dropdown')].map(d => d.dataset.value || '')
+        }));
+    });
+    return out;
+}
+
+function capturerSaisie(type) {
+    const onglet = document.getElementById('tab-' + type);
+    if (!onglet) return null;
+    const champs = {}, listes = {};
+    onglet.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+        // Un champ fichier ne se recharge pas : le navigateur l'interdit, et les photos
+        // sont de toute facon rattachees au devis en base, pas au formulaire.
+        if (el.type !== 'file' && !el.closest('.line-row')) champs[el.id] = valeurChamp(el);
+    });
+    onglet.querySelectorAll('.dropdown[id]').forEach(dd => {
+        if (!dd.closest('.line-row')) listes[dd.id] = dd.dataset.value || '';
+    });
+    const saisie = { v: SAISIE_VERSION, type, champs, listes, lignes: capturerLignes(type) };
+    if (type === 'vehicule') {
+        saisie.zones = [...zonesChoisies];
+        saisie.blocs = blocsVisuels.map(b => ({ ...b }));
+    }
+    // Le prix vendu peut avoir ete ajuste a la main apres le calcul : sans cela, rouvrir
+    // un devis le ramenerait au prix du moteur sans prevenir.
+    saisie.prix = { ajustementPct, prixCible };
+    return saisie;
+}
+
+async function restaurerSaisie(saisie) {
+    if (!saisie || !saisie.type) throw new Error('Saisie illisible');
+    const type = saisie.type;
+    const bouton = [...document.querySelectorAll('.tab-btn')]
+        .find(b => (b.getAttribute('onclick') || '').includes(`switchTab('${type}'`));
+    if (bouton) bouton.click();
+
+    // Les lignes d'abord : les champs qu'elles contiennent n'existent pas avant.
+    (SAISIE_LIGNES[type] || []).forEach(g => {
+        const lignes = (saisie.lignes && saisie.lignes[g.conteneur]) || [];
+        const cont = document.getElementById(g.conteneur);
+        if (!cont) return;
+        cont.innerHTML = '';
+        lignes.forEach(() => window[g.ajouter]());
+        [...cont.querySelectorAll('.line-row')].forEach((row, i) => {
+            const l = lignes[i];
+            if (!l) return;
+            [...row.querySelectorAll('input, select, textarea')].forEach((el, j) => poserChamp(el, l.champs[j]));
+            [...row.querySelectorAll('.dropdown')].forEach((dd, j) => poserListe(dd, l.listes[j]));
+        });
+    });
+
+    Object.entries(saisie.champs || {}).forEach(([id, v]) => {
+        const el = document.getElementById(id);
+        if (el) poserChamp(el, v);
+    });
+    Object.entries(saisie.listes || {}).forEach(([id, v]) => poserListe(document.getElementById(id), v));
+
+    if (type === 'vehicule') {
+        zonesChoisies = new Set(saisie.zones || []);
+        blocsVisuels = (saisie.blocs || []).map(b => ({ ...b }));
+        if (typeof zonesRender === 'function') zonesRender();
+    }
+
+    const calcul = SAISIE_CALCUL[type];
+    if (calcul && typeof window[calcul] === 'function') await window[calcul]();
+
+    // L'ajustement de prix est reapplique APRES le calcul, qui le remet a zero.
+    const p = saisie.prix || {};
+    if (devisCourant && (p.prixCible !== null && p.prixCible !== undefined)) prixCible = p.prixCible;
+    else if (devisCourant && p.ajustementPct) ajustementPct = p.ajustementPct;
+    if (devisCourant) rendreResultat();
+}
+
+/* ---- reprise depuis l'historique ---- */
+let devisEnEdition = null;   // id du devis repris, null en saisie normale
+
+async function modifierDevis(id) {
+    try {
+        const tous = await apiFetch('/devis');
+        const d = tous.find(x => x.id === id);
+        if (!d) { showNotification('Devis introuvable', 'error'); return; }
+        const saisie = typeof d.saisie === 'string' ? JSON.parse(d.saisie || 'null') : d.saisie;
+        if (!saisie) {
+            showNotification('Ce devis a été enregistré avant la reprise : il faut le refaire', 'error');
+            return;
+        }
+        devisEnEdition = { id, client: d.client, client_id: d.client_id };
+        await restaurerSaisie(saisie);
+        majBandeauEdition();
+        showNotification('Devis repris — modifie puis enregistre', 'success');
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+function annulerEdition() {
+    devisEnEdition = null;
+    majBandeauEdition();
+    showNotification('Reprise annulée — le devis d\'origine est intact', 'success');
+}
+
+// Tant qu'une reprise est en cours, il faut que ce soit VISIBLE : sans cela on croit
+// creer un devis et on en ecrase un autre.
+function majBandeauEdition() {
+    let el = document.getElementById('bandeau-edition');
+    if (!devisEnEdition) { if (el) el.remove(); return; }
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'bandeau-edition';
+        el.style.cssText = 'position:sticky;top:0;z-index:50;margin:0 0 12px;padding:10px 14px;border-radius:10px;'
+            + 'background:rgba(255,87,34,.12);border:1px solid var(--primary);display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+        const conteneur = document.querySelector('.container') || document.body;
+        conteneur.prepend(el);
+    }
+    el.innerHTML = `<span style="font-size:12px;font-weight:600;color:var(--primary);">
+        Reprise du devis n°${devisEnEdition.id}${devisEnEdition.client ? ' — ' + escapeHtml(devisEnEdition.client) : ''}.
+        L'enregistrement remplacera ce devis.</span>
+        <button type="button" style="margin-left:auto;font-size:11px;padding:6px 12px;" onclick="annulerEdition()">Annuler la reprise</button>`;
+}
+
 function prixVente() {
     if (!devisCourant) return 0;
     if (prixCible !== null) return prixCible;
@@ -2584,6 +2746,8 @@ function prixVente() {
 
 function showResult(title, ttc, ht, tva, rows, type, qty, warnings = [], prefixHTML = '') {
     lastDevisDetails = { title, rows };
+    // V33 — capturee ici, donc toujours en phase avec le resultat affiche.
+    lastDevisSaisie = capturerSaisie(type);
     ajustementPct = 0; prixCible = null;   // un nouveau calcul repart toujours du prix du moteur
     devisCourant = {
         title, rows, type, qty, prefixHTML,
@@ -2919,6 +3083,9 @@ async function renderHistorique() {
                         ${boutonStatut(d.id, 'valide', st, '✅ Validé')}
                         ${boutonStatut(d.id, 'refuse', st, '❌ Refusé')}
                     </div>
+                    ${d.saisie
+                        ? `<button class="btn-pri" style="margin-top:10px;width:100%;" onclick="modifierDevis(${d.id})">Reprendre et modifier ce devis</button>`
+                        : '<p style="font-size:11px;color:var(--text-light);margin-top:10px;">Devis enregistré avant la reprise : sa saisie n\'a pas été conservée, il faut le refaire pour le modifier.</p>'}
                     <button class="danger" style="margin-top:10px;width:100%;" onclick="deleteDevis(${d.id})">Supprimer ce devis</button>
                 </div>
             </div>`;
@@ -3148,13 +3315,15 @@ async function saveDevis(type, qty, ht, ttc, btn) {
     sel.innerHTML = '<option value="">— Sans client —</option>'
         + allClients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('')
         + '<option value="__new">+ Nouveau client…</option>';
-    sel.value = '';
+    // V33 — en reprise, on repart du client deja rattache : le corriger reste possible,
+    // mais l'oubli ne doit pas detacher le devis de son client.
+    sel.value = devisEnEdition && devisEnEdition.client_id ? String(devisEnEdition.client_id) : '';
     document.getElementById('md-nom').value = '';
     document.getElementById('md-type').value = 'prospect';
     optionsSources('md-source', '');
     majChampsNouveauClient();
     document.getElementById('md-ok').disabled = false;
-    document.getElementById('md-ok').textContent = 'Enregistrer';
+    document.getElementById('md-ok').textContent = devisEnEdition ? 'Mettre à jour' : 'Enregistrer';
     ouvrirModal('modal-devis');
 }
 
@@ -3173,7 +3342,7 @@ async function confirmerSaveDevis() {
     const { type, qty, ht, ttc, btn } = devisEnAttente;
     const choix = document.getElementById('md-client').value;
     const ok = document.getElementById('md-ok');
-    ok.disabled = true; ok.textContent = 'Enregistrement...';
+    ok.disabled = true; ok.textContent = devisEnEdition ? 'Mise à jour...' : 'Enregistrement...';
     try {
         let clientId = null, clientNom = null;
         if (choix === '__new') {
@@ -3192,25 +3361,33 @@ async function confirmerSaveDevis() {
         }
         // On enregistre le prix REELLEMENT VENDU dans `ht` — c'est lui le chiffre d'affaires —
         // et le prix du moteur a cote, pour pouvoir mesurer l'ecart et recalibrer plus tard.
-        await apiSend('/devis', 'POST', {
+        const corps = {
             // V26 — le serveur rattache au devis les photos prises sous ce brouillon.
             brouillon_id: brouillonCourant(),
-            type, qty, ht, ttc, details: lastDevisDetails || {}, client: clientNom, client_id: clientId,
+            type, qty, ht, ttc, details: lastDevisDetails || {},
+            // V33 — la saisie part avec le devis : c'est elle qui le rendra modifiable.
+            saisie: lastDevisSaisie || null,
+            client: clientNom, client_id: clientId,
             ht_calcule: devisCourant ? Number(devisCourant.htCalcule.toFixed(2)) : null,
             ajustement_pct: devisCourant && devisCourant.htCalcule > 0 && Math.abs(ht - devisCourant.htCalcule) > 0.005
                 ? Number((((ht / devisCourant.htCalcule) - 1) * 100).toFixed(2)) : null
-        });
+        };
+        if (devisEnEdition) await apiSend('/devis/' + devisEnEdition.id, 'PUT', corps);
+        else await apiSend('/devis', 'POST', corps);
         fermerModal('modal-devis');
         devisEnAttente = null;
+        const etaitUneReprise = !!devisEnEdition;
+        devisEnEdition = null;
+        majBandeauEdition();
         // V26 — les photos appartiennent desormais au devis enregistre : on repart sur un
         // brouillon neuf, sinon le prochain devis se les verrait rattacher aussi.
         brouillonSuivant();
-        showNotification('Devis sauvegardé ✓', 'success');
+        showNotification(etaitUneReprise ? 'Devis mis à jour ✓' : 'Devis sauvegardé ✓', 'success');
         themeSaisonFete(btn);   // V24 — habillage : le devis est deja enregistre, rien ne depend de ceci
-        if (btn) { btn.disabled = true; btn.textContent = 'Devis enregistré ✓'; } // reste desactive : evite les doublons
+        if (btn) { btn.disabled = true; btn.textContent = etaitUneReprise ? 'Devis mis à jour ✓' : 'Devis enregistré ✓'; } // reste desactive : evite les doublons
     } catch (err) {
         showNotification(err.message, 'error');
-        ok.disabled = false; ok.textContent = 'Enregistrer';
+        ok.disabled = false; ok.textContent = devisEnEdition ? 'Mettre à jour' : 'Enregistrer';
     }
 }
 

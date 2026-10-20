@@ -200,6 +200,11 @@ async function ensureV11Tables(existingConn) {
         // n'ont pas d'ajustement : ht_calcule reste NULL et vaut alors ht, ce qui est exact.
         `ALTER TABLE devis ADD COLUMN ht_calcule DECIMAL(10, 2) DEFAULT NULL`,
         `ALTER TABLE devis ADD COLUMN ajustement_pct DECIMAL(6, 2) DEFAULT NULL`,
+        // V33 — etat du formulaire au moment du calcul : c'est ce qui rend un devis
+        // modifiable. Les devis plus anciens gardent NULL et ne sont pas recalculables.
+        `ALTER TABLE devis ADD COLUMN saisie JSON DEFAULT NULL`,
+        `ALTER TABLE devis ADD COLUMN modifie_le DATETIME DEFAULT NULL`,
+        `ALTER TABLE devis ADD COLUMN modifie_par INT DEFAULT NULL`,
         // V15 — trace des recapitulatifs deja envoyes. En base et non en memoire : un
         // redemarrage du serveur ne doit pas provoquer un second envoi.
         `CREATE TABLE IF NOT EXISTS recaps_envoyes (
@@ -928,7 +933,7 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
 app.post('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
-        const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct, brouillon_id } = req.body;
+        const { type, qty, ht, ttc, details, client, client_id, ht_calcule, ajustement_pct, brouillon_id, saisie } = req.body;
         const devisId = await avecConnexion(async (conn) => {
             // client_id n'est accepte que s'il appartient a l'equipe, sinon on l'ignore et
             // on garde le nom en texte : un devis mal rattache fausserait les statistiques.
@@ -938,9 +943,10 @@ app.post('/api/devis', verifyToken, async (req, res) => {
                 if (c.length) lien = c[0].id;
             }
             const [r] = await conn.query(
-                `INSERT INTO devis (user_id, type, qty, ht, ttc, details, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [req.userId, type, qty, ht, ttc, JSON.stringify(details), (client || '').trim() || null, lien, req.authUserId,
+                `INSERT INTO devis (user_id, type, qty, ht, ttc, details, saisie, client, client_id, auteur_id, ht_calcule, ajustement_pct, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [req.userId, type, qty, ht, ttc, JSON.stringify(details), saisie ? JSON.stringify(saisie) : null,
+                 (client || '').trim() || null, lien, req.authUserId,
                  ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
                  ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct]);
             return r.insertId;
@@ -961,6 +967,36 @@ app.post('/api/devis', verifyToken, async (req, res) => {
         res.status(201).json({ message: 'OK', id: devisId, photos });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// V33 — modification d'un devis deja enregistre. Le devis garde son id, sa date de
+// creation et son statut : on remplace ce qui a ete recalcule, rien d'autre. Le client
+// peut changer, parce qu'un devis attribue au mauvais client fausse les statistiques.
+app.put('/api/devis/:id', verifyToken, async (req, res) => {
+    try {
+        await ensureV9Tables(); await ensureV11Tables();
+        const { type, qty, ht, ttc, details, saisie, client, client_id, ht_calcule, ajustement_pct } = req.body;
+        if (!type || !(Number(ht) >= 0)) return res.status(400).json({ error: 'Devis incomplet' });
+        const touche = await avecConnexion(async (conn) => {
+            let lien = null;
+            if (client_id) {
+                const [c] = await conn.query('SELECT id FROM clients WHERE id = ? AND equipe_id = ?', [client_id, req.userId]);
+                if (c.length) lien = c[0].id;
+            }
+            const [r] = await conn.query(
+                `UPDATE devis SET type = ?, qty = ?, ht = ?, ttc = ?, details = ?, saisie = ?,
+                        client = ?, client_id = ?, ht_calcule = ?, ajustement_pct = ?, modifie_le = NOW(), modifie_par = ?
+                 WHERE id = ? AND user_id = ?`,
+                [type, qty, ht, ttc, JSON.stringify(details), saisie ? JSON.stringify(saisie) : null,
+                 (client || '').trim() || null, lien,
+                 ht_calcule === undefined || ht_calcule === null ? null : ht_calcule,
+                 ajustement_pct === undefined || ajustement_pct === null ? null : ajustement_pct,
+                 req.authUserId, req.params.id, req.userId]);
+            return r.affectedRows;
+        });
+        if (!touche) return res.status(404).json({ error: 'Devis introuvable' });
+        res.json({ message: 'OK', id: Number(req.params.id) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/devis', verifyToken, async (req, res) => {
     try {
         await ensureV9Tables(); await ensureV11Tables();
