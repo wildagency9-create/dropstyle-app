@@ -3331,6 +3331,9 @@ let zonesErreur = null;   // message du dernier echec de chargement, affiche a l
 async function chargerZones() {
     try {
         const d = await apiFetch('/zones-vehicule');
+        // apiFetch ne regarde pas le code HTTP : une erreur du serveur arrive donc ici sous
+        // la forme { error: "..." }, et passait jusqu'ici pour une reponse vide.
+        if (d && d.error) throw new Error(d.error);
         toutesZones = d.zones || {};
         totauxZones = d.totaux || {};
         zonesErreur = null;

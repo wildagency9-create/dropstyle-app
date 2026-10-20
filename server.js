@@ -368,6 +368,7 @@ function surfaceTotaleZones(zones) {
 }
 
 let v28Prete = false;
+let v28Echec = null;   // message du dernier echec de creation, remonte a l'ecran
 
 async function ensureV28Tables(existingConn) {
     if (v28Prete && !existingConn) return;
@@ -387,7 +388,13 @@ async function ensureV28Tables(existingConn) {
                 INDEX idx_equipe_type (equipe_id, type_vehicule)
             )`);
             v28Prete = true;
-        } catch (e) { console.error('V28 init:', e.message); }
+            v28Echec = null;
+        } catch (e) {
+            // On n'interrompt pas le demarrage pour autant, mais on garde la raison : sans
+            // elle, l'ecran des zones restait vide sans que personne puisse dire pourquoi.
+            v28Echec = e.message;
+            console.error('V28 init:', e.message);
+        }
     });
 }
 
@@ -396,14 +403,20 @@ async function ensureV28Tables(existingConn) {
 async function ensureZonesEquipe(conn, equipeId) {
     const [[{ n }]] = await conn.query('SELECT COUNT(*) AS n FROM zones_vehicule WHERE equipe_id = ?', [equipeId]);
     if (n > 0) return;
+    // Les 69 zones partent en UNE requete. Ligne par ligne, c'etaient 69 allers-retours
+    // vers une base distante : assez long pour que la requete HTTP soit coupee avant la fin,
+    // et l'ecran des zones restait vide sans explication.
+    const lignes = [], params = [];
     for (const [type, zones] of Object.entries(ZONES_DEFAUT)) {
-        for (let i = 0; i < zones.length; i++) {
-            const z = zones[i];
-            await conn.query(
-                'INSERT INTO zones_vehicule (equipe_id, type_vehicule, cle, nom, face, par_cote, surface_m2, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [equipeId, type, z.cle, z.nom, z.face, z.par_cote, z.m2, i]);
-        }
+        zones.forEach((z, i) => {
+            lignes.push('(?, ?, ?, ?, ?, ?, ?, ?)');
+            params.push(equipeId, type, z.cle, z.nom, z.face, z.par_cote, z.m2, i);
+        });
     }
+    if (!lignes.length) return;
+    await conn.query(
+        'INSERT INTO zones_vehicule (equipe_id, type_vehicule, cle, nom, face, par_cote, surface_m2, ordre) VALUES '
+        + lignes.join(', '), params);
 }
 
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
@@ -1073,6 +1086,7 @@ app.delete('/api/photos/:id', verifyToken, async (req, res) => {
 app.get('/api/zones-vehicule', verifyToken, async (req, res) => {
     try {
         await ensureV28Tables();
+        if (v28Echec) return res.status(500).json({ error: 'Table des zones indisponible : ' + v28Echec });
         const rows = await avecConnexion(async (conn) => {
             await ensureZonesEquipe(conn, req.userId);
             const [lignes] = await conn.query(
