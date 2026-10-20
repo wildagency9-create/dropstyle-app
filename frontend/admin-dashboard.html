@@ -170,9 +170,9 @@
         .rail {
             width: 224px; flex: none; align-self: stretch;
             border-right: 1px solid var(--border);
-            background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 38%);
-            padding-block: 16px 24px; display: flex; flex-direction: column; gap: 18px;
-            position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+            background: #0a0b0e;
+            padding-block: 0 0; display: flex; flex-direction: column; gap: 18px;
+            position: sticky; top: 0; height: 100vh; overflow-y: auto;
         }
         .rail-groupe { display: flex; flex-direction: column; gap: 2px; padding-inline: 10px; }
         .rail-titre {
@@ -184,7 +184,7 @@
             display: flex; align-items: center; gap: 10px; padding: 9px 12px; width: 100%;
             color: var(--text-secondary); font-size: 13px; font-weight: 500; text-align: left;
             background: none; border: none; border-radius: 12px; cursor: pointer; font-family: inherit;
-            transform: none;
+            transform: none; text-transform: none; letter-spacing: normal; box-shadow: none;
         }
         .rail .tab-btn:hover { color: var(--text-primary); background: var(--verre); transform: none; }
         .rail .tab-btn.active {
@@ -239,7 +239,10 @@
         .rail-marque img { width: 100%; height: 100%; object-fit: contain; }
         .rail-marque b { font-size: 15px; font-weight: 800; letter-spacing: -.3px; display: block; line-height: 1.1; }
         .rail-marque small { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-light); }
-        .rail-pied { margin-top: auto; padding: 14px 10px 16px; display: grid; gap: 7px; border-top: 1px solid var(--border); }
+        .rail-pied {
+            margin-top: auto; padding: 14px 10px 16px; display: grid; gap: 7px;
+            border-top: 1px solid var(--border); position: sticky; bottom: 0; background: #0a0b0e;
+        }
         .rail-pied button { width: 100%; font-size: 12px; padding: 9px 10px; }
 
         /* Outils de l'en-tete : recherche, cloche, compte, bouton de disposition. */
@@ -273,7 +276,9 @@
             position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; border-radius: 99px;
             background: var(--primary); color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px;
         }
-        .tb-dispo { font-size: 12px; padding: 9px 15px; border-radius: 99px; }
+        .tb-dispo { font-size: 12.5px; padding: 9px 17px; border-radius: 99px; text-transform: none; letter-spacing: normal; }
+        .tb-barre-dispo button, .tb-outils-carte button, .tb-resultats button { text-transform: none; letter-spacing: normal; }
+        .rail-pied button { text-transform: none; letter-spacing: normal; font-weight: 600; }
 
         .tb-entete { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .tb-bonjour { font-size: 21px; font-weight: 800; margin: 0; letter-spacing: -.4px; color: var(--text-primary); }
@@ -317,8 +322,9 @@
         .tb-pleine .tb-bloc { width: 100%; }
         .tb-segments { display: inline-flex; gap: 4px; padding: 4px; border-radius: 99px; background: var(--verre); border: 1px solid var(--border); }
         .tb-segments button {
-            font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
+            font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 15px; border-radius: 99px;
             cursor: pointer; background: transparent; color: var(--text-secondary); border: none; transform: none;
+            text-transform: none; letter-spacing: normal; box-shadow: none;
         }
         .tb-segments button.on { background: var(--primary); color: #fff; }
         .tb-segments button:hover { transform: none; }
@@ -1496,8 +1502,8 @@ async function chargerTableauBord() {
     };
     try {
         const stats = await lire('/admin/utilisateurs-stats');
-        tbSerie = stats.activite || [];
-        tbSerieJours = stats.activite_jours || [];
+        tbSerie = tbCompleter(stats.activite || [], 'semaine', 52);
+        tbSerieJours = tbCompleter(stats.activite_jours || [], 'jour', 7);
         tbRedessiner();
         tbEquipe(stats.utilisateurs || []);
     } catch (err) { tbEchec('tb-g-activite', err.message); tbEchec('tb-equipe', err.message); }
@@ -1538,12 +1544,39 @@ function tbActivite(activite) {
         <path d="${ligne} L${x(activite.length - 1)} ${H - bas} L${gauche} ${H - bas} Z" fill="url(#tb-deg)"/>
         <path d="${ligne}" fill="none" stroke="#FF5722" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         ${pts.map((p, i) => `<circle class="tb-barre" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="9" fill="transparent"/>`).join('')}
+        <circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3.5" fill="#FF5722"/>
+        <text class="tb-val-dir" x="${W}" y="${Math.max(12, pts[pts.length - 1][1] - 10)}" text-anchor="end">${tbEur(activite[activite.length - 1].ca_valide)}</text>
         ${axeX}</svg>`;
     el.querySelectorAll('.tb-barre').forEach(c => {
         const a = activite[+c.dataset.i];
         tbSuivre(c, `<b>${parJour ? 'le ' + court(a.jour) : 'semaine du ' + court(a.semaine)}</b> · ${tbEur(a.ca_valide)} validé<br>
             <span style="color:var(--text-secondary)">${a.nb} devis chiffrés, ${a.nb_valides || 0} validé(s)</span>`);
     });
+}
+
+// Une période sans devis doit apparaître à zéro, pas disparaître : sans cela deux
+// semaines éloignées se retrouvent voisines sur l'axe et la courbe raconte n'importe quoi.
+const TB_VIDE = { nb: 0, ca: 0, ca_valide: 0, ca_calcule: 0, nb_valides: 0, nb_refuses: 0 };
+function tbCompleter(serie, champ, combien) {
+    const jourCle = v => {
+        const d = new Date(v);
+        return isNaN(d) ? String(v).slice(0, 10)
+            : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    };
+    const connus = new Map(serie.map(p => [jourCle(p[champ]), p]));
+    const pasJours = champ === 'semaine' ? 7 : 1;
+    // On part d'aujourd'hui — du lundi de cette semaine pour les séries hebdomadaires.
+    const fin = new Date();
+    fin.setHours(12, 0, 0, 0);
+    if (champ === 'semaine') fin.setDate(fin.getDate() - ((fin.getDay() + 6) % 7));
+    const out = [];
+    for (let i = combien - 1; i >= 0; i--) {
+        const d = new Date(fin);
+        d.setDate(d.getDate() - i * pasJours);
+        const cle = jourCle(d);
+        out.push(connus.get(cle) || { ...TB_VIDE, [champ]: cle });
+    }
+    return out;
 }
 
 // Numéro de semaine ISO : c'est le repère que l'atelier emploie pour planifier.
@@ -1590,6 +1623,7 @@ function tbRedessiner() {
 // Variation MESURÉE : la seconde moitié de la fenêtre comparée à la première. Si l'une
 // des deux moitiés est vide, on n'affiche pas de badge — un pourcentage sorti d'une
 // division par zéro ne veut rien dire.
+const TB_PLANCHERS = { nb: 3, ca_valide: 500, ca: 500 };
 function tbVariation(id, serie, champ) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1599,7 +1633,9 @@ function tbVariation(id, serie, champ) {
     const moitie = Math.floor(serie.length / 2);
     const somme = t => t.reduce((a, x) => a + (Number(x[champ]) || 0), 0);
     const avant = somme(serie.slice(0, moitie)), apres = somme(serie.slice(moitie));
-    if (avant <= 0) return;
+    // Passer de 1 devis a 10 n'est pas « +900 % » : c'est une periode de depart trop
+    // maigre pour qu'un pourcentage veuille dire quoi que ce soit.
+    if (avant < (TB_PLANCHERS[champ] || 1)) return;
     const pct = Math.round(((apres - avant) / avant) * 100);
     if (!isFinite(pct) || pct === 0) return;
     el.classList.add(pct > 0 ? 'haut' : 'bas');
