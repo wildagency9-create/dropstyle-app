@@ -308,6 +308,27 @@
         .photo-sup:hover { background: var(--danger); }
         .photo-aide { font-size: 10px; color: var(--text-light); margin-top: 6px; }
 
+        /* V30 — vehicule reconnu. La confiance est dite franchement : une reconnaissance
+           moyenne ou faible doit inviter a verifier, pas passer pour un fait acquis. */
+        .reco {
+            display: flex; align-items: flex-start; gap: 11px; margin-top: 10px;
+            padding: 12px 14px; border-radius: 14px;
+            background: var(--bg-input); border: 1px solid var(--border);
+        }
+        .reco.haute { border-color: rgba(74,222,128,.4); }
+        .reco.moyenne, .reco.faible { border-color: rgba(255,87,34,.45); }
+        .reco .pastille {
+            width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center;
+            background: rgba(255,87,34,.14); border: 1px solid rgba(255,87,34,.3); color: var(--primary-clair);
+            font-size: 17px;
+        }
+        .reco .corps { min-width: 0; flex: 1; }
+        .reco .modele { font-weight: 700; font-size: 14px; }
+        .reco .detail { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+        .reco .confiance { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+        .reco.haute .confiance { color: var(--success); }
+        .reco.moyenne .confiance, .reco.faible .confiance { color: var(--primary-clair); }
+
         /* V27 — choix a deux options montre en clair. Le mode PAO etait dans un menu
            deroulant ou l'option « A l'heure » passait inapercue. */
         .choix { display: flex; gap: 6px; }
@@ -919,6 +940,12 @@
                     <label>Photos du véhicule <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0;">— facultatif</span></label>
                     <div class="photo-grille" id="photo-grille"></div>
                     <p class="photo-aide" id="photo-aide">Une photo par face. Elles sont enregistrées avec le devis.</p>
+                    <!-- V30 — reconnaissance. Volontairement sur demande et non automatique :
+                         chaque reconnaissance est un appel facture, c'est l'utilisateur qui decide. -->
+                    <div class="zone-actions" id="reco-actions" style="display:none;">
+                        <button type="button" class="choix-btn" style="flex:none;" id="btn-reco" onclick="reconnaitreVehicule()">Reconnaître le véhicule</button>
+                    </div>
+                    <div id="reco-resultat"></div>
                 </div>
                 <div class="form-group"><label>Type de véhicule</label>
                     <div class="dropdown" id="dd-v-type">
@@ -3692,6 +3719,10 @@ function renderPhotos() {
             ? 'Une photo par face. Elles sont enregistrées avec le devis.'
             : `${n} photo${n > 1 ? 's' : ''} sur 5 — enregistrée${n > 1 ? 's' : ''} avec le devis.`;
     }
+    // V30 — sans photo, il n'y a rien a reconnaitre.
+    const reco = document.getElementById('reco-actions');
+    if (reco) reco.style.display = n > 0 ? '' : 'none';
+    if (n === 0) { const r = document.getElementById('reco-resultat'); if (r) r.innerHTML = ''; }
 }
 
 // Recompression dans le navigateur : on n'envoie jamais le fichier brut du telephone.
@@ -3743,6 +3774,48 @@ async function photoChoisie(face, input) {
     } catch (err) {
         if (cellule) cellule.classList.remove('occupee');
         showNotification(err.message, 'error');
+    }
+}
+
+// V30 — reconnaissance du vehicule a partir d'une photo deja envoyee. Le type reconnu
+// prerempli le formulaire, mais reste modifiable : c'est une proposition, pas un verdict.
+const RECO_LIBELLE = { citadine: 'Citadine', berline: 'Berline / Break', suv: 'SUV / 4x4', utilitaire: 'Utilitaire', fourgon: 'Fourgon', camion: 'Camion / PL' };
+
+async function reconnaitreVehicule() {
+    // On prend la premiere photo disponible, en privilegiant un profil : de face, la
+    // carrosserie est bien plus difficile a classer.
+    const ordre = ['gauche', 'droite', 'arriere', 'avant', 'toit'];
+    const face = ordre.find(f => photosPrises[f]);
+    if (!face) return;
+    const btn = document.getElementById('btn-reco');
+    const zone = document.getElementById('reco-resultat');
+    btn.disabled = true; btn.textContent = 'Analyse de la photo...';
+    try {
+        const d = await apiSend('/reconnaitre-vehicule', 'POST', { photo_id: photosPrises[face].id });
+        if (d && d.error) throw new Error(d.error);
+        // Le type est applique au formulaire : c'est lui qui determine la surface.
+        const dd = document.getElementById('dd-v-type');
+        if (d.type && RECO_LIBELLE[d.type]) {
+            dd.dataset.value = d.type;
+            dd.querySelector('.dropdown-label').textContent = RECO_LIBELLE[d.type];
+            zonesChoisies.clear(); blocsVisuels = []; zonesRender();
+        }
+        zone.innerHTML = `<div class="reco ${escapeHtml(d.confiance || 'moyenne')}">
+            <span class="pastille" aria-hidden="true">🚗</span>
+            <div class="corps">
+                <div class="modele">${escapeHtml(d.modele || RECO_LIBELLE[d.type] || 'Véhicule')}</div>
+                <div class="detail">${escapeHtml(RECO_LIBELLE[d.type] || d.type)} — type appliqué au devis. ${escapeHtml(d.commentaire || '')}</div>
+                ${d.plaque ? `<div class="detail">Plaque lue : ${escapeHtml(d.plaque)} — affichée seulement, rien n'est enregistré.</div>` : ''}
+                <div class="detail"><span class="confiance">confiance ${escapeHtml(d.confiance || '?')}</span>
+                    ${d.confiance === 'haute' ? '' : ' — vérifiez le type ci-dessous avant de chiffrer.'}</div>
+            </div>
+        </div>`;
+    } catch (err) {
+        zone.innerHTML = `<div class="reco faible"><span class="pastille" aria-hidden="true">⚠</span>
+            <div class="corps"><div class="modele">Reconnaissance impossible</div>
+            <div class="detail">${escapeHtml(err.message)}</div></div></div>`;
+    } finally {
+        btn.disabled = false; btn.textContent = 'Reconnaître le véhicule';
     }
 }
 

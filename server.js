@@ -1264,6 +1264,73 @@ ${ctx.devis.map(d => `${d.id} | ${d.client || 'sans nom'} | ${d.type} | ${d.qty}
     }
 });
 
+// ===== V30 — RECONNAISSANCE DU VEHICULE SUR LA PHOTO =====
+// Le moteur n'a besoin que du TYPE parmi six : c'est lui qui donne la surface validee.
+// Le modele et la plaque ne servent qu'a l'affichage, pour que l'utilisateur verifie d'un
+// coup d'oeil que la machine a reconnu le bon vehicule. Rien de tout cela n'est enregistre.
+const OUTIL_VEHICULE = {
+    name: 'vehicule_reconnu',
+    description: "Decrit le vehicule visible sur la photo, pour preremplir un devis de covering.",
+    strict: true,
+    input_schema: {
+        type: 'object',
+        properties: {
+            type: {
+                type: 'string',
+                enum: ['citadine', 'berline', 'suv', 'utilitaire', 'fourgon', 'camion'],
+                description: 'Categorie de carrosserie. utilitaire = Kangoo, Partner, Citan. fourgon = Trafic, Transit, Master, Daily. camion = porteur ou poids lourd.'
+            },
+            modele: { type: ['string', 'null'], description: 'Marque et modele si identifiables avec certitude, sinon null' },
+            plaque: { type: ['string', 'null'], description: "Plaque d'immatriculation si elle est nettement lisible, sinon null" },
+            confiance: { type: 'string', enum: ['haute', 'moyenne', 'faible'] },
+            commentaire: { type: 'string', description: 'Une phrase courte, en francais, disant sur quoi repose le choix du type.' }
+        },
+        required: ['type', 'modele', 'plaque', 'confiance', 'commentaire'],
+        additionalProperties: false
+    }
+};
+
+app.post('/api/reconnaitre-vehicule', verifyToken, async (req, res) => {
+    if (!process.env.ANTHROPIC_API_KEY) {
+        return res.status(503).json({ error: "Reconnaissance non configurée : la clé ANTHROPIC_API_KEY n'est pas définie sur le serveur." });
+    }
+    try {
+        const photoId = parseInt(req.body.photo_id, 10);
+        if (!photoId) return res.status(400).json({ error: 'Photo non précisée' });
+        await ensureV26Tables();
+        // Filtre d'equipe : on ne lit jamais la photo d'une autre entreprise.
+        const [rows] = await avecConnexion(conn => conn.query(
+            'SELECT mime, octets FROM devis_photos WHERE id = ? AND equipe_id = ?', [photoId, req.userId]));
+        if (!rows.length) return res.status(404).json({ error: 'Photo introuvable' });
+
+        const client = new Anthropic();
+        const reponse = await client.messages.create({
+            // Haiku suffit pour ranger une carrosserie dans six categories, et l'appel a lieu
+            // a chaque photo : inutile d'y mettre le modele le plus cher.
+            model: 'claude-haiku-5-5',
+            max_tokens: 500,
+            tools: [OUTIL_VEHICULE],
+            tool_choice: { type: 'tool', name: 'vehicule_reconnu' },
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image', source: { type: 'base64', media_type: rows[0].mime, data: Buffer.from(rows[0].octets).toString('base64') } },
+                    { type: 'text', text: "Quel véhicule est sur cette photo ? Réponds avec l'outil. Le type de carrosserie est ce qui compte : il détermine la surface à couvrir. Si la photo ne montre pas de véhicule, choisis le type le plus proche et indique une confiance faible en l'expliquant." }
+                ]
+            }]
+        });
+        const appel = reponse.content.find(b => b.type === 'tool_use');
+        if (!appel) return res.status(502).json({ error: "La reconnaissance n'a rien renvoyé d'exploitable." });
+        res.json(appel.input);
+    } catch (err) {
+        if (err instanceof Anthropic.AuthenticationError) return res.status(502).json({ error: 'Clé API Anthropic invalide.' });
+        if (err instanceof Anthropic.RateLimitError) return res.status(502).json({ error: 'Trop de demandes, réessayez dans un instant.' });
+        if (err instanceof Anthropic.APIError) return res.status(502).json({ error: `Reconnaissance indisponible (${err.status}).` });
+        console.error('Reconnaissance vehicule :', err.message);
+        res.status(500).json({ error: 'Erreur de reconnaissance : ' + err.message });
+    }
+});
+
 // ===== V8 — STOCK (module independant du moteur de prix) =====
 const STOCK_TABLES = {
     vinyles: { table: 'vinyles', nameCol: 'name' },
