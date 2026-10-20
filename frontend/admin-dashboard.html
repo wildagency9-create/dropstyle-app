@@ -162,6 +162,106 @@
             border-bottom: 1px solid var(--border);
             margin-bottom: 20px;
         }
+        /* ===== V32 — coque laterale et tableau de bord =====
+           Les onze onglets tenaient dans une barre horizontale devenue trop etroite. Ils
+           passent dans une colonne groupee par usage, ce qui laisse la place au stock et
+           aux ecrans a venir. Le contenu des onglets, lui, n'est pas touche. */
+        .appli { display: flex; align-items: flex-start; gap: 0; }
+        .rail {
+            width: 224px; flex: none; align-self: stretch;
+            border-right: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 38%);
+            padding-block: 16px 24px; display: flex; flex-direction: column; gap: 18px;
+            position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+        }
+        .rail-groupe { display: flex; flex-direction: column; gap: 2px; padding-inline: 10px; }
+        .rail-titre {
+            font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+            color: var(--text-light); padding: 0 8px 6px;
+        }
+        /* Les liens portent la classe tab-btn : switchTab continue de fonctionner tel quel. */
+        .rail .tab-btn {
+            display: flex; align-items: center; gap: 10px; padding: 9px 12px; width: 100%;
+            color: var(--text-secondary); font-size: 13px; font-weight: 500; text-align: left;
+            background: none; border: none; border-radius: 12px; cursor: pointer; font-family: inherit;
+            transform: none;
+        }
+        .rail .tab-btn:hover { color: var(--text-primary); background: var(--verre); transform: none; }
+        .rail .tab-btn.active {
+            color: #fff; font-weight: 600; border-bottom: none;
+            background: linear-gradient(135deg, rgba(255,87,34,.22), rgba(255,87,34,.10));
+            box-shadow: inset 0 0 0 1px rgba(255,87,34,.3);
+        }
+        .rail .ico { width: 18px; height: 18px; flex: none; display: grid; place-items: center; opacity: .92; }
+        .rail svg { flex: none; display: block; }
+        .pastille-nb {
+            margin-left: auto; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+            background: rgba(255,90,90,.16); color: #ffa5a5; border: 1px solid rgba(255,90,90,.3);
+        }
+        .burger-admin { display: none; }
+
+        /* ---- tableau de bord ---- */
+        .tb-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+        .tb-bloc {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px;
+            padding: 16px; min-width: 0;
+            background-image: linear-gradient(rgba(255,255,255,.055), transparent 42%);
+        }
+        .tb-bloc.large { grid-column: span 2; }
+        .tb-bloc h3 { font-size: 13px; font-weight: 700; margin: 0 0 2px; }
+        .tb-bloc .note { font-size: 11.5px; color: var(--text-secondary); margin: 0 0 13px; }
+        .tb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 11px; }
+        .tb-kpi { background: var(--verre); border: 1px solid var(--border); border-radius: 16px; padding: 13px 14px; min-width: 0; }
+        .tb-kpi .lbl { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-secondary); }
+        .tb-kpi .val { font-size: 25px; font-weight: 800; letter-spacing: -.7px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+        .tb-kpi .sous { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .tb-kpi.vedette .val { color: var(--primary); }
+        .tb-kpi.alerte .val { color: #ffa5a5; }
+        /* Seuls les graphiques s'etirent : une regle svg globale redimensionnerait les icones. */
+        .tb-bloc figure svg, svg.tb-spark { display: block; width: 100%; height: auto; overflow: visible; }
+        .tb-bloc figure { margin: 0; }
+        svg.tb-spark { height: 28px; margin-top: 8px; }
+        .tb-axe { font-size: 9.5px; fill: var(--text-light); }
+        .tb-val-dir { font-size: 10px; font-weight: 700; fill: var(--text-primary); font-variant-numeric: tabular-nums; }
+        .tb-barre { transition: opacity .12s; cursor: pointer; }
+        .tb-barre:hover { opacity: .76; }
+        .tb-legende { display: flex; gap: 13px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-secondary); margin-top: 11px; }
+        .tb-legende span { display: inline-flex; align-items: center; gap: 6px; }
+        .tb-legende i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+        .tb-ligne { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+        .tb-ligne:last-child { border-bottom: none; }
+        .tb-rond {
+            width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+            background: rgba(255,87,34,.14); border: 1px solid rgba(255,87,34,.28); color: var(--primary-clair); font-weight: 700; font-size: 12px;
+        }
+        .tb-ligne .qui { flex: 1; min-width: 0; }
+        .tb-ligne .nom { font-weight: 600; font-size: 13px; }
+        .tb-ligne .det { font-size: 11px; color: var(--text-secondary); }
+        .tb-ligne .chiffre { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .stat-icon svg { display: block; margin: 0 auto; color: var(--primary); opacity: .9; }
+        .tb-vide { font-size: 12.5px; color: var(--text-light); font-style: italic; }
+        .puce-etat {
+            font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+            display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+        }
+        .puce-etat.ok { background: rgba(74,222,128,.13); color: var(--success); border: 1px solid rgba(74,222,128,.3); }
+        .puce-etat.bas { background: rgba(255,90,90,.13); color: #ffa5a5; border: 1px solid rgba(255,90,90,.3); }
+        .tb-bulle {
+            position: fixed; pointer-events: none; z-index: 60; opacity: 0; transition: opacity .1s;
+            background: #1b1e26; border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px;
+            font-size: 11.5px; box-shadow: 0 10px 28px rgba(0,0,0,.5); white-space: nowrap;
+        }
+        @media (max-width: 900px) {
+            .tb-grille { grid-template-columns: 1fr; }
+            .tb-bloc.large { grid-column: span 1; }
+            .rail {
+                position: fixed; left: -232px; top: 0; height: 100vh; max-height: none; z-index: 60;
+                background: #0c0e13; transition: left .2s;
+            }
+            .rail.ouvert { left: 0; }
+            .burger-admin { display: inline-flex; align-items: center; gap: 7px; }
+        }
+
         /* V28 — reglage des zones. Le recapitulatif est le garde-fou : il dit en permanence
            si le total s'ecarte de la surface validee le 26/08 pour ce type de vehicule. */
         .zone-type-btn {
@@ -335,35 +435,60 @@
     </div>
 </header>
 
+<div class="appli">
+<nav class="rail" id="rail"></nav>
 <div class="container">
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
-        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
-        <!-- "Devis calcules" et non "Revenu" : un devis chiffre n'est pas une commande. -->
-        <div class="stat-card"><div class="stat-icon">🧮</div><div class="stat-label">Devis calculés</div><div class="stat-value" id="stat-revenue">0€</div></div>
-        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenu estimé</div><div class="stat-value" id="stat-revenu-valide">0€</div>
-            <div class="stat-sous" id="stat-transfo">&nbsp;</div></div>
-        <div class="stat-card" id="stat-stock-card"><div class="stat-icon">📦</div><div class="stat-label">Stock faible</div><div class="stat-value" id="stat-stock-low">0</div></div>
-    </div>
+    <button class="calc-btn burger-admin" style="margin-bottom:14px;" onclick="document.getElementById('rail').classList.toggle('ouvert')">☰ Menu</button>
 
     <div class="message" id="message"></div>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('users', this)">👥 Utilisateurs</button>
-        <button class="tab-btn" onclick="switchTab('vinyles', this)">🎨 Vinyles</button>
-        <button class="tab-btn" onclick="switchTab('materiaux', this)">📋 Matériaux</button>
-        <button class="tab-btn" onclick="switchTab('poseurs', this)">👷 Poseurs</button>
-        <button class="tab-btn" onclick="switchTab('impressions', this)">🖨️ Impressions</button>
-        <button class="tab-btn" onclick="switchTab('stock', this)">📦 Stock</button>
-        <button class="tab-btn" onclick="switchTab('notifs', this); initNotifs()">📣 Notifications</button>
-        <button class="tab-btn" onclick="switchTab('sources', this); loadSources()">🎯 Sources</button>
-        <button class="tab-btn" onclick="switchTab('zones', this); loadZones()">🚗 Zones</button>
-        <button class="tab-btn" onclick="switchTab('moteur', this)">⚙️ Moteur</button>
-        <button class="tab-btn" onclick="switchTab('habillage', this)">🎉 Habillage</button>
+    <!-- V32 — tableau de bord. Les cinq compteurs d'origine sont conservés tels quels
+         (mêmes identifiants, donc loadStats continue de les remplir) et rejoints par
+         les graphiques que les données permettaient déjà de tracer. -->
+    <div class="tab-content active" id="tab-dashboard">
+        <div class="section-header"><div class="section-title">Vue d'ensemble</div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 19.5v-1.2a3.8 3.8 0 0 0-3.8-3.8H6.3a3.8 3.8 0 0 0-3.8 3.8v1.2"/><circle cx="9" cy="7.2" r="3.2"/><path d="M21.5 19.5v-1.2a3.8 3.8 0 0 0-2.9-3.7"/><path d="M16.2 4.2a3.8 3.8 0 0 1 0 7.3"/></svg></div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
+            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
+            <!-- "Devis calcules" et non "Revenu" : un devis chiffre n'est pas une commande. -->
+            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.2"/><path d="M8 7.5h8"/><path d="M8.5 12.5h.01M12 12.5h.01M15.5 12.5h.01M8.5 16.5h.01M12 16.5h.01M15.5 16.5h.01"/></svg></div><div class="stat-label">Devis calculés</div><div class="stat-value" id="stat-revenue">0€</div></div>
+            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.4 8.9a4.4 4.4 0 1 0 0 6.2"/><path d="M7.6 11.2h5.6M7.6 13.4h5.6"/></svg></div><div class="stat-label">Revenu estimé</div><div class="stat-value" id="stat-revenu-valide">0€</div>
+                <div class="stat-sous" id="stat-transfo">&nbsp;</div></div>
+            <div class="stat-card" id="stat-stock-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.6l9-4.6 9 4.6v8.8L12 21l-9-4.6V7.6z"/><path d="M3 7.6l9 4.6 9-4.6"/><path d="M12 12.2V21"/></svg></div><div class="stat-label">Stock faible</div><div class="stat-value" id="stat-stock-low">0</div></div>
+        </div>
+
+        <div class="tb-grille" style="margin-top:14px;">
+            <div class="tb-bloc large">
+                <h3>Chiffre d'affaires validé</h3>
+                <p class="note">Devis devenus commandes, par semaine, sur 12 semaines. Survolez la courbe.</p>
+                <figure id="tb-g-activite"><p class="tb-vide">Chargement…</p></figure>
+            </div>
+            <div class="tb-bloc">
+                <h3>D'où viennent les affaires</h3>
+                <p class="note">Chiffre d'affaires des devis par canal d'acquisition.</p>
+                <figure id="tb-g-sources"><p class="tb-vide">Chargement…</p></figure>
+            </div>
+            <div class="tb-bloc">
+                <h3>Suite donnée aux devis</h3>
+                <p class="note">Répartition de tous les devis enregistrés.</p>
+                <figure id="tb-g-statuts"></figure>
+                <div class="tb-legende" id="tb-leg-statuts"></div>
+            </div>
+            <div class="tb-bloc">
+                <h3>L'équipe</h3>
+                <p class="note">Devis validés, puis chiffre d'affaires.</p>
+                <div id="tb-equipe"><p class="tb-vide">Chargement…</p></div>
+            </div>
+            <div class="tb-bloc">
+                <h3>Stock à surveiller</h3>
+                <p class="note">Matières sous leur seuil d'alerte.</p>
+                <div id="tb-stock"><p class="tb-vide">Chargement…</p></div>
+            </div>
+        </div>
     </div>
 
     <!-- USERS -->
-    <div class="tab-content active" id="tab-users">
+    <div class="tab-content" id="tab-users">
         <div class="section-header"><div class="section-title">Gestion Utilisateurs</div>
             <div style="display:flex;gap:8px;">
                 <button class="calc-btn" onclick="openModal('modal-rattacher')">Rattacher un compte</button>
@@ -532,7 +657,7 @@
 
     <!-- MOTEUR (V5) -->
     <div class="tab-content" id="tab-moteur">
-        <div class="section-header"><div class="section-title">Paramètres du moteur</div><button class="success" onclick="saveParametres()">💾 Enregistrer</button></div>
+        <div class="section-header"><div class="section-title">Paramètres du moteur</div><button class="success" onclick="saveParametres()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Enregistrer</button></div>
         <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
             <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px;">Codes P01–P24 du classeur de validation. Les lignes COÛT (matière) sont multipliées par le coefficient ; les lignes VENTE (pose, PAO) sont ajoutées telles quelles.</p>
             <div style="font-weight:700;font-size:12px;margin:8px 0;color:var(--primary);">Général</div>
@@ -573,7 +698,7 @@
             </div>
         </div>
 
-        <div class="section-header"><div class="section-title">Synchronisation Google Sheets</div><button onclick="syncPreview()">🔄 Synchroniser depuis Google Sheets</button></div>
+        <div class="section-header"><div class="section-title">Synchronisation Google Sheets</div><button onclick="syncPreview()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 4v4h-4M3 20v-4h4"/></svg>Synchroniser depuis Google Sheets</button></div>
         <div class="table-wrap" style="padding:20px;margin-bottom:24px;">
             <p style="color:var(--text-secondary);font-size:12px;">Source : classeur « DropStyle moteur validation » partagé en lecture (feuilles <b>Paramètres</b> et <b>Tarifs matières</b>). La synchro met à jour les paramètres P01–P24 et les tables Vinyles, Laminations, Tapes et Panneaux. Un aperçu des changements est affiché avant application — rien n'est écrit sans confirmation.</p>
             <div id="sync-result" style="margin-top:12px;"></div>
@@ -692,6 +817,7 @@
         </p>
     </div>
 </div>
+</div><!-- fin .appli -->
 
 <!-- V20 — RATTACHER UN COMPTE EXISTANT -->
 <div class="modal" id="modal-rattacher">
@@ -936,9 +1062,11 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!token || user?.role !== 'admin') { window.location.href = '/'; return; }
     loadAll();
+    chargerTableauBord();
 });
 
 async function loadAll() {
+    construireNav();
     await loadParametres();
     await Promise.all([loadStats(), loadUsers(), loadVinyles(), loadMateriaux(), loadPoseurs(), loadImpressions(), loadForfaits(), loadKits(), loadLaminations(), loadStock()]);
     await populateTestSelects();
@@ -965,9 +1093,11 @@ function animerNombre(id, valeur, suffixe, decimales) {
     })(depart);
 }
 
+let statsAdmin = null;
 async function loadStats() {
     try {
         const data = await fetch(`${API_URL}/admin/stats`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        statsAdmin = data;
         animerNombre('stat-users', data.users);
         animerNombre('stat-devis', data.devis);
         animerNombre('stat-revenue', parseFloat(data.revenue), '€', 2);
@@ -978,6 +1108,7 @@ async function loadStats() {
         if (t) t.textContent = data.taux_transformation === null || data.taux_transformation === undefined
             ? `${data.devis_valides || 0} devis validés`
             : `${data.devis_valides} validés / ${data.devis_refuses} refusés — ${data.taux_transformation} % de transformation`;
+        tbStatuts();
     } catch (err) {
         console.error(err);
         ['stat-users', 'stat-devis', 'stat-revenue', 'stat-revenu-valide'].forEach(id => animerNombre(id, null));
@@ -1119,6 +1250,213 @@ async function supprimerInvitation(id) {
 }
 
 // ===== V11 — SOURCES D'ACQUISITION =====
+// ===== V32 — NAVIGATION LATERALE ET TABLEAU DE BORD =====
+// Les icones sont dessinees ici : un seul jeu, meme grille, meme epaisseur, et elles
+// prennent la couleur du texte — ce qu'un emoji ne sait pas faire.
+const TRAITS = {
+    tableau:   '<rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>',
+    equipe:    '<path d="M15.5 19.5v-1.2a3.8 3.8 0 0 0-3.8-3.8H6.3a3.8 3.8 0 0 0-3.8 3.8v1.2"/><circle cx="9" cy="7.2" r="3.2"/><path d="M21.5 19.5v-1.2a3.8 3.8 0 0 0-2.9-3.7"/><path d="M16.2 4.2a3.8 3.8 0 0 1 0 7.3"/>',
+    stock:     '<path d="M3 7.6l9-4.6 9 4.6v8.8L12 21l-9-4.6V7.6z"/><path d="M3 7.6l9 4.6 9-4.6"/><path d="M12 12.2V21"/>',
+    sources:   '<path d="M3 4.5h18l-7 8.2V19l-4 2v-8.3L3 4.5z"/>',
+    notifs:    '<path d="M18 8.6a6 6 0 1 0-12 0c0 6.6-2.6 7.6-2.6 7.6h17.2S18 15.2 18 8.6z"/><path d="M13.7 19.6a2 2 0 0 1-3.4 0"/>',
+    vinyles:   '<ellipse cx="12" cy="6.2" rx="6.8" ry="2.7"/><path d="M5.2 6.2v11.6c0 1.5 3 2.7 6.8 2.7s6.8-1.2 6.8-2.7V6.2"/><path d="M5.2 12c0 1.5 3 2.7 6.8 2.7s6.8-1.2 6.8-2.7"/>',
+    materiaux: '<path d="M12 3l9 4.6-9 4.6-9-4.6L12 3z"/><path d="M3 12.4l9 4.6 9-4.6"/><path d="M3 16.8l9 4.6 9-4.6"/>',
+    poseurs:   '<path d="M14.9 3.4a5 5 0 0 0-4.6 7.8L3 18.5 5.5 21l7.3-7.3a5 5 0 0 0 7-5.6l-3 3-2.2-.6-.6-2.2 2.9-2.9z"/>',
+    impression:'<path d="M6.5 9.5V3.5h11v6"/><rect x="3" y="9.5" width="18" height="7.2" rx="2.2"/><path d="M6.5 14h11v6.5h-11z"/><path d="M17.3 12.6h1"/>',
+    reglages:  '<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9.5" cy="7" r="2.1" fill="var(--bg-dark)"/><circle cx="15" cy="12" r="2.1" fill="var(--bg-dark)"/><circle cx="8" cy="17" r="2.1" fill="var(--bg-dark)"/>',
+    vehicule:  '<path d="M2.8 16.2V8.6a1.2 1.2 0 0 1 1.2-1.2h8.6v8.8"/><path d="M12.6 10.4h4.1l3.5 4v1.8"/><path d="M2.8 16.2h1.6M9.2 16.2h3.4M18.4 16.2h2.8"/><circle cx="6.6" cy="17.6" r="1.9"/><circle cx="16.2" cy="17.6" r="1.9"/>',
+    habillage: '<path d="M11 3l1.7 4.4L17 9.1l-4.3 1.7L11 15.2 9.3 10.8 5 9.1l4.3-1.7L11 3z"/><path d="M18 14.6l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>'
+};
+const icoAdmin = (nom, t = 18) =>
+    `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TRAITS[nom] || ''}</svg>`;
+
+// Chaque entree appelle switchTab comme avant : la mecanique des onglets n'est pas touchee.
+const NAV_ADMIN = [
+    { titre: 'Pilotage', items: [
+        { cle: 'dashboard', nom: 'Tableau de bord', ico: 'tableau', actif: true },
+        { cle: 'users', nom: 'Utilisateurs', ico: 'equipe' },
+        { cle: 'stock', nom: 'Stock', ico: 'stock', badge: 'nav-stock-badge' },
+        { cle: 'sources', nom: 'Sources', ico: 'sources', apres: 'loadSources' },
+        { cle: 'notifs', nom: 'Notifications', ico: 'notifs', apres: 'initNotifs' }
+    ]},
+    { titre: 'Catalogue', items: [
+        { cle: 'vinyles', nom: 'Vinyles', ico: 'vinyles' },
+        { cle: 'materiaux', nom: 'Matériaux', ico: 'materiaux' },
+        { cle: 'poseurs', nom: 'Poseurs', ico: 'poseurs' },
+        { cle: 'impressions', nom: 'Impressions', ico: 'impression' }
+    ]},
+    { titre: 'Moteur de prix', items: [
+        { cle: 'moteur', nom: 'Paramètres', ico: 'reglages' },
+        { cle: 'zones', nom: 'Zones véhicule', ico: 'vehicule', apres: 'loadZones' },
+        { cle: 'habillage', nom: 'Habillage', ico: 'habillage' }
+    ]}
+];
+function construireNav() {
+    document.getElementById('rail').innerHTML = NAV_ADMIN.map(g => `<div class="rail-groupe">
+        <div class="rail-titre">${g.titre}</div>
+        ${g.items.map(i => `<button class="tab-btn${i.actif ? ' active' : ''}"
+            onclick="switchTab('${i.cle}', this)${i.apres ? '; ' + i.apres + '()' : ''}; document.getElementById('rail').classList.remove('ouvert')">
+            <span class="ico">${icoAdmin(i.ico)}</span> ${i.nom}
+            ${i.badge ? `<span class="pastille-nb" id="${i.badge}" style="display:none">0</span>` : ''}</button>`).join('')}
+    </div>`).join('');
+}
+
+/* ---- tableau de bord : tout vient des endpoints existants ---- */
+const tbEur = n => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+const tbBulle = (() => {
+    const el = document.createElement('div');
+    el.className = 'tb-bulle';
+    document.body.appendChild(el);
+    return el;
+})();
+function tbSuivre(el, texte) {
+    el.addEventListener('pointerenter', e => { tbBulle.innerHTML = texte; tbBulle.style.opacity = '1'; tbPlacer(e); });
+    el.addEventListener('pointermove', tbPlacer);
+    el.addEventListener('pointerleave', () => { tbBulle.style.opacity = '0'; });
+}
+function tbPlacer(e) {
+    const r = tbBulle.getBoundingClientRect();
+    tbBulle.style.left = Math.min(window.innerWidth - r.width - 10, e.clientX + 14) + 'px';
+    tbBulle.style.top = Math.max(8, e.clientY - r.height - 12) + 'px';
+}
+
+// Un chargement qui échoue doit le DIRE : sans cela, la carte reste sur « Chargement… »
+// indéfiniment et personne ne sait si la donnée est vide ou si le serveur a refusé.
+function tbEchec(id, err) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<p class="tb-vide" style="color:#ffa5a5;font-style:normal;">
+        Chargement impossible${err ? ' — ' + escapeHtml(String(err).slice(0, 90)) : ''}.
+        <button class="small" style="margin-left:8px;" onclick="chargerTableauBord()">Réessayer</button></p>`;
+}
+
+async function chargerTableauBord() {
+    const h = { 'Authorization': `Bearer ${token}` };
+    const lire = async (chemin) => {
+        const r = await fetch(`${API_URL}${chemin}`, { headers: h });
+        const d = await r.json().catch(() => null);
+        if (!r.ok || (d && d.error)) throw new Error((d && d.error) || `erreur ${r.status}`);
+        return d;
+    };
+    try {
+        const stats = await lire('/admin/utilisateurs-stats');
+        tbActivite(stats.activite || []);
+        tbEquipe(stats.utilisateurs || []);
+    } catch (err) { tbEchec('tb-g-activite', err.message); tbEchec('tb-equipe', err.message); }
+    try { tbSources(await lire('/stats/sources')); } catch (err) { tbEchec('tb-g-sources', err.message); }
+    try { tbStock(await lire('/stock')); } catch (err) { tbEchec('tb-stock', err.message); }
+    tbStatuts();
+}
+
+// Une seule série, donc une seule couleur et pas de légende.
+function tbActivite(activite) {
+    const el = document.getElementById('tb-g-activite');
+    if (!activite.length) { el.innerHTML = '<p class="tb-vide">Aucun devis sur les 12 dernières semaines.</p>'; return; }
+    const W = 720, H = 210, bas = 26, gauche = 48, haut = 16;
+    const max = Math.max(...activite.map(a => a.ca_valide || 0), 1);
+    const pas = activite.length > 1 ? (W - gauche) / (activite.length - 1) : 0;
+    const x = i => gauche + pas * i;
+    const y = v => haut + (1 - v / max) * (H - bas - haut);
+    let grille = '', axeX = '';
+    [0, max / 2, max].forEach(v => {
+        grille += `<line x1="${gauche}" y1="${y(v)}" x2="${W}" y2="${y(v)}" stroke="rgba(255,255,255,.07)" stroke-width="1"/>`
+               + `<text class="tb-axe" x="${gauche - 8}" y="${y(v) + 3}" text-anchor="end">${Math.round(v / 1000)}k€</text>`;
+    });
+    const court = s => { const d = new Date(s); return isNaN(d) ? '' : `${d.getDate()}/${d.getMonth() + 1}`; };
+    activite.forEach((a, i) => {
+        if (i % 2 === 0 || i === activite.length - 1) axeX += `<text class="tb-axe" x="${x(i)}" y="${H - 8}" text-anchor="middle">${court(a.semaine)}</text>`;
+    });
+    const pts = activite.map((a, i) => [x(i), y(a.ca_valide || 0)]);
+    const ligne = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chiffre d'affaires validé par semaine">
+        <defs><linearGradient id="tb-deg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FF5722" stop-opacity=".40"/><stop offset="100%" stop-color="#FF5722" stop-opacity="0"/>
+        </linearGradient></defs>${grille}
+        <path d="${ligne} L${x(activite.length - 1)} ${H - bas} L${gauche} ${H - bas} Z" fill="url(#tb-deg)"/>
+        <path d="${ligne}" fill="none" stroke="#FF5722" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${pts.map((p, i) => `<circle class="tb-barre" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="9" fill="transparent"/>`).join('')}
+        ${axeX}</svg>`;
+    el.querySelectorAll('.tb-barre').forEach(c => {
+        const a = activite[+c.dataset.i];
+        tbSuivre(c, `<b>semaine du ${court(a.semaine)}</b> · ${tbEur(a.ca_valide)} validé<br>
+            <span style="color:var(--text-secondary)">${a.nb} devis chiffrés, ${a.nb_valides || 0} validé(s)</span>`);
+    });
+}
+
+function tbSources(sources) {
+    const el = document.getElementById('tb-g-sources');
+    const lignes = sources.filter(s => Number(s.ca_devis) > 0).sort((a, b) => b.ca_devis - a.ca_devis).slice(0, 6);
+    if (!lignes.length) { el.innerHTML = '<p class="tb-vide">Aucun devis rattaché à un client pour l\'instant.</p>'; return; }
+    const max = Math.max(...lignes.map(s => Number(s.ca_devis)));
+    const W = 460, label = 140, H = lignes.length * 32;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chiffre d'affaires par canal d'acquisition">`
+        + lignes.map((s, i) => {
+            const y = i * 32 + 6, l = Math.max(3, (Number(s.ca_devis) / max) * (W - label - 70));
+            const nom = String(s.source || '');
+            return `<text class="tb-axe" x="0" y="${y + 14}" style="font-size:11px;fill:var(--text-secondary)">${escapeHtml(nom.length > 20 ? nom.slice(0, 19) + '…' : nom)}</text>`
+                 + `<rect class="tb-barre" data-i="${i}" x="${label}" y="${y + 3}" width="${l}" height="15" rx="4" fill="#FF5722"/>`
+                 + `<text class="tb-val-dir" x="${label + l + 8}" y="${y + 15}">${tbEur(s.ca_devis)}</text>`;
+        }).join('') + '</svg>';
+    el.querySelectorAll('.tb-barre').forEach(b => {
+        const s = lignes[+b.dataset.i];
+        tbSuivre(b, `<b>${escapeHtml(String(s.source))}</b><br>${tbEur(s.ca_devis)} · ${s.total} contact(s) · ${s.taux} % convertis`);
+    });
+}
+
+// Trois états : couleurs d'état, doublées d'une icône et d'un libellé dans la légende.
+// Les chiffres viennent de l'API, jamais du texte affiché à l'écran.
+function tbStatuts() {
+    if (!statsAdmin) return;
+    const total = Number(statsAdmin.devis) || 0;
+    const valides = Number(statsAdmin.devis_valides) || 0;
+    const refuses = Number(statsAdmin.devis_refuses) || 0;
+    const attente = Math.max(0, total - valides - refuses);
+    const el = document.getElementById('tb-g-statuts');
+    if (!total) { el.innerHTML = '<p class="tb-vide">Aucun devis enregistré.</p>'; document.getElementById('tb-leg-statuts').innerHTML = ''; return; }
+    const parts = [
+        { nom: 'Validés', n: valides, c: '#2FBF6E', ico: '✓' },
+        { nom: 'En attente', n: attente, c: '#7C828F', ico: '•' },
+        { nom: 'Refusés', n: refuses, c: '#E8413F', ico: '✕' }
+    ];
+    const W = 300, H = 26;
+    let x = 0, out = '';
+    parts.forEach((p, i) => {
+        const l = (p.n / total) * W;
+        if (l > 0) out += `<rect class="tb-barre" data-i="${i}" x="${x}" y="0" width="${Math.max(2, l - 2)}" height="${H}" rx="4" fill="${p.c}"/>`;
+        x += l;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Répartition des devis par suite donnée">${out}</svg>`;
+    document.getElementById('tb-leg-statuts').innerHTML = parts.map(p =>
+        `<span><i style="background:${p.c}"></i>${p.ico} ${p.nom} · <b>${p.n}</b> (${Math.round(p.n / total * 100)} %)</span>`).join('');
+    el.querySelectorAll('.tb-barre').forEach(b => {
+        const p = parts[+b.dataset.i];
+        tbSuivre(b, `<b>${p.nom}</b> · ${p.n} devis (${Math.round(p.n / total * 100)} %)`);
+    });
+}
+
+function tbEquipe(utilisateurs) {
+    const el = document.getElementById('tb-equipe');
+    const lignes = [...utilisateurs].sort((a, b) => (b.nb_valides || 0) - (a.nb_valides || 0)).slice(0, 5);
+    if (!lignes.length) { el.innerHTML = '<p class="tb-vide">Aucun membre.</p>'; return; }
+    el.innerHTML = lignes.map(u => `<div class="tb-ligne">
+        <span class="tb-rond">${escapeHtml(String(u.nom || '?').charAt(0).toUpperCase())}</span>
+        <div class="qui"><div class="nom">${escapeHtml(u.nom || '')}</div><div class="det">${u.nb_devis || 0} devis chiffrés</div></div>
+        <div style="text-align:right;"><div class="chiffre">${u.nb_valides || 0} validés</div>
+        <div class="det">${tbEur(u.ca_valide)}</div></div></div>`).join('');
+}
+
+function tbStock(items) {
+    const el = document.getElementById('tb-stock');
+    const bas = items.filter(i => i.low);
+    const badge = document.getElementById('nav-stock-badge');
+    if (badge) { badge.textContent = bas.length; badge.style.display = bas.length ? '' : 'none'; }
+    el.innerHTML = bas.length
+        ? bas.slice(0, 6).map(i => `<div class="tb-ligne">
+            <div class="qui"><div class="nom">${escapeHtml(i.nom || '')}</div><div class="det">${i.type} · seuil ${Number(i.seuil_effectif).toFixed(1)} m²</div></div>
+            <span class="puce-etat bas">⚠︎ ${Number(i.stock_m2).toFixed(1)} m²</span></div>`).join('')
+        : '<p class="tb-vide">Aucune matière sous son seuil.</p>';
+}
+
 // ===== V28 — ZONES DU VEHICULE =====
 // Les surfaces entrent dans le prix : elles doivent donc etre reglables ici, comme les
 // parametres du moteur. Le garde-fou affiche en permanence l'ecart avec la grille validee.

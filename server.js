@@ -2041,7 +2041,9 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
             // Activite hebdomadaire : lundi de chaque semaine, sur 12 semaines.
             const [activite] = await conn.query(
                 `SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS semaine,
-                        COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca
+                        COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
+                        COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
+                        SUM(statut = 'valide') AS nb_valides
                  FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
                  GROUP BY semaine ORDER BY semaine`, [req.userId]);
             return { membres, parDevis, parClient, activite };
@@ -2080,7 +2082,12 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
                 ...chiffres(devisPar.get(null)),
                 nb_clients: orphelinC ? orphelinC.nb : 0
             },
-            activite: activite.map(a => ({ semaine: a.semaine, nb: a.nb, ca: Number(a.ca) }))
+            // ca = tout ce qui a ete chiffre ; ca_valide = ce qui est devenu commande.
+            // Les deux sont renvoyes, le tableau de bord ne doit pas les confondre.
+            activite: activite.map(a => ({
+                semaine: a.semaine, nb: a.nb, ca: Number(a.ca),
+                ca_valide: Number(a.ca_valide), nb_valides: Number(a.nb_valides)
+            }))
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
