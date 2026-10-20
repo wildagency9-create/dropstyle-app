@@ -210,11 +210,49 @@
         .tb-bloc.large { grid-column: span 2; }
         .tb-bloc h3 { font-size: 13px; font-weight: 700; margin: 0 0 2px; }
         .tb-bloc .note { font-size: 11.5px; color: var(--text-secondary); margin: 0 0 13px; }
-        .tb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 11px; }
-        .tb-kpi { background: var(--verre); border: 1px solid var(--border); border-radius: 16px; padding: 13px 14px; min-width: 0; }
+        .tb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(164px, 1fr)); gap: 11px; }
+        .tb-kpi {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px;
+            padding: 14px 15px; min-width: 0;
+            background-image: linear-gradient(rgba(255,255,255,.055), transparent 45%);
+        }
         .tb-kpi .lbl { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-secondary); }
-        .tb-kpi .val { font-size: 25px; font-weight: 800; letter-spacing: -.7px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+        .tb-kpi .val {
+            font-size: 25px; font-weight: 800; letter-spacing: -.7px; margin-top: 5px;
+            font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+        }
         .tb-kpi .sous { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .tb-var {
+            font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+            display: inline-flex; align-items: center; gap: 3px;
+        }
+        .tb-var.haut { background: rgba(47,191,110,.14); color: #6ee7a8; border: 1px solid rgba(47,191,110,.3); }
+        .tb-var.bas { background: rgba(232,65,63,.14); color: #ffa5a5; border: 1px solid rgba(232,65,63,.3); }
+        .tb-spark-boite { margin: 8px 0 0; }
+
+        /* En-tete du tableau de bord : accueil nomme et compte, comme sur la maquette. */
+        .tb-entete { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tb-bonjour { font-size: 21px; font-weight: 800; margin: 0; letter-spacing: -.4px; color: var(--text-primary); }
+        .tb-bonjour em { font-style: normal; color: var(--primary); }
+        .tb-date { margin: 2px 0 0; font-size: 12.5px; color: var(--text-secondary); }
+        .tb-compte { display: flex; align-items: center; gap: 9px; padding: 4px 14px 4px 4px; border-radius: 99px; background: var(--bg-card); border: 1px solid var(--border); }
+        .tb-av {
+            width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center;
+            font-weight: 700; font-size: 12px; color: #fff;
+            background: linear-gradient(145deg, var(--primary), var(--primary-dark));
+        }
+        .tb-qn { font-size: 12.5px; font-weight: 600; line-height: 1.15; }
+        .tb-qr { font-size: 10.5px; color: var(--text-light); }
+        .tb-tete { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 13px; }
+        .tb-tete > div:first-child { flex: 1; min-width: 0; }
+        .tb-tete .note { margin-bottom: 0; }
+        .tb-segments { display: inline-flex; gap: 4px; padding: 4px; border-radius: 99px; background: var(--verre); border: 1px solid var(--border); }
+        .tb-segments button {
+            font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
+            cursor: pointer; background: transparent; color: var(--text-secondary); border: none; transform: none;
+        }
+        .tb-segments button.on { background: var(--primary); color: #fff; }
+        .tb-segments button:hover { transform: none; }
         .tb-kpi.vedette .val { color: var(--primary); }
         .tb-kpi.alerte .val { color: #ffa5a5; }
         /* Seuls les graphiques s'etirent : une regle svg globale redimensionnerait les icones. */
@@ -446,21 +484,55 @@
          (mêmes identifiants, donc loadStats continue de les remplir) et rejoints par
          les graphiques que les données permettaient déjà de tracer. -->
     <div class="tab-content active" id="tab-dashboard">
-        <div class="section-header"><div class="section-title">Vue d'ensemble</div></div>
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 19.5v-1.2a3.8 3.8 0 0 0-3.8-3.8H6.3a3.8 3.8 0 0 0-3.8 3.8v1.2"/><circle cx="9" cy="7.2" r="3.2"/><path d="M21.5 19.5v-1.2a3.8 3.8 0 0 0-2.9-3.7"/><path d="M16.2 4.2a3.8 3.8 0 0 1 0 7.3"/></svg></div><div class="stat-label">Utilisateurs</div><div class="stat-value" id="stat-users">0</div></div>
-            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div><div class="stat-label">Devis</div><div class="stat-value" id="stat-devis">0</div></div>
+        <div class="tb-entete">
+            <div>
+                <h2 class="tb-bonjour">Bonjour <em id="tb-prenom">—</em></h2>
+                <p class="tb-date" id="tb-date"></p>
+            </div>
+            <div class="tb-compte"><span class="tb-av" id="tb-initiale">—</span>
+                <div><div class="tb-qn" id="tb-nom">—</div><div class="tb-qr">Administrateur</div></div></div>
+        </div>
+        <div class="tb-kpis" id="tb-kpis">
+            <div class="tb-kpi vedette">
+                <div class="lbl">Revenu validé</div>
+                <div class="val"><span id="stat-revenu-valide">0€</span><span class="tb-var" id="var-revenu"></span></div>
+                <div class="sous" id="stat-transfo">&nbsp;</div>
+                <figure class="tb-spark-boite" id="spark-revenu"></figure>
+            </div>
+            <div class="tb-kpi">
+                <div class="lbl">Devis chiffrés</div>
+                <div class="val"><span id="stat-devis">0</span><span class="tb-var" id="var-devis"></span></div>
+                <div class="sous" id="sous-devis">sur toute la période</div>
+                <figure class="tb-spark-boite" id="spark-devis"></figure>
+            </div>
             <!-- "Devis calcules" et non "Revenu" : un devis chiffre n'est pas une commande. -->
-            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.2"/><path d="M8 7.5h8"/><path d="M8.5 12.5h.01M12 12.5h.01M15.5 12.5h.01M8.5 16.5h.01M12 16.5h.01M15.5 16.5h.01"/></svg></div><div class="stat-label">Devis calculés</div><div class="stat-value" id="stat-revenue">0€</div></div>
-            <div class="stat-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.4 8.9a4.4 4.4 0 1 0 0 6.2"/><path d="M7.6 11.2h5.6M7.6 13.4h5.6"/></svg></div><div class="stat-label">Revenu estimé</div><div class="stat-value" id="stat-revenu-valide">0€</div>
-                <div class="stat-sous" id="stat-transfo">&nbsp;</div></div>
-            <div class="stat-card" id="stat-stock-card"><div class="stat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.6l9-4.6 9 4.6v8.8L12 21l-9-4.6V7.6z"/><path d="M3 7.6l9 4.6 9-4.6"/><path d="M12 12.2V21"/></svg></div><div class="stat-label">Stock faible</div><div class="stat-value" id="stat-stock-low">0</div></div>
+            <div class="tb-kpi">
+                <div class="lbl">Total chiffré</div>
+                <div class="val"><span id="stat-revenue">0€</span></div>
+                <div class="sous">tous devis confondus, TTC</div>
+            </div>
+            <div class="tb-kpi">
+                <div class="lbl">Utilisateurs</div>
+                <div class="val"><span id="stat-users">0</span></div>
+                <div class="sous">dans l'équipe</div>
+            </div>
+            <div class="tb-kpi" id="stat-stock-card">
+                <div class="lbl">Stock sous le seuil</div>
+                <div class="val"><span id="stat-stock-low">0</span></div>
+                <div class="sous">matières à commander</div>
+            </div>
         </div>
 
         <div class="tb-grille" style="margin-top:14px;">
             <div class="tb-bloc large">
-                <h3>Chiffre d'affaires validé</h3>
-                <p class="note">Devis devenus commandes, par semaine, sur 12 semaines. Survolez la courbe.</p>
+                <div class="tb-tete">
+                    <div><h3>Chiffre d'affaires validé</h3>
+                    <p class="note">Devis devenus commandes, par semaine. Survolez la courbe.</p></div>
+                    <div class="tb-segments" role="group" aria-label="Période">
+                        <button onclick="tbPeriode(4, this)">4 sem.</button>
+                        <button class="on" onclick="tbPeriode(12, this)">12 sem.</button>
+                    </div>
+                </div>
                 <figure id="tb-g-activite"><p class="tb-vide">Chargement…</p></figure>
             </div>
             <div class="tb-bloc">
@@ -1061,6 +1133,7 @@ window.addEventListener('DOMContentLoaded', () => {
     token = localStorage.getItem('token');
     user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!token || user?.role !== 'admin') { window.location.href = '/'; return; }
+    tbAccueil();
     loadAll();
     chargerTableauBord();
 });
@@ -1080,7 +1153,13 @@ function animerNombre(id, valeur, suffixe, decimales) {
     if (!el) return;
     const fin = Number(valeur);
     const dec = decimales || 0;
-    const ecrire = v => { el.textContent = v.toFixed(dec) + (suffixe || ''); };
+    // Un montant se lit « 31 962 € », pas « 31962.00€ » : groupage des milliers,
+    // espace avant l'euro, et les centimes tombent — personne ne les lit sur un total.
+    const ecrire = v => {
+        el.textContent = suffixe === '€'
+            ? v.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'
+            : v.toFixed(dec) + (suffixe || '');
+    };
     // Valeur absente ou illisible : un tiret vaut mieux que "undefined" ou un zero
     // qui laisserait croire a un chiffre reel.
     if (!isFinite(fin)) { el.textContent = '—'; return; }
@@ -1100,8 +1179,8 @@ async function loadStats() {
         statsAdmin = data;
         animerNombre('stat-users', data.users);
         animerNombre('stat-devis', data.devis);
-        animerNombre('stat-revenue', parseFloat(data.revenue), '€', 2);
-        animerNombre('stat-revenu-valide', parseFloat(data.revenu_valide), '€', 2);
+        animerNombre('stat-revenue', parseFloat(data.revenue), '€');
+        animerNombre('stat-revenu-valide', parseFloat(data.revenu_valide), '€');
         const t = document.getElementById('stat-transfo');
         // Le taux n'a de sens que sur les devis tranches ; sans aucun, on n'affiche rien
         // plutot qu'un 0 % qui ferait croire a un echec commercial.
@@ -1340,7 +1419,9 @@ async function chargerTableauBord() {
     };
     try {
         const stats = await lire('/admin/utilisateurs-stats');
-        tbActivite(stats.activite || []);
+        tbSerie = stats.activite || [];
+        tbActivite(tbSerie.slice(-tbFenetre));
+        tbIndicateurs();
         tbEquipe(stats.utilisateurs || []);
     } catch (err) { tbEchec('tb-g-activite', err.message); tbEchec('tb-equipe', err.message); }
     try { tbSources(await lire('/stats/sources')); } catch (err) { tbEchec('tb-g-sources', err.message); }
@@ -1364,7 +1445,8 @@ function tbActivite(activite) {
     });
     const court = s => { const d = new Date(s); return isNaN(d) ? '' : `${d.getDate()}/${d.getMonth() + 1}`; };
     activite.forEach((a, i) => {
-        if (i % 2 === 0 || i === activite.length - 1) axeX += `<text class="tb-axe" x="${x(i)}" y="${H - 8}" text-anchor="middle">${court(a.semaine)}</text>`;
+        const pasAxe = activite.length > 8 ? 2 : 1;
+        if (i % pasAxe === 0 || i === activite.length - 1) axeX += `<text class="tb-axe" x="${x(i)}" y="${H - 8}" text-anchor="middle">S${tbNumSemaine(a.semaine)}</text>`;
     });
     const pts = activite.map((a, i) => [x(i), y(a.ca_valide || 0)]);
     const ligne = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
@@ -1381,6 +1463,88 @@ function tbActivite(activite) {
         tbSuivre(c, `<b>semaine du ${court(a.semaine)}</b> · ${tbEur(a.ca_valide)} validé<br>
             <span style="color:var(--text-secondary)">${a.nb} devis chiffrés, ${a.nb_valides || 0} validé(s)</span>`);
     });
+}
+
+// Numéro de semaine ISO : c'est le repère que l'atelier emploie pour planifier.
+function tbNumSemaine(valeur) {
+    const d = new Date(valeur);
+    if (isNaN(d)) return '?';
+    const j = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    j.setUTCDate(j.getUTCDate() + 4 - (j.getUTCDay() || 7));          // jeudi de la semaine
+    const jan = new Date(Date.UTC(j.getUTCFullYear(), 0, 1));
+    return Math.ceil(((j - jan) / 86400000 + 1) / 7);
+}
+
+// Les segments rejouent la série déjà chargée : aucun aller-retour serveur, et la
+// fenêtre choisie vaut aussi pour les courbes de tendance des compteurs.
+let tbSerie = [], tbFenetre = 12;
+function tbPeriode(n, bouton) {
+    tbFenetre = n;
+    document.querySelectorAll('.tb-segments button').forEach(b => b.classList.toggle('on', b === bouton));
+    if (tbSerie.length) { tbActivite(tbSerie.slice(-n)); tbIndicateurs(); }
+}
+
+// Variation MESURÉE : la seconde moitié de la fenêtre comparée à la première. Si l'une
+// des deux moitiés est vide, on n'affiche pas de badge — un pourcentage sorti d'une
+// division par zéro ne veut rien dire.
+function tbVariation(id, serie, champ) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'tb-var';
+    el.textContent = '';
+    if (serie.length < 4) return;
+    const moitie = Math.floor(serie.length / 2);
+    const somme = t => t.reduce((a, x) => a + (Number(x[champ]) || 0), 0);
+    const avant = somme(serie.slice(0, moitie)), apres = somme(serie.slice(moitie));
+    if (avant <= 0) return;
+    const pct = Math.round(((apres - avant) / avant) * 100);
+    if (!isFinite(pct) || pct === 0) return;
+    el.classList.add(pct > 0 ? 'haut' : 'bas');
+    el.textContent = (pct > 0 ? '↑ +' : '↓ ') + pct + ' %';
+    el.title = `${moitie} dernières semaines comparées aux ${serie.length - moitie} précédentes`;
+}
+
+// Courbe de tendance : même série, même couleur que le grand graphique, sans axes —
+// elle donne la forme, le chiffre à côté donne la valeur.
+function tbSpark(id, serie, champ) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const vals = serie.map(x => Number(x[champ]) || 0);
+    if (vals.length < 2) { el.innerHTML = ''; return; }
+    const W = 160, H = 34, max = Math.max(...vals, 1), pas = W / (vals.length - 1);
+    const pts = vals.map((v, i) => [i * pas, 2 + (1 - v / max) * (H - 4)]);
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    el.innerHTML = `<svg class="tb-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${d} L${W} ${H} L0 ${H} Z" fill="url(#tb-deg-spark)" opacity=".5"/>
+        <defs><linearGradient id="tb-deg-spark" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FF5722" stop-opacity=".35"/><stop offset="100%" stop-color="#FF5722" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${d}" fill="none" stroke="#FF5722" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="2.6" fill="#FF5722"/></svg>`;
+}
+
+function tbIndicateurs() {
+    const fen = tbSerie.slice(-tbFenetre);
+    tbVariation('var-revenu', fen, 'ca_valide');
+    tbVariation('var-devis', fen, 'nb');
+    tbSpark('spark-revenu', fen, 'ca_valide');
+    tbSpark('spark-devis', fen, 'nb');
+    const derniere = tbSerie[tbSerie.length - 1];
+    const sd = document.getElementById('sous-devis');
+    if (sd && derniere) sd.textContent = `${derniere.nb || 0} cette semaine`;
+}
+
+// Accueil : le prénom vient du compte connecté, la date du navigateur. Rien d'inventé.
+function tbAccueil() {
+    const nom = (user && user.nom) ? String(user.nom) : '';
+    const prenom = nom.split(' ')[0] || (user && user.email ? String(user.email).split('@')[0] : 'vous');
+    const mettre = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    mettre('tb-prenom', prenom);
+    mettre('tb-nom', nom || (user && user.email) || '—');
+    mettre('tb-initiale', (prenom[0] || '?').toUpperCase());
+    const d = new Date();
+    const jour = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    mettre('tb-date', `Semaine ${tbNumSemaine(d)} · ${jour.charAt(0).toUpperCase() + jour.slice(1)}`);
 }
 
 function tbSources(sources) {
