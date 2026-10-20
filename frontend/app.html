@@ -370,7 +370,8 @@
             color: var(--primary-clair);
         }
         .zone-invite .fleche { font-size: 18px; line-height: 1; flex: none; }
-        .zone-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        .zone-scene svg, .zone-scene img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        .zone-scene img { object-fit: cover; }
         .zone-poly {
             fill: rgba(255,255,255,.02); stroke: rgba(255,255,255,.28); stroke-width: 1.2;
             stroke-dasharray: 4 3; cursor: pointer; transition: fill .14s, stroke .14s;
@@ -995,11 +996,18 @@
                      vient de ce qu'on coche, au lieu d'une valeur unique par type de marquage. -->
                 <div class="conditional" id="v-zones-cond">
                     <div class="zone-faces" id="zone-faces" role="group" aria-label="Face du véhicule"></div>
-                    <div class="zone-scene" id="zone-scene"><svg viewBox="0 0 480 200" id="zone-dessin" aria-label="Silhouette du véhicule"></svg></div>
+                    <div class="zone-scene" id="zone-scene">
+                        <img id="zone-photo" alt="Photo du véhicule" hidden>
+                        <svg viewBox="0 0 480 200" id="zone-dessin" aria-label="Silhouette du véhicule"></svg>
+                    </div>
+                    <p class="photo-aide" id="zone-note-photo" style="display:none;margin-top:-4px;margin-bottom:8px;">
+                        Les zones se cochent dans la liste : sur une photo, leurs contours ne tomberaient pas au bon endroit.
+                    </p>
                     <div class="zone-liste" id="zone-liste"></div>
                     <!-- V29 — visuels poses sur le vehicule, en plus des zones couvertes. -->
                     <div class="zone-liste" id="blocs-liste" style="margin-top:8px;"></div>
                     <div class="zone-actions">
+                        <button type="button" class="choix-btn" style="flex:none;" id="btn-fond" onclick="basculerFond()">Voir le schéma</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-texte" onclick="ajouterBloc('texte')">+ Texte</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-logo" onclick="ajouterBloc('logo')">+ Logo</button>
                         <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutCocher()">Covering complet</button>
@@ -3462,10 +3470,25 @@ function zonesRender() {
     // n'apprendrait rien de plus que la liste.
     const scene = document.getElementById('zone-scene');
     const silhouette = ZONE_SILHOUETTES[ZONE_FAMILLE[type]];
-    if (def.source === 'cote' && silhouette) {
+    const photo = photoDeLaFace();
+    const img = document.getElementById('zone-photo');
+    const svg = document.getElementById('zone-dessin');
+
+    const fond = fondCourant();
+    if (fond === 'photo') {
+        // La scene prend le format de la photo : sinon elle serait rognee, et les visuels
+        // poses dessus ne tomberaient plus sur la bonne partie du vehicule.
+        scene.style.display = '';
+        scene.style.transform = '';
+        scene.style.aspectRatio = (photo.largeur && photo.hauteur) ? `${photo.largeur} / ${photo.hauteur}` : '480 / 200';
+        img.src = photo.url; img.hidden = false;
+        svg.innerHTML = '';
+    } else if (fond === 'silhouette') {
         scene.style.display = '';
         scene.style.transform = def.cote === 'd' ? 'scaleX(-1)' : '';
-        document.getElementById('zone-dessin').innerHTML = silhouette.fond + zones.map(z => {
+        scene.style.aspectRatio = '480 / 200';
+        img.hidden = true; img.removeAttribute('src');
+        svg.innerHTML = silhouette.fond + zones.map(z => {
             const pts = silhouette.zones[z.cle];
             if (!pts) return '';
             const coche = zonesChoisies.has(zoneClef(z, def.cote));
@@ -3476,7 +3499,18 @@ function zonesRender() {
         }).join('');
     } else {
         scene.style.display = 'none';
+        img.hidden = true; img.removeAttribute('src');
     }
+
+    // Le bouton de bascule n'a de sens que si les deux fonds existent pour cette face.
+    const bascule = document.getElementById('btn-fond');
+    if (bascule) {
+        const possible = !!photo && def.source === 'cote' && !!silhouette;
+        bascule.style.display = possible ? '' : 'none';
+        bascule.textContent = fondPhoto ? 'Voir le schéma' : 'Voir la photo';
+    }
+    const note = document.getElementById('zone-note-photo');
+    if (note) note.style.display = (fond === 'photo' && zones.length) ? '' : 'none';
 
     liste.innerHTML = zones.length ? zones.map(z => {
         const clef = zoneClef(z, def.cote);
@@ -3503,11 +3537,9 @@ const surfaceBlocs = () => blocsVisuels.reduce((s, b) => s + (b.l / 100) * (b.h 
 // Surface facturee du vehicule : les zones couvertes plus les visuels poses.
 const surfaceVehicule = () => surfaceZonesChoisies() + surfaceBlocs();
 
-// Un bloc n'a de sens que sur une face dessinee : ailleurs, on ne saurait pas ou le poser.
-const facePorteDessin = () => {
-    const f = ZONE_FACES.find(x => x.cle === zoneFace);
-    return !!(f && f.source === 'cote' && ZONE_SILHOUETTES[ZONE_FAMILLE[getDropdownValue('dd-v-type')]]);
-};
+// Un bloc n'a de sens que sur une face montree a l'ecran, photo ou schema : ailleurs, on
+// ne saurait pas ou le poser.
+const facePorteDessin = () => fondCourant() !== 'rien';
 
 function ajouterBloc(type) {
     if (!facePorteDessin()) return;
@@ -3527,12 +3559,40 @@ function majBloc(id, champ, valeur) {
     majTotalZones();
 }
 
+// V31 — fond de la scene : la photo du vehicule quand elle existe, sinon la silhouette.
+// Les blocs sont places en pourcentage de la scene, ils tombent donc au meme endroit sur
+// l'une comme sur l'autre. Les zones, elles, ne sont cliquables que sur la silhouette :
+// leurs contours sont des coordonnees fixes, ils ne colleraient pas a une photo prise a un
+// angle quelconque. Sur la photo, on coche dans la liste.
+let fondPhoto = true;
+
+const photoDeLaFace = () => {
+    const f = ZONE_FACES.find(x => x.cle === zoneFace);
+    return f && photosPrises[f.cle] ? photosPrises[f.cle] : null;
+};
+
+// Ce que la scene montre pour la face courante. La silhouette n'existe que de profil ;
+// la photo, elle, existe pour toutes les faces — c'est elle qui permet de poser un visuel
+// sur un hayon ou un capot, ce que le schema ne permettait pas.
+function fondCourant() {
+    const def = ZONE_FACES.find(x => x.cle === zoneFace) || ZONE_FACES[0];
+    const peutSilhouette = def.source === 'cote' && !!ZONE_SILHOUETTES[ZONE_FAMILLE[getDropdownValue('dd-v-type')]];
+    if (photoDeLaFace() && (fondPhoto || !peutSilhouette)) return 'photo';
+    return peutSilhouette ? 'silhouette' : 'rien';
+}
+
+function basculerFond() { fondPhoto = !fondPhoto; zonesRender(); }
+
 const surfaceDunBloc = b => (b.l / 100) * (b.h / 100) * b.q;
 const texteBloc = b => `${b.type}${b.q > 1 ? ' ×' + b.q : ''}<br>${surfaceDunBloc(b).toFixed(2).replace('.', ',')} m²`;
-// Echelle de la silhouette : la scene fait 480 x 200 unites pour cette longueur de vehicule.
+// Echelle de la scene : la largeur represente la longueur du vehicule, et la hauteur suit
+// le format REEL de la scene — qui change avec la photo affichee. Sans cette mesure, un
+// bloc etire sur une photo 4:3 recevrait les centimetres d'une silhouette 480 x 200.
 function echelleScene() {
     const longueur = LONGUEUR_AFFICHAGE[ZONE_FAMILLE[getDropdownValue('dd-v-type')]] || 5;
-    return { longueur, hauteur: longueur * 200 / 480 };
+    const r = document.getElementById('zone-scene').getBoundingClientRect();
+    const ratio = r.width > 0 && r.height > 0 ? r.height / r.width : 200 / 480;
+    return { longueur, hauteur: longueur * ratio };
 }
 
 function rendreBlocs() {
@@ -3768,7 +3828,7 @@ async function photoChoisie(face, input) {
         const ancienne = photosPrises[face];
         if (ancienne && ancienne.url) URL.revokeObjectURL(ancienne.url);
         // La vignette vient du fichier local : inutile de retelecharger ce qu'on vient d'envoyer.
-        photosPrises[face] = { id: r.id, url: URL.createObjectURL(fichier) };
+        photosPrises[face] = { id: r.id, url: URL.createObjectURL(fichier), largeur, hauteur };
         renderPhotos();
         showNotification('Photo ajoutée ✓', 'success');
     } catch (err) {
@@ -3840,7 +3900,7 @@ async function photosInit() {
             try {
                 const r = await fetch(`${API_URL}/photos/${ligne.id}/image`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!r.ok) continue;
-                photosPrises[ligne.face] = { id: ligne.id, url: URL.createObjectURL(await r.blob()) };
+                photosPrises[ligne.face] = { id: ligne.id, url: URL.createObjectURL(await r.blob()), largeur: ligne.largeur, hauteur: ligne.hauteur };
             } catch (e) { /* une vignette manquante ne doit pas bloquer les autres */ }
         }
         renderPhotos();
