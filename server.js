@@ -2022,7 +2022,7 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
     try {
         if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
         await ensureV11Tables();
-        const { membres, parDevis, parClient, activite } = await avecConnexion(async (conn) => {
+        const { membres, parDevis, parClient, activite, activiteJours } = await avecConnexion(async (conn) => {
             const [membres] = await conn.query(
                 `SELECT id, nom, email, role, created_at, derniere_connexion, COALESCE(nb_connexions, 0) AS nb_connexions
                  FROM users WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]);
@@ -2038,15 +2038,30 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
                  FROM devis WHERE user_id = ? GROUP BY auteur_id`, [req.userId]);
             const [parClient] = await conn.query(
                 `SELECT auteur_id, COUNT(*) AS nb FROM clients WHERE equipe_id = ? GROUP BY auteur_id`, [req.userId]);
-            // Activite hebdomadaire : lundi de chaque semaine, sur 12 semaines.
+            // Activite hebdomadaire : lundi de chaque semaine, sur 52 semaines — le
+            // tableau de bord y decoupe sa fenetre (mois, trimestre, annee) sans rappeler
+            // le serveur. L'affichage par defaut reste 12 semaines.
             const [activite] = await conn.query(
                 `SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS semaine,
                         COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
                         COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
-                        SUM(statut = 'valide') AS nb_valides
-                 FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+                        COALESCE(SUM(COALESCE(ht_calcule, ht)), 0) AS ca_calcule,
+                        SUM(statut = 'valide') AS nb_valides,
+                        SUM(statut = 'refuse') AS nb_refuses
+                 FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 52 WEEK)
                  GROUP BY semaine ORDER BY semaine`, [req.userId]);
-            return { membres, parDevis, parClient, activite };
+            // Les sept derniers jours : une courbe hebdomadaire reduite a un point ne
+            // montrerait rien, le segment « Cette semaine » passe donc au jour.
+            const [activiteJours] = await conn.query(
+                `SELECT DATE(created_at) AS jour,
+                        COUNT(*) AS nb, COALESCE(SUM(ht), 0) AS ca,
+                        COALESCE(SUM(CASE WHEN statut = 'valide' THEN ht ELSE 0 END), 0) AS ca_valide,
+                        COALESCE(SUM(COALESCE(ht_calcule, ht)), 0) AS ca_calcule,
+                        SUM(statut = 'valide') AS nb_valides,
+                        SUM(statut = 'refuse') AS nb_refuses
+                 FROM devis WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                 GROUP BY jour ORDER BY jour`, [req.userId]);
+            return { membres, parDevis, parClient, activite, activiteJours };
         });
 
         const devisPar = new Map(parDevis.map(r => [r.auteur_id, r]));
@@ -2086,7 +2101,13 @@ app.get('/api/admin/utilisateurs-stats', verifyToken, async (req, res) => {
             // Les deux sont renvoyes, le tableau de bord ne doit pas les confondre.
             activite: activite.map(a => ({
                 semaine: a.semaine, nb: a.nb, ca: Number(a.ca),
-                ca_valide: Number(a.ca_valide), nb_valides: Number(a.nb_valides)
+                ca_valide: Number(a.ca_valide), ca_calcule: Number(a.ca_calcule),
+                nb_valides: Number(a.nb_valides), nb_refuses: Number(a.nb_refuses)
+            })),
+            activite_jours: activiteJours.map(j => ({
+                jour: j.jour, nb: j.nb, ca: Number(j.ca),
+                ca_valide: Number(j.ca_valide), ca_calcule: Number(j.ca_calcule),
+                nb_valides: Number(j.nb_valides), nb_refuses: Number(j.nb_refuses)
             }))
         });
     } catch (err) { res.status(500).json({ error: err.message }); }

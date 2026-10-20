@@ -231,6 +231,50 @@
         .tb-spark-boite { margin: 8px 0 0; }
 
         /* En-tete du tableau de bord : accueil nomme et compte, comme sur la maquette. */
+        .rail-marque { display: flex; align-items: center; gap: 10px; padding: 16px 14px 18px; }
+        .rail-marque .goutte {
+            width: 30px; height: 30px; background: #fff; border-radius: 8px; flex: none;
+            display: flex; align-items: center; justify-content: center; padding: 4px;
+        }
+        .rail-marque img { width: 100%; height: 100%; object-fit: contain; }
+        .rail-marque b { font-size: 15px; font-weight: 800; letter-spacing: -.3px; display: block; line-height: 1.1; }
+        .rail-marque small { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-light); }
+        .rail-pied { margin-top: auto; padding: 14px 10px 16px; display: grid; gap: 7px; border-top: 1px solid var(--border); }
+        .rail-pied button { width: 100%; font-size: 12px; padding: 9px 10px; }
+
+        /* Outils de l'en-tete : recherche, cloche, compte, bouton de disposition. */
+        .tb-outils { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+        .tb-rech { position: relative; }
+        .tb-rech svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-light); pointer-events: none; }
+        .tb-rech input {
+            font-family: inherit; font-size: 12.5px; width: 230px; padding: 9px 12px 9px 33px;
+            border-radius: 99px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+        }
+        .tb-rech input:focus { outline: none; border-color: var(--primary); }
+        .tb-resultats {
+            position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; width: 320px; max-height: 320px; overflow: auto;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 6px; display: none;
+            box-shadow: 0 20px 50px -20px rgba(0,0,0,.9);
+        }
+        .tb-resultats.ouvert { display: block; }
+        .tb-resultats button {
+            display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text-primary);
+            font-family: inherit; font-size: 12.5px; padding: 8px 10px; border-radius: 9px; transform: none; cursor: pointer;
+        }
+        .tb-resultats button:hover { background: var(--verre); transform: none; }
+        .tb-resultats .ou { display: block; font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: .06em; }
+        .tb-resultats .rien { padding: 10px; font-size: 12.5px; color: var(--text-secondary); }
+        .tb-cloche {
+            position: relative; width: 36px; height: 36px; border-radius: 50%; padding: 0; flex: none;
+            display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
+        }
+        .tb-cloche:hover { transform: none; color: var(--text-primary); }
+        .tb-cloche .nb {
+            position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; border-radius: 99px;
+            background: var(--primary); color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px;
+        }
+        .tb-dispo { font-size: 12px; padding: 9px 15px; border-radius: 99px; }
+
         .tb-entete { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .tb-bonjour { font-size: 21px; font-weight: 800; margin: 0; letter-spacing: -.4px; color: var(--text-primary); }
         .tb-bonjour em { font-style: normal; color: var(--primary); }
@@ -246,6 +290,31 @@
         .tb-tete { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 13px; }
         .tb-tete > div:first-child { flex: 1; min-width: 0; }
         .tb-tete .note { margin-bottom: 0; }
+        .tb-fenetre { font-size: 11.5px; color: var(--text-light); padding-top: 3px; }
+        .tb-barre-dispo {
+            display: none; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+            padding: 11px 13px; border-radius: 14px; border: 1px dashed var(--primary);
+            background: rgba(255,87,34,.07);
+        }
+        .tb-barre-dispo.ouvert { display: flex; }
+        .tb-barre-dispo .dit { font-size: 12px; font-weight: 600; color: var(--primary); }
+        .tb-barre-dispo .pousse { flex: 1; }
+        .tb-barre-dispo button, .tb-outils-carte button { font-size: 11.5px; padding: 6px 11px; border-radius: 99px; }
+        .tb-outils-carte {
+            display: none; position: absolute; top: 8px; right: 8px; gap: 3px; z-index: 5;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; padding: 3px;
+        }
+        .tb-outils-carte button {
+            width: 25px; height: 25px; padding: 0; display: grid; place-items: center;
+            background: transparent; border: none; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+        }
+        .tb-outils-carte button:hover { background: var(--verre); color: var(--text-primary); transform: none; }
+        body.dispo .tb-outils-carte { display: flex; }
+        body.dispo [data-carte] { position: relative; cursor: grab; outline: 1px dashed rgba(255,87,34,.35); outline-offset: 2px; }
+        body.dispo [data-carte].glisse { opacity: .45; }
+        [data-carte].cible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .tb-kpi { position: relative; }
+        .tb-pleine .tb-bloc { width: 100%; }
         .tb-segments { display: inline-flex; gap: 4px; padding: 4px; border-radius: 99px; background: var(--verre); border: 1px solid var(--border); }
         .tb-segments button {
             font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
@@ -462,17 +531,6 @@
 </head>
 <body>
 
-<header>
-    <div class="header-left">
-        <div class="logo-icon"><img src="/img/goutte.png" alt=""></div>
-        <h1>Dashboard Admin</h1>
-    </div>
-    <div class="header-actions">
-        <button class="calc-btn" onclick="window.location.href='/app'">Calculateur</button>
-        <button class="logout-btn" onclick="logout()">Déconnexion</button>
-    </div>
-</header>
-
 <div class="appli">
 <nav class="rail" id="rail"></nav>
 <div class="container">
@@ -489,69 +547,88 @@
                 <h2 class="tb-bonjour">Bonjour <em id="tb-prenom">—</em></h2>
                 <p class="tb-date" id="tb-date"></p>
             </div>
-            <div class="tb-compte"><span class="tb-av" id="tb-initiale">—</span>
-                <div><div class="tb-qn" id="tb-nom">—</div><div class="tb-qr">Administrateur</div></div></div>
-        </div>
-        <div class="tb-kpis" id="tb-kpis">
-            <div class="tb-kpi vedette">
-                <div class="lbl">Revenu validé</div>
-                <div class="val"><span id="stat-revenu-valide">0€</span><span class="tb-var" id="var-revenu"></span></div>
-                <div class="sous" id="stat-transfo">&nbsp;</div>
-                <figure class="tb-spark-boite" id="spark-revenu"></figure>
-            </div>
-            <div class="tb-kpi">
-                <div class="lbl">Devis chiffrés</div>
-                <div class="val"><span id="stat-devis">0</span><span class="tb-var" id="var-devis"></span></div>
-                <div class="sous" id="sous-devis">sur toute la période</div>
-                <figure class="tb-spark-boite" id="spark-devis"></figure>
-            </div>
-            <!-- "Devis calcules" et non "Revenu" : un devis chiffre n'est pas une commande. -->
-            <div class="tb-kpi">
-                <div class="lbl">Total chiffré</div>
-                <div class="val"><span id="stat-revenue">0€</span></div>
-                <div class="sous">tous devis confondus, TTC</div>
-            </div>
-            <div class="tb-kpi">
-                <div class="lbl">Utilisateurs</div>
-                <div class="val"><span id="stat-users">0</span></div>
-                <div class="sous">dans l'équipe</div>
-            </div>
-            <div class="tb-kpi" id="stat-stock-card">
-                <div class="lbl">Stock sous le seuil</div>
-                <div class="val"><span id="stat-stock-low">0</span></div>
-                <div class="sous">matières à commander</div>
+            <div class="tb-outils">
+                <div class="tb-rech">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.4-3.4"/></svg>
+                    <input id="tb-rech" type="search" autocomplete="off" placeholder="Rechercher un vinyle, un poseur…"
+                           oninput="tbChercher(this.value)" onfocus="tbChercher(this.value)">
+                    <div class="tb-resultats" id="tb-resultats"></div>
+                </div>
+                <button class="tb-cloche" id="tb-cloche" title="Notifications"
+                        onclick="switchTab('notifs', this); initNotifs()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.2 7.5-2.2 7.5h16.4S18 14.5 18 8.5"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg></button>
+                <div class="tb-compte"><span class="tb-av" id="tb-initiale">—</span>
+                    <div><div class="tb-qn" id="tb-nom">—</div><div class="tb-qr">Administrateur</div></div></div>
+                <button class="tb-dispo" id="tb-dispo-btn" onclick="tbDispoBasculer()">Personnaliser</button>
             </div>
         </div>
-
-        <div class="tb-grille" style="margin-top:14px;">
-            <div class="tb-bloc large">
+        <div class="tb-segments" id="tb-periodes" role="group" aria-label="Période">
+            <button onclick="tbPeriode('semaine', this)">Cette semaine</button>
+            <button onclick="tbPeriode(4, this)">Ce mois</button>
+            <button class="on" onclick="tbPeriode(12, this)">12 semaines</button>
+            <button onclick="tbPeriode(52, this)">Année</button>
+        </div>
+        <div class="tb-barre-dispo" id="tb-barre-dispo">
+            <span class="dit">Glissez les cartes pour les déplacer. Ajouter&nbsp;:</span>
+            <span id="tb-masquees"></span>
+            <span class="pousse"></span>
+            <button class="small" onclick="tbDispoReset()">Disposition d'origine</button>
+            <button class="calc-btn small" onclick="tbDispoBasculer()">Terminé</button>
+        </div>
+        <div class="tb-pleine" style="margin-top:14px;">
+            <div class="tb-bloc large" data-carte="activite">
                 <div class="tb-tete">
                     <div><h3>Chiffre d'affaires validé</h3>
-                    <p class="note">Devis devenus commandes, par semaine. Survolez la courbe.</p></div>
-                    <div class="tb-segments" role="group" aria-label="Période">
-                        <button onclick="tbPeriode(4, this)">4 sem.</button>
-                        <button class="on" onclick="tbPeriode(12, this)">12 sem.</button>
-                    </div>
+                    <p class="note" id="tb-note-courbe">Devis devenus commandes, par semaine. Survolez la courbe.</p></div>
+                    <span class="tb-fenetre" id="tb-fenetre">12 sem.</span>
                 </div>
                 <figure id="tb-g-activite"><p class="tb-vide">Chargement…</p></figure>
             </div>
-            <div class="tb-bloc">
+        </div>
+        <div class="tb-kpis" id="tb-kpis">
+            <div class="tb-kpi" data-carte="ca">
+                <div class="lbl">CA validé · <span id="lbl-fenetre">12 sem.</span></div>
+                <div class="val"><span id="stat-revenu-valide">0 €</span><span class="tb-var" id="var-revenu"></span></div>
+                <figure class="tb-spark-boite" id="spark-revenu"></figure>
+                <div class="sous" id="stat-transfo">&nbsp;</div>
+            </div>
+            <div class="tb-kpi" data-carte="transfo">
+                <div class="lbl">Transformation</div>
+                <div class="val"><span id="stat-taux">—</span><span class="tb-var" id="var-taux"></span></div>
+                <figure class="tb-spark-boite" id="spark-taux"></figure>
+                <div class="sous">des devis tranchés</div>
+            </div>
+            <div class="tb-kpi" data-carte="devis">
+                <div class="lbl">Devis chiffrés</div>
+                <div class="val"><span id="stat-devis">0</span><span class="tb-var" id="var-devis"></span></div>
+                <figure class="tb-spark-boite" id="spark-devis"></figure>
+                <div class="sous" id="sous-devis">sur toute la période</div>
+            </div>
+            <div class="tb-kpi" data-carte="ecart">
+                <div class="lbl">Écart moteur / vendu</div>
+                <div class="val"><span id="stat-ecart">—</span><span class="tb-var" id="var-ecart"></span></div>
+                <figure class="tb-spark-boite" id="spark-ecart"></figure>
+                <div class="sous" id="sous-ecart">&nbsp;</div>
+            </div>
+        </div>
+
+        <div class="tb-grille" style="margin-top:12px;">
+            <div class="tb-bloc" data-carte="sources">
                 <h3>D'où viennent les affaires</h3>
                 <p class="note">Chiffre d'affaires des devis par canal d'acquisition.</p>
                 <figure id="tb-g-sources"><p class="tb-vide">Chargement…</p></figure>
             </div>
-            <div class="tb-bloc">
+            <div class="tb-bloc" data-carte="statuts">
                 <h3>Suite donnée aux devis</h3>
                 <p class="note">Répartition de tous les devis enregistrés.</p>
                 <figure id="tb-g-statuts"></figure>
                 <div class="tb-legende" id="tb-leg-statuts"></div>
             </div>
-            <div class="tb-bloc">
+            <div class="tb-bloc" data-carte="equipe">
                 <h3>L'équipe</h3>
                 <p class="note">Devis validés, puis chiffre d'affaires.</p>
                 <div id="tb-equipe"><p class="tb-vide">Chargement…</p></div>
             </div>
-            <div class="tb-bloc">
+            <div class="tb-bloc" data-carte="stock">
                 <h3>Stock à surveiller</h3>
                 <p class="note">Matières sous leur seuil d'alerte.</p>
                 <div id="tb-stock"><p class="tb-vide">Chargement…</p></div>
@@ -1134,6 +1211,7 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!token || user?.role !== 'admin') { window.location.href = '/'; return; }
     tbAccueil();
+    tbAppliquerDispo();
     loadAll();
     chargerTableauBord();
 });
@@ -1178,19 +1256,13 @@ async function loadStats() {
         const data = await fetch(`${API_URL}/admin/stats`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
         statsAdmin = data;
         animerNombre('stat-users', data.users);
-        animerNombre('stat-devis', data.devis);
         animerNombre('stat-revenue', parseFloat(data.revenue), '€');
-        animerNombre('stat-revenu-valide', parseFloat(data.revenu_valide), '€');
-        const t = document.getElementById('stat-transfo');
-        // Le taux n'a de sens que sur les devis tranches ; sans aucun, on n'affiche rien
-        // plutot qu'un 0 % qui ferait croire a un echec commercial.
-        if (t) t.textContent = data.taux_transformation === null || data.taux_transformation === undefined
-            ? `${data.devis_valides || 0} devis validés`
-            : `${data.devis_valides} validés / ${data.devis_refuses} refusés — ${data.taux_transformation} % de transformation`;
+        // stat-revenu-valide, stat-devis, stat-taux et stat-ecart sont remplis par
+        // tbIndicateurs : ils suivent la periode choisie, pas le cumul de toute la base.
         tbStatuts();
     } catch (err) {
         console.error(err);
-        ['stat-users', 'stat-devis', 'stat-revenue', 'stat-revenu-valide'].forEach(id => animerNombre(id, null));
+        ['stat-users', 'stat-revenue'].forEach(id => animerNombre(id, null));
     }
 }
 
@@ -1354,10 +1426,9 @@ const icoAdmin = (nom, t = 18) =>
 const NAV_ADMIN = [
     { titre: 'Pilotage', items: [
         { cle: 'dashboard', nom: 'Tableau de bord', ico: 'tableau', actif: true },
-        { cle: 'users', nom: 'Utilisateurs', ico: 'equipe' },
+        { cle: 'users', nom: 'Équipe', ico: 'equipe' },
         { cle: 'stock', nom: 'Stock', ico: 'stock', badge: 'nav-stock-badge' },
-        { cle: 'sources', nom: 'Sources', ico: 'sources', apres: 'loadSources' },
-        { cle: 'notifs', nom: 'Notifications', ico: 'notifs', apres: 'initNotifs' }
+        { cle: 'sources', nom: 'Sources', ico: 'sources', apres: 'loadSources' }
     ]},
     { titre: 'Catalogue', items: [
         { cle: 'vinyles', nom: 'Vinyles', ico: 'vinyles' },
@@ -1372,13 +1443,19 @@ const NAV_ADMIN = [
     ]}
 ];
 function construireNav() {
-    document.getElementById('rail').innerHTML = NAV_ADMIN.map(g => `<div class="rail-groupe">
+    document.getElementById('rail').innerHTML = `<div class="rail-marque">
+        <span class="goutte"><img src="/img/goutte.png" alt=""></span>
+        <span><b>DropStyle</b><small>Administration</small></span>
+    </div>` + NAV_ADMIN.map(g => `<div class="rail-groupe">
         <div class="rail-titre">${g.titre}</div>
         ${g.items.map(i => `<button class="tab-btn${i.actif ? ' active' : ''}"
             onclick="switchTab('${i.cle}', this)${i.apres ? '; ' + i.apres + '()' : ''}; document.getElementById('rail').classList.remove('ouvert')">
             <span class="ico">${icoAdmin(i.ico)}</span> ${i.nom}
             ${i.badge ? `<span class="pastille-nb" id="${i.badge}" style="display:none">0</span>` : ''}</button>`).join('')}
-    </div>`).join('');
+    </div>`).join('') + `<div class="rail-pied">
+        <button class="calc-btn" onclick="window.location.href='/app'">Calculateur</button>
+        <button class="logout-btn" onclick="logout()">Déconnexion</button>
+    </div>`;
 }
 
 /* ---- tableau de bord : tout vient des endpoints existants ---- */
@@ -1420,8 +1497,8 @@ async function chargerTableauBord() {
     try {
         const stats = await lire('/admin/utilisateurs-stats');
         tbSerie = stats.activite || [];
-        tbActivite(tbSerie.slice(-tbFenetre));
-        tbIndicateurs();
+        tbSerieJours = stats.activite_jours || [];
+        tbRedessiner();
         tbEquipe(stats.utilisateurs || []);
     } catch (err) { tbEchec('tb-g-activite', err.message); tbEchec('tb-equipe', err.message); }
     try { tbSources(await lire('/stats/sources')); } catch (err) { tbEchec('tb-g-sources', err.message); }
@@ -1432,7 +1509,8 @@ async function chargerTableauBord() {
 // Une seule série, donc une seule couleur et pas de légende.
 function tbActivite(activite) {
     const el = document.getElementById('tb-g-activite');
-    if (!activite.length) { el.innerHTML = '<p class="tb-vide">Aucun devis sur les 12 dernières semaines.</p>'; return; }
+    if (!activite.length) { el.innerHTML = '<p class="tb-vide">Aucun devis sur cette période.</p>'; return; }
+    const parJour = !!(activite[0] && activite[0].jour);
     const W = 720, H = 210, bas = 26, gauche = 48, haut = 16;
     const max = Math.max(...activite.map(a => a.ca_valide || 0), 1);
     const pas = activite.length > 1 ? (W - gauche) / (activite.length - 1) : 0;
@@ -1445,8 +1523,11 @@ function tbActivite(activite) {
     });
     const court = s => { const d = new Date(s); return isNaN(d) ? '' : `${d.getDate()}/${d.getMonth() + 1}`; };
     activite.forEach((a, i) => {
-        const pasAxe = activite.length > 8 ? 2 : 1;
-        if (i % pasAxe === 0 || i === activite.length - 1) axeX += `<text class="tb-axe" x="${x(i)}" y="${H - 8}" text-anchor="middle">S${tbNumSemaine(a.semaine)}</text>`;
+        const pasAxe = Math.max(1, Math.ceil(activite.length / 9));
+        const etiq = parJour
+            ? new Date(a.jour).toLocaleDateString('fr-FR', { weekday: 'short' })
+            : 'S' + tbNumSemaine(a.semaine);
+        if (i % pasAxe === 0 || i === activite.length - 1) axeX += `<text class="tb-axe" x="${x(i)}" y="${H - 8}" text-anchor="middle">${etiq}</text>`;
     });
     const pts = activite.map((a, i) => [x(i), y(a.ca_valide || 0)]);
     const ligne = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
@@ -1460,7 +1541,7 @@ function tbActivite(activite) {
         ${axeX}</svg>`;
     el.querySelectorAll('.tb-barre').forEach(c => {
         const a = activite[+c.dataset.i];
-        tbSuivre(c, `<b>semaine du ${court(a.semaine)}</b> · ${tbEur(a.ca_valide)} validé<br>
+        tbSuivre(c, `<b>${parJour ? 'le ' + court(a.jour) : 'semaine du ' + court(a.semaine)}</b> · ${tbEur(a.ca_valide)} validé<br>
             <span style="color:var(--text-secondary)">${a.nb} devis chiffrés, ${a.nb_valides || 0} validé(s)</span>`);
     });
 }
@@ -1477,11 +1558,33 @@ function tbNumSemaine(valeur) {
 
 // Les segments rejouent la série déjà chargée : aucun aller-retour serveur, et la
 // fenêtre choisie vaut aussi pour les courbes de tendance des compteurs.
-let tbSerie = [], tbFenetre = 12;
+let tbSerie = [], tbSerieJours = [], tbFenetre = 12;
+const TB_LIBELLES = { semaine: '7 jours', 4: '4 sem.', 12: '12 sem.', 52: '52 sem.' };
+
+// La fenetre courante, deja decoupee : c'est elle que lisent la courbe ET les compteurs,
+// pour qu'un chiffre affiche corresponde toujours a la periode affichee.
+function tbFenetreCourante() {
+    return tbFenetre === 'semaine' ? tbSerieJours : tbSerie.slice(-tbFenetre);
+}
+
 function tbPeriode(n, bouton) {
     tbFenetre = n;
-    document.querySelectorAll('.tb-segments button').forEach(b => b.classList.toggle('on', b === bouton));
-    if (tbSerie.length) { tbActivite(tbSerie.slice(-n)); tbIndicateurs(); }
+    document.querySelectorAll('#tb-periodes button').forEach(b => b.classList.toggle('on', b === bouton));
+    tbRedessiner();
+}
+
+function tbRedessiner() {
+    const parJour = tbFenetre === 'semaine';
+    const note = document.getElementById('tb-note-courbe');
+    if (note) note.textContent = parJour
+        ? 'Devis devenus commandes, par jour. Survolez la courbe.'
+        : 'Devis devenus commandes, par semaine. Survolez la courbe.';
+    const rappel = document.getElementById('tb-fenetre');
+    if (rappel) rappel.textContent = TB_LIBELLES[tbFenetre] || '';
+    const lbl = document.getElementById('lbl-fenetre');
+    if (lbl) lbl.textContent = TB_LIBELLES[tbFenetre] || '';
+    tbActivite(tbFenetreCourante());
+    tbIndicateurs();
 }
 
 // Variation MESURÉE : la seconde moitié de la fenêtre comparée à la première. Si l'une
@@ -1523,15 +1626,69 @@ function tbSpark(id, serie, champ) {
         <circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="2.6" fill="#FF5722"/></svg>`;
 }
 
+// Taux de transformation et ecart moteur/vendu se calculent par periode : ils sont
+// ajoutes a chaque point pour que badge et courbe de tendance lisent la meme chose.
+function tbEnrichir(serie) {
+    return serie.map(p => {
+        const tranches = (Number(p.nb_valides) || 0) + (Number(p.nb_refuses) || 0);
+        const calcule = Number(p.ca_calcule) || 0;
+        return {
+            ...p,
+            taux: tranches ? ((Number(p.nb_valides) || 0) / tranches) * 100 : null,
+            ecart: calcule > 0 ? ((Number(p.ca) - calcule) / calcule) * 100 : null
+        };
+    });
+}
+const tbSomme = (serie, champ) => serie.reduce((a, p) => a + (Number(p[champ]) || 0), 0);
+
 function tbIndicateurs() {
-    const fen = tbSerie.slice(-tbFenetre);
+    const fen = tbEnrichir(tbFenetreCourante());
+    const ecrire = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    // CA validé sur la fenêtre — pas le cumul de toute la base.
+    ecrire('stat-revenu-valide', tbEur(tbSomme(fen, 'ca_valide')));
+    ecrire('stat-transfo', `${tbSomme(fen, 'nb_valides')} devis acceptés`);
     tbVariation('var-revenu', fen, 'ca_valide');
-    tbVariation('var-devis', fen, 'nb');
     tbSpark('spark-revenu', fen, 'ca_valide');
+
+    // Transformation : part des devis tranchés qui sont devenus commandes.
+    const val = tbSomme(fen, 'nb_valides'), ref = tbSomme(fen, 'nb_refuses');
+    ecrire('stat-taux', val + ref > 0 ? Math.round((val / (val + ref)) * 100) + ' %' : '—');
+    tbVariationPts('var-taux', fen, 'taux');
+    tbSpark('spark-taux', fen, 'taux');
+
+    ecrire('stat-devis', String(tbSomme(fen, 'nb')));
+    tbVariation('var-devis', fen, 'nb');
     tbSpark('spark-devis', fen, 'nb');
     const derniere = tbSerie[tbSerie.length - 1];
-    const sd = document.getElementById('sous-devis');
-    if (sd && derniere) sd.textContent = `${derniere.nb || 0} cette semaine`;
+    ecrire('sous-devis', derniere ? `${derniere.nb || 0} cette semaine` : 'sur la période');
+
+    // Écart moteur / vendu : un écart positif veut dire que le moteur chiffre sous le vendu.
+    const chiffre = tbSomme(fen, 'ca'), calcule = tbSomme(fen, 'ca_calcule');
+    const ecart = calcule > 0 ? Math.round(((chiffre - calcule) / calcule) * 1000) / 10 : null;
+    ecrire('stat-ecart', ecart === null ? '—' : (ecart > 0 ? '+' : '') + ecart + ' %');
+    ecrire('sous-ecart', ecart === null ? 'aucun devis chiffré sur la période'
+        : ecart > 0 ? 'le moteur chiffre sous le vendu'
+        : ecart < 0 ? 'le moteur chiffre au-dessus du vendu' : 'le moteur tombe juste');
+    tbVariationPts('var-ecart', fen, 'ecart');
+    tbSpark('spark-ecart', fen, 'ecart');
+}
+
+// Variation d'un pourcentage : elle s'exprime en POINTS, pas en pourcent — passer de
+// 60 % à 66 % n'est pas « +10 % », c'est « +6 pts ».
+function tbVariationPts(id, serie, champ) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'tb-var';
+    el.textContent = '';
+    const pts = serie.filter(p => p[champ] !== null && p[champ] !== undefined);
+    if (pts.length < 4) return;
+    const moitie = Math.floor(pts.length / 2);
+    const moy = t => t.reduce((a, p) => a + p[champ], 0) / t.length;
+    const diff = Math.round(moy(pts.slice(moitie)) - moy(pts.slice(0, moitie)));
+    if (!isFinite(diff) || diff === 0) return;
+    el.classList.add(diff > 0 ? 'haut' : 'bas');
+    el.textContent = (diff > 0 ? '↑ +' : '↓ ') + diff + (Math.abs(diff) > 1 ? ' pts' : ' pt');
 }
 
 // Accueil : le prénom vient du compte connecté, la date du navigateur. Rien d'inventé.
@@ -1546,6 +1703,200 @@ function tbAccueil() {
     const jour = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     mettre('tb-date', `Semaine ${tbNumSemaine(d)} · ${jour.charAt(0).toUpperCase() + jour.slice(1)}`);
 }
+
+/* ---- recherche : elle parcourt ce que l'admin affiche deja ---- */
+// Pas d'endpoint de recherche cote serveur : on cherche dans les tableaux charges, ce
+// qui couvre vinyles, materiaux, poseurs, impressions, forfaits, equipe et stock.
+const TB_ONGLETS = {
+    'tab-vinyles': 'Vinyles', 'tab-materiaux': 'Matériaux', 'tab-poseurs': 'Poseurs',
+    'tab-impressions': 'Impressions', 'tab-users': 'Équipe', 'tab-stock': 'Stock',
+    'tab-sources': 'Sources', 'tab-moteur': 'Paramètres', 'tab-zones': 'Zones véhicule'
+};
+
+function tbChercher(q) {
+    const boite = document.getElementById('tb-resultats');
+    if (!boite) return;
+    const terme = String(q || '').trim().toLowerCase();
+    if (terme.length < 2) { boite.classList.remove('ouvert'); boite.innerHTML = ''; return; }
+    const trouves = [];
+    for (const [idOnglet, nomOnglet] of Object.entries(TB_ONGLETS)) {
+        const onglet = document.getElementById(idOnglet);
+        if (!onglet) continue;
+        onglet.querySelectorAll('tbody tr').forEach(tr => {
+            if (trouves.length >= 20) return;
+            const txt = tr.textContent.replace(/\s+/g, ' ').trim();
+            if (txt && txt.toLowerCase().includes(terme)) trouves.push({ idOnglet, nomOnglet, tr, txt });
+        });
+    }
+    if (!trouves.length) {
+        boite.innerHTML = '<p class="rien">Rien trouvé. La recherche porte sur les fiches déjà chargées.</p>';
+        boite.classList.add('ouvert');
+        return;
+    }
+    boite.innerHTML = trouves.slice(0, 12).map((t, i) =>
+        `<button type="button" data-i="${i}"><span class="ou">${escapeHtml(t.nomOnglet)}</span>${escapeHtml(t.txt.slice(0, 70))}</button>`
+    ).join('');
+    boite.querySelectorAll('button').forEach(b => {
+        b.onclick = () => {
+            const t = trouves[+b.dataset.i];
+            tbAllerA(t.idOnglet, t.tr);
+            boite.classList.remove('ouvert');
+        };
+    });
+    boite.classList.add('ouvert');
+}
+
+// On ouvre l'onglet en cliquant son entree de menu : les chargements qui y sont
+// rattaches (loadSources, loadZones...) se declenchent comme d'habitude.
+function tbAllerA(idOnglet, ligne) {
+    const cle = idOnglet.replace('tab-', '');
+    const bouton = [...document.querySelectorAll('#rail .tab-btn')]
+        .find(b => (b.getAttribute('onclick') || '').includes(`switchTab('${cle}'`));
+    if (bouton) bouton.click();
+    if (!ligne) return;
+    ligne.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    ligne.style.transition = 'background .3s';
+    ligne.style.background = 'rgba(255,87,34,.18)';
+    setTimeout(() => { ligne.style.background = ''; }, 1800);
+}
+
+document.addEventListener('click', e => {
+    const boite = document.getElementById('tb-resultats');
+    if (boite && !e.target.closest('.tb-rech')) boite.classList.remove('ouvert');
+});
+
+/* ---- disposition des cartes ---- */
+// La disposition est propre au navigateur : elle tient dans localStorage, pas en base.
+// Chacun range son tableau de bord comme il veut sans rien imposer a l'equipe.
+const TB_CLE_DISPO = 'dropstyle-dispo-admin';
+const TB_NOMS_CARTE = {
+    activite: 'Chiffre d\'affaires', ca: 'CA validé', transfo: 'Transformation',
+    devis: 'Devis chiffrés', ecart: 'Écart moteur / vendu', sources: 'Canaux d\'acquisition',
+    statuts: 'Suite donnée aux devis', equipe: 'L\'équipe', stock: 'Stock à surveiller'
+};
+let tbModeDispo = false;
+
+function tbLireDispo() {
+    try { return JSON.parse(localStorage.getItem(TB_CLE_DISPO) || '{}'); } catch (e) { return {}; }
+}
+function tbEcrireDispo(d) {
+    try { localStorage.setItem(TB_CLE_DISPO, JSON.stringify(d)); } catch (e) { /* navigation privee */ }
+}
+
+function tbCartes() { return [...document.querySelectorAll('#tab-dashboard [data-carte]')]; }
+
+function tbAppliquerDispo() {
+    const d = tbLireDispo();
+    tbCartes().forEach(c => {
+        const cle = c.dataset.carte;
+        c.style.display = d.masquees && d.masquees.includes(cle) ? 'none' : '';
+        if (d.larges && d.larges.includes(cle)) c.classList.add('large');
+    });
+    // L'ordre enregistre est rejoue dans chaque conteneur.
+    (d.ordre || []).forEach(cle => {
+        const c = document.querySelector(`#tab-dashboard [data-carte="${cle}"]`);
+        if (c && c.parentElement) c.parentElement.appendChild(c);
+    });
+    tbListerMasquees();
+}
+
+function tbListerMasquees() {
+    const el = document.getElementById('tb-masquees');
+    if (!el) return;
+    const masquees = (tbLireDispo().masquees || []);
+    el.innerHTML = masquees.length
+        ? masquees.map(c => `<button class="small" onclick="tbRevoir('${c}')">+ ${escapeHtml(TB_NOMS_CARTE[c] || c)}</button>`).join(' ')
+        : '<span style="font-size:12px;color:var(--text-light)">aucune carte masquée</span>';
+}
+
+function tbMasquer(cle) {
+    const d = tbLireDispo();
+    d.masquees = [...new Set([...(d.masquees || []), cle])];
+    tbEcrireDispo(d);
+    tbAppliquerDispo();
+}
+function tbRevoir(cle) {
+    const d = tbLireDispo();
+    d.masquees = (d.masquees || []).filter(c => c !== cle);
+    tbEcrireDispo(d);
+    tbAppliquerDispo();
+}
+function tbElargir(cle) {
+    const d = tbLireDispo();
+    const larges = new Set(d.larges || []);
+    const carte = document.querySelector(`#tab-dashboard [data-carte="${cle}"]`);
+    if (!carte) return;
+    if (larges.has(cle)) { larges.delete(cle); carte.classList.remove('large'); }
+    else { larges.add(cle); carte.classList.add('large'); }
+    d.larges = [...larges];
+    tbEcrireDispo(d);
+}
+function tbDeplacer(cle, sens) {
+    const carte = document.querySelector(`#tab-dashboard [data-carte="${cle}"]`);
+    if (!carte) return;
+    const voisin = sens < 0 ? carte.previousElementSibling : carte.nextElementSibling;
+    if (!voisin || !voisin.dataset.carte) return;
+    if (sens < 0) voisin.before(carte); else voisin.after(carte);
+    tbEnregistrerOrdre();
+}
+function tbEnregistrerOrdre() {
+    const d = tbLireDispo();
+    d.ordre = tbCartes().map(c => c.dataset.carte);
+    tbEcrireDispo(d);
+}
+
+function tbDispoReset() {
+    tbEcrireDispo({});
+    window.location.reload();
+}
+
+function tbDispoBasculer() {
+    tbModeDispo = !tbModeDispo;
+    document.body.classList.toggle('dispo', tbModeDispo);
+    const barre = document.getElementById('tb-barre-dispo');
+    if (barre) barre.classList.toggle('ouvert', tbModeDispo);
+    const btn = document.getElementById('tb-dispo-btn');
+    if (btn) { btn.textContent = tbModeDispo ? 'Terminé' : 'Personnaliser'; btn.classList.toggle('calc-btn', !tbModeDispo); }
+    if (tbModeDispo) tbOutillerCartes(); else tbCartes().forEach(c => {
+        const o = c.querySelector('.tb-outils-carte'); if (o) o.remove();
+    });
+    tbListerMasquees();
+}
+
+// Les quatre commandes de la maquette : monter, descendre, elargir, masquer.
+function tbOutillerCartes() {
+    tbCartes().forEach(c => {
+        if (c.querySelector('.tb-outils-carte')) return;
+        const cle = c.dataset.carte;
+        const o = document.createElement('div');
+        o.className = 'tb-outils-carte';
+        o.innerHTML = `<button title="Monter" onclick="event.stopPropagation();tbDeplacer('${cle}',-1)">↑</button>
+            <button title="Descendre" onclick="event.stopPropagation();tbDeplacer('${cle}',1)">↓</button>
+            <button title="Élargir ou rétrécir" onclick="event.stopPropagation();tbElargir('${cle}')">⇔</button>
+            <button title="Masquer" onclick="event.stopPropagation();tbMasquer('${cle}')">✕</button>`;
+        c.appendChild(o);
+        c.draggable = true;
+        c.addEventListener('dragstart', e => {
+            if (!tbModeDispo) { e.preventDefault(); return; }
+            tbGlisse = c; c.classList.add('glisse');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        c.addEventListener('dragend', () => { c.classList.remove('glisse'); tbCartes().forEach(x => x.classList.remove('cible')); });
+        c.addEventListener('dragover', e => {
+            if (!tbGlisse || tbGlisse === c || tbGlisse.parentElement !== c.parentElement) return;
+            e.preventDefault(); c.classList.add('cible');
+        });
+        c.addEventListener('dragleave', () => c.classList.remove('cible'));
+        c.addEventListener('drop', e => {
+            e.preventDefault(); c.classList.remove('cible');
+            if (!tbGlisse || tbGlisse === c || tbGlisse.parentElement !== c.parentElement) return;
+            const cartes = [...c.parentElement.children];
+            if (cartes.indexOf(tbGlisse) < cartes.indexOf(c)) c.after(tbGlisse); else c.before(tbGlisse);
+            tbEnregistrerOrdre();
+        });
+    });
+}
+let tbGlisse = null;
 
 function tbSources(sources) {
     const el = document.getElementById('tb-g-sources');
@@ -2487,8 +2838,10 @@ async function loadStock() {
         const items = await fetch(`${API_URL}/stock`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
         if (!Array.isArray(items)) throw new Error('reponse invalide');
         const lowCount = items.filter(i => i.low).length;
-        document.getElementById('stat-stock-low').textContent = lowCount;
-        document.getElementById('stat-stock-card').style.color = lowCount > 0 ? 'var(--danger)' : '';
+        const compteur = document.getElementById('stat-stock-low');
+        if (compteur) compteur.textContent = lowCount;
+        const carte = document.getElementById('stat-stock-card');
+        if (carte) carte.style.color = lowCount > 0 ? 'var(--danger)' : '';
         if (!items.length) { document.getElementById('stock-list').innerHTML = '<tr><td colspan="5" class="empty-state">Aucun article</td></tr>'; return; }
         document.getElementById('stock-list').innerHTML = items.map(i => `
             <tr style="${i.low ? 'background:rgba(220,53,69,0.08);' : ''}">
