@@ -375,6 +375,39 @@
         .zone-total .valeur { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
         .zone-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
 
+        /* V29 — blocs texte et logo poses sur le vehicule. Le bloc montre OU se trouve le
+           visuel ; sa surface vient des dimensions saisies, jamais de sa taille a l'ecran. */
+        .bloc-visuel {
+            position: absolute; border: 1.5px solid var(--primary-clair); border-radius: 5px;
+            background: rgba(255,87,34,.22); cursor: grab; touch-action: none;
+            display: grid; place-items: center; overflow: hidden;
+        }
+        .bloc-visuel.pris { cursor: grabbing; box-shadow: 0 0 0 3px var(--halo); }
+        .bloc-visuel.actif { border-width: 2px; box-shadow: 0 0 0 2px rgba(255,138,80,.5); }
+        .bloc-visuel span {
+            font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+            color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none;
+            text-align: center; padding: 0 2px; line-height: 1.15;
+        }
+        .bloc-ligne {
+            display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+            padding: 9px 11px; border-radius: 11px; font-size: 12.5px;
+            background: var(--bg-input); border: 1px solid rgba(255,87,34,.3);
+        }
+        .bloc-ligne .etiquette { font-weight: 700; color: var(--primary-clair); text-transform: uppercase; font-size: 10.5px; letter-spacing: .06em; }
+        .bloc-ligne input[type="number"] {
+            width: 62px; padding: 6px 7px; font-size: 12.5px; text-align: right;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text-primary); font-family: inherit; font-variant-numeric: tabular-nums;
+        }
+        .bloc-ligne .unite { color: var(--text-light); font-size: 11px; }
+        .bloc-ligne .surface { margin-left: auto; color: var(--primary-clair); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .bloc-ligne .retirer {
+            background: none; border: none; color: var(--text-light); cursor: pointer;
+            font-size: 15px; padding: 2px 5px; font-family: inherit;
+        }
+        .bloc-ligne .retirer:hover { color: var(--danger); }
+
         /* Le prix est le heros de l'ecran : halo derriere le chiffre, degrade blanc vers orange. */
         .price-display {
             background: linear-gradient(158deg, var(--verre-haut), var(--bg-card));
@@ -916,7 +949,11 @@
                     <div class="zone-faces" id="zone-faces" role="group" aria-label="Face du véhicule"></div>
                     <div class="zone-scene" id="zone-scene"><svg viewBox="0 0 480 200" id="zone-dessin" aria-label="Silhouette du véhicule"></svg></div>
                     <div class="zone-liste" id="zone-liste"></div>
+                    <!-- V29 — visuels poses sur le vehicule, en plus des zones couvertes. -->
+                    <div class="zone-liste" id="blocs-liste" style="margin-top:8px;"></div>
                     <div class="zone-actions">
+                        <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-texte" onclick="ajouterBloc('texte')">+ Texte</button>
+                        <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-logo" onclick="ajouterBloc('logo')">+ Logo</button>
                         <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutCocher()">Covering complet</button>
                         <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutDecocher()">Tout décocher</button>
                     </div>
@@ -1542,7 +1579,7 @@ function selectDropdownItem(item) {
     }
     // V28 — changer de vehicule change les zones et leurs surfaces : la selection precedente
     // ne veut plus rien dire, on repart a zero plutot que de garder des cases d'un autre type.
-    if (dd.id === 'dd-v-type') { zonesChoisies.clear(); zonesRender(); }
+    if (dd.id === 'dd-v-type') { zonesChoisies.clear(); blocsVisuels = []; zonesRender(); }
     // V27 — le mode PAO n'est plus un menu deroulant mais deux boutons : voir choisirPAO().
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
@@ -1976,7 +2013,7 @@ async function calcVehicule() {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
         return;
     }
-    if (parZones && surfaceZonesChoisies() <= 0) {
+    if (parZones && surfaceVehicule() <= 0) {
         document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Cochez au moins une zone à habiller</p></div>';
         return;
     }
@@ -1995,7 +2032,7 @@ async function calcVehicule() {
     const echenillagePrice = echenillageCheck ? parseFloat(getDropdownValue('dd-v-echenillage')) || 0 : 0;
 
     // Part matiere (× coefficient) — support (vinyle+lamination+tape) et impression separes pour l'affichage par etape
-    const surface = parZones ? surfaceZonesChoisies() : surfaces[type][marquage];
+    const surface = parZones ? surfaceVehicule() : surfaces[type][marquage];
     const conso = surface * num('chute_vehicule', 1.25);
     const tapePrix = tape ? (allTapes.length ? parseFloat(allTapes[0].prix) : 1.21) : 0;
     const coutM2Support = parseFloat(vinyle.price) + (lamination ? parseFloat(lamination.prix) : 0) + tapePrix;
@@ -2021,7 +2058,7 @@ async function calcVehicule() {
     const venteSupport = coutMatiereSupport * t.coefficient;
 
     const rows = [
-        { label: `Surface ${parZones ? surface.toFixed(2) : surface}m²${parZones ? ` (${zonesChoisies.size} zone${zonesChoisies.size > 1 ? 's' : ''})` : ''} × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
+        { label: `Surface ${parZones ? surface.toFixed(2) : surface}m²${parZones ? ` (${zonesChoisies.size} zone${zonesChoisies.size > 1 ? 's' : ''}${blocsVisuels.length ? ' + ' + blocsVisuels.length + ' visuel' + (blocsVisuels.length > 1 ? 's' : '') : ''})` : ''} × chute ${num('chute_vehicule', 1.25).toFixed(2)} = ${conso.toFixed(2)}m² conso.`, val: '', stage: 1 },
         { label: `Coût matière support (${coutM2Support.toFixed(2)}€/m² : vinyle${lamination ? ` + lamination ${finition}` : ''}${tape ? ' + tape' : ''})${qty > 1 ? ` × ${qty} véh.` : ''}`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
         remise > 0 ? { label: `Remise quantité matière`, val: `-${(remise * 100).toFixed(0)}%`, stage: 1 } : null,
         { label: `Vente matière support (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
@@ -3399,10 +3436,120 @@ function zonesRender() {
         </label>`;
     }).join('') : '<p style="font-size:12px;color:var(--text-light);">Aucune zone sur cette face.</p>';
 
-    const total = surfaceZonesChoisies();
+    rendreBlocs();
+    majTotalZones();
+}
+
+// ===== V29 — VISUELS POSES SUR LE VEHICULE (texte et logo) =====
+// Un bloc dit OU se trouve le visuel ; sa surface vient des dimensions saisies en cm, et
+// jamais de sa taille a l'ecran : un prix ne doit pas dependre d'un glissement de doigt.
+// Les longueurs ci-dessous ne servent qu'a dessiner le bloc a l'echelle de la silhouette.
+const LONGUEUR_AFFICHAGE = { voiture: 4.3, fourgon: 5.0, camion: 8.5 };
+let blocsVisuels = [];   // { id, type, face, x, y, l, h, q }  — x/y en % de la scene, l/h en cm
+let blocSeq = 1;
+
+const surfaceBlocs = () => blocsVisuels.reduce((s, b) => s + (b.l / 100) * (b.h / 100) * b.q, 0);
+// Surface facturee du vehicule : les zones couvertes plus les visuels poses.
+const surfaceVehicule = () => surfaceZonesChoisies() + surfaceBlocs();
+
+// Un bloc n'a de sens que sur une face dessinee : ailleurs, on ne saurait pas ou le poser.
+const facePorteDessin = () => {
+    const f = ZONE_FACES.find(x => x.cle === zoneFace);
+    return !!(f && f.source === 'cote' && ZONE_SILHOUETTES[ZONE_FAMILLE[getDropdownValue('dd-v-type')]]);
+};
+
+function ajouterBloc(type) {
+    if (!facePorteDessin()) return;
+    blocsVisuels.push({
+        id: blocSeq++, type, face: zoneFace, x: 34, y: 38,
+        l: type === 'logo' ? 80 : 150, h: type === 'logo' ? 40 : 20, q: 1
+    });
+    zonesRender();
+}
+function retirerBloc(id) { blocsVisuels = blocsVisuels.filter(b => b.id !== id); zonesRender(); }
+function majBloc(id, champ, valeur) {
+    const b = blocsVisuels.find(x => x.id === id);
+    if (!b) return;
+    const v = parseFloat(valeur);
+    b[champ] = isNaN(v) || v < 0 ? 0 : v;
+    rendreBlocs();
+    majTotalZones();
+}
+
+function rendreBlocs() {
+    const scene = document.getElementById('zone-scene');
+    scene.querySelectorAll('.bloc-visuel').forEach(e => e.remove());
+    if (!facePorteDessin()) return;
+    const famille = ZONE_FAMILLE[getDropdownValue('dd-v-type')];
+    const longueur = LONGUEUR_AFFICHAGE[famille] || 5;
+    const hauteurScene = longueur * 200 / 480;   // la scene fait 480 x 200 unites
+    for (const b of blocsVisuels.filter(x => x.face === zoneFace)) {
+        const el = document.createElement('div');
+        el.className = 'bloc-visuel';
+        const larg = Math.min(100 - b.x, (b.l / 100) / longueur * 100);
+        const haut = Math.min(100 - b.y, (b.h / 100) / hauteurScene * 100);
+        el.style.cssText = `left:${b.x}%;top:${b.y}%;width:${Math.max(larg, 2)}%;height:${Math.max(haut, 2)}%`;
+        el.innerHTML = `<span>${b.type}${b.q > 1 ? ' ×' + b.q : ''}</span>`;
+        glisserBloc(el, b);
+        scene.appendChild(el);
+    }
+}
+
+// Deplacement au doigt comme a la souris. Seule la position bouge : les dimensions, donc
+// le prix, ne changent jamais par glissement.
+function glisserBloc(el, b) {
+    el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const scene = document.getElementById('zone-scene');
+        const r = scene.getBoundingClientRect();
+        const dep = { x: e.clientX, y: e.clientY, bx: b.x, by: b.y };
+        el.classList.add('pris');
+        const bouger = (ev) => {
+            const larg = parseFloat(el.style.width), haut = parseFloat(el.style.height);
+            b.x = Math.min(100 - larg, Math.max(0, dep.bx + ((ev.clientX - dep.x) / r.width) * 100));
+            b.y = Math.min(100 - haut, Math.max(0, dep.by + ((ev.clientY - dep.y) / r.height) * 100));
+            el.style.left = b.x + '%'; el.style.top = b.y + '%';
+        };
+        const lacher = () => {
+            el.classList.remove('pris');
+            window.removeEventListener('pointermove', bouger);
+            window.removeEventListener('pointerup', lacher);
+        };
+        window.addEventListener('pointermove', bouger);
+        window.addEventListener('pointerup', lacher);
+    });
+}
+
+function rendreListeBlocs() {
+    const el = document.getElementById('blocs-liste');
+    const dessus = blocsVisuels.filter(b => b.face === zoneFace);
+    el.innerHTML = dessus.map(b => `<div class="bloc-ligne">
+        <span class="etiquette">${b.type}</span>
+        <input type="number" min="0" step="1" value="${b.l}" aria-label="Largeur en cm" onchange="majBloc(${b.id}, 'l', this.value)">
+        <span class="unite">× </span>
+        <input type="number" min="0" step="1" value="${b.h}" aria-label="Hauteur en cm" onchange="majBloc(${b.id}, 'h', this.value)">
+        <span class="unite">cm</span>
+        <input type="number" min="1" step="1" value="${b.q}" aria-label="Quantité" onchange="majBloc(${b.id}, 'q', this.value)">
+        <span class="unite">ex.</span>
+        <span class="surface">${((b.l / 100) * (b.h / 100) * b.q).toFixed(2)} m²</span>
+        <button type="button" class="retirer" onclick="retirerBloc(${b.id})" aria-label="Retirer ce visuel">✕</button>
+    </div>`).join('');
+    const possible = facePorteDessin();
+    for (const id of ['btn-ajout-texte', 'btn-ajout-logo']) {
+        const btn = document.getElementById(id);
+        if (btn) { btn.style.display = possible ? '' : 'none'; }
+    }
+}
+
+function majTotalZones() {
+    const type = getDropdownValue('dd-v-type');
+    const zones = surfaceZonesChoisies(), blocs = surfaceBlocs();
     const reference = totauxZones[type];
-    document.getElementById('zone-total').textContent = total.toFixed(2).replace('.', ',') + ' m²'
-        + (reference ? ` sur ${Number(reference).toFixed(2).replace('.', ',')}` : '');
+    const fmt = n => n.toFixed(2).replace('.', ',');
+    document.getElementById('zone-total').textContent = fmt(zones + blocs) + ' m²'
+        + (blocs > 0 ? ` (dont ${fmt(blocs)} de visuels)` : '')
+        + (reference ? ` sur ${fmt(Number(reference))}` : '');
+    rendreListeBlocs();
 }
 
 function zonesBasculer(clef) {
@@ -3417,7 +3564,7 @@ function zonesToutCocher() {
     }
     zonesRender();
 }
-function zonesToutDecocher() { zonesChoisies.clear(); zonesRender(); }
+function zonesToutDecocher() { zonesChoisies.clear(); blocsVisuels = []; zonesRender(); }
 
 // ===== V26 — PHOTOS DU VEHICULE =====
 // Les photos sont prises avant que le devis existe : elles partent donc au serveur sous un
