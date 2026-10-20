@@ -389,8 +389,8 @@
         }
         /* Bloc trop bas pour deux lignes : on garde la surface seule, sur une ligne.
            Trop bas meme pour ca : plus rien, le chiffre reste lisible dans la liste. */
-        .bloc-visuel.compact span { font-size: 8.5px; line-height: 1; white-space: nowrap; }
-        .bloc-visuel.minuscule span { display: none; }
+        .bloc-visuel.compact .bloc-txt { font-size: 8.5px; line-height: 1; white-space: nowrap; }
+        .bloc-visuel.minuscule .bloc-txt { display: none; }
         .bloc-visuel .bloc-sup {
             position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; z-index: 2;
             border-radius: 50%; border: 1.5px solid var(--bg-dark); cursor: pointer; padding: 0;
@@ -405,7 +405,7 @@
         }
         .bloc-visuel.pris { cursor: grabbing; box-shadow: 0 0 0 3px var(--halo); }
         .bloc-visuel.actif { border-width: 2px; box-shadow: 0 0 0 2px rgba(255,138,80,.5); }
-        .bloc-visuel span {
+        .bloc-visuel .bloc-txt {
             font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
             color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none;
             text-align: center; padding: 0 2px; line-height: 1.15;
@@ -3519,7 +3519,7 @@ function rendreBlocs() {
         el.style.cssText = `left:${b.x}%;top:${b.y}%;`
             + `width:${Math.max(Math.min(100 - b.x, (b.l / 100) / ech.longueur * 100), 2)}%;`
             + `height:${Math.max(Math.min(100 - b.y, (b.h / 100) / ech.hauteur * 100), 2)}%`;
-        el.innerHTML = `<span>${texteBloc(b)}</span>`
+        el.innerHTML = `<span class="bloc-txt">${texteBloc(b)}</span>`
             + `<button type="button" class="bloc-sup" aria-label="Retirer ce visuel">✕</button>`
             + `<span class="bloc-poignee" role="presentation" aria-hidden="true"></span>`;
         el.querySelector('.bloc-sup').addEventListener('pointerdown', e => e.stopPropagation());
@@ -3531,7 +3531,7 @@ function rendreBlocs() {
         if (haut < 13) el.classList.add('minuscule');
         else if (haut < 26) {
             el.classList.add('compact');
-            el.querySelector('span').innerHTML = surfaceDunBloc(b).toFixed(2).replace('.', ',') + ' m²';
+            el.querySelector('.bloc-txt').innerHTML = surfaceDunBloc(b).toFixed(2).replace('.', ',') + ' m²';
         }
     }
 }
@@ -3569,7 +3569,7 @@ function glisserBloc(el, b, ech) {
                 b.h = Math.min(2000, Math.max(5, Math.round(dep.h + dy / 100 * ech.hauteur * 100)));
                 el.style.width = Math.min(100 - b.x, (b.l / 100) / ech.longueur * 100) + '%';
                 el.style.height = Math.min(100 - b.y, (b.h / 100) / ech.hauteur * 100) + '%';
-                el.querySelector('span').innerHTML = texteBloc(b);
+                el.querySelector('.bloc-txt').innerHTML = texteBloc(b);
                 majTotalSeul();
             }
         };
