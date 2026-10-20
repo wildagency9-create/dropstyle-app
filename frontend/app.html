@@ -1008,6 +1008,7 @@
                     <div class="zone-liste" id="blocs-liste" style="margin-top:8px;"></div>
                     <div class="zone-actions">
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-fond" onclick="basculerFond()">Voir le schéma</button>
+                        <button type="button" class="choix-btn" style="flex:none;" id="btn-apercu" onclick="ouvrirApercu()">Aperçu client</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-texte" onclick="ajouterBloc('texte')">+ Texte</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-logo" onclick="ajouterBloc('logo')">+ Logo</button>
                         <button type="button" class="choix-btn" style="flex:none;" onclick="zonesToutCocher()">Covering complet</button>
@@ -1464,6 +1465,22 @@
 </div>
 
 <!-- V11 — enregistrement d'un devis : rattachement au client -->
+<!-- V34 — apercu client : ce que le client verra, avant d'envoyer le prix. -->
+<div class="modal-back" id="modal-apercu" onclick="if(event.target===this)fermerModal('modal-apercu')">
+    <div class="modal" style="max-width:720px;">
+        <h3>Aperçu pour le client</h3>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">
+            Reprend la face affichée : fond, zones retenues et visuels posés.
+        </p>
+        <img id="apercu-image" alt="Aperçu du véhicule marqué" style="width:100%;border-radius:10px;border:1px solid var(--border);display:block;">
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+            <button type="button" class="btn-pri" style="flex:1;" onclick="telechargerApercu()">Télécharger l'image</button>
+            <button type="button" class="choix-btn" style="flex:1;" id="apercu-joindre" onclick="joindreApercu()">Joindre au devis</button>
+            <button type="button" style="flex:none;background:transparent;border:1px solid var(--border);color:var(--text-secondary);" onclick="fermerModal('modal-apercu')">Fermer</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-back" id="modal-devis" onclick="if(event.target===this)annulerSaveDevis()">
     <div class="modal">
         <h3>Enregistrer le devis</h3>
@@ -3905,6 +3922,174 @@ function zonesToutDecocher() { zonesChoisies.clear(); blocsVisuels = []; zonesRe
 // Les photos sont prises avant que le devis existe : elles partent donc au serveur sous un
 // identifiant de brouillon garde en memoire du navigateur, puis le serveur les rattache au
 // devis a l'enregistrement. Rien ici ne touche au calcul du prix.
+/* ===== V34 — apercu client =====
+   Ce que l'atelier voit a l'ecran ne sort pas de l'ecran : le client, lui, recoit un prix
+   sans rien voir. On redessine donc la scene dans une image — fond, zones retenues,
+   visuels poses, et un bandeau qui recapitule ce qui est facture — que l'on peut
+   telecharger ou joindre au devis. L'image est reconstruite au trait plutot que capturee :
+   pas de bibliotheque tierce, et le resultat ne depend pas de la taille de l'ecran. */
+const APERCU_LARGEUR = 1200;
+const APERCU_BANDEAU = 132;
+
+function chargerImage(src) {
+    return new Promise((ok, ko) => {
+        const img = new Image();
+        img.onload = () => ok(img);
+        img.onerror = () => ko(new Error('Image illisible'));
+        img.src = src;
+    });
+}
+
+// La silhouette est un SVG sans image externe : elle se rasterise sans salir la toile.
+function silhouetteEnImage(contenuSVG) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" width="480" height="200">`
+        + `<style>.zone-poly{fill:rgba(255,255,255,.06);stroke:rgba(255,255,255,.28);stroke-width:1.2}`
+        + `.zone-poly.on{fill:rgba(255,87,34,.45);stroke:#FF5722;stroke-width:2}</style>`
+        + contenuSVG + '</svg>';
+    // encodeURIComponent plutot que base64 : pas de depassement de pile sur un gros SVG,
+    // et aucun recours a unescape, deprecie.
+    return chargerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+}
+
+function apercuZonesDeLaFace() {
+    const { def, liste } = zonesDeLaFace();
+    return liste.filter(z => zonesChoisies.has(zoneClef(z, def.cote)));
+}
+
+async function construireApercu() {
+    const type = getDropdownValue('dd-v-type');
+    if (!type) throw new Error('Choisissez d\'abord le type de véhicule');
+    const fond = fondCourant();
+    if (fond === 'rien') throw new Error('Cette face n\'a ni photo ni schéma à montrer');
+
+    const photo = photoDeLaFace();
+    const { def } = zonesDeLaFace();
+    const W = APERCU_LARGEUR;
+    const H = fond === 'photo' && photo.largeur && photo.hauteur
+        ? Math.round(W * photo.hauteur / photo.largeur)
+        : Math.round(W * 200 / 480);
+
+    const toile = document.createElement('canvas');
+    toile.width = W; toile.height = H + APERCU_BANDEAU;
+    const c = toile.getContext('2d');
+    c.fillStyle = '#0b0c0f';
+    c.fillRect(0, 0, W, H + APERCU_BANDEAU);
+
+    // Le profil droit est affiche en miroir a l'ecran : l'apercu doit l'etre aussi, sinon
+    // le client verrait ses visuels du mauvais cote.
+    const miroir = fond === 'silhouette' && def.cote === 'd';
+    c.save();
+    if (miroir) { c.translate(W, 0); c.scale(-1, 1); }
+    if (fond === 'photo') {
+        c.drawImage(await chargerImage(photo.url), 0, 0, W, H);
+    } else {
+        const silhouette = ZONE_SILHOUETTES[ZONE_FAMILLE[type]];
+        const polys = zonesDeLaFace().liste.map(z => {
+            const pts = silhouette.zones[z.cle];
+            if (!pts) return '';
+            const coche = zonesChoisies.has(zoneClef(z, def.cote));
+            return `<polygon class="zone-poly${coche ? ' on' : ''}" points="${pts}"/>`;
+        }).join('');
+        c.drawImage(await silhouetteEnImage(silhouette.fond + polys), 0, 0, W, H);
+    }
+    c.restore();
+
+    // Les visuels, aux memes pourcentages qu'a l'ecran : la scene de l'apercu a le meme
+    // format, donc les proportions sont conservees.
+    const ech = echelleScene();
+    for (const b of blocsVisuels.filter(x => x.face === zoneFace)) {
+        const x = (b.x / 100) * W;
+        const y = (b.y / 100) * H;
+        const l = Math.max(Math.min(W - x, ((b.l / 100) / ech.longueur) * W), 8);
+        const h = Math.max(Math.min(H - y, ((b.h / 100) / ech.hauteur) * H), 8);
+        c.fillStyle = 'rgba(255,87,34,.26)';
+        c.fillRect(x, y, l, h);
+        c.strokeStyle = '#FF8A50'; c.lineWidth = 2;
+        c.strokeRect(x, y, l, h);
+        const etiquette = `${b.type}${b.q > 1 ? ' ×' + b.q : ''} — ${surfaceDunBloc(b).toFixed(2).replace('.', ',')} m²`;
+        c.font = '600 15px system-ui, sans-serif';
+        const large = c.measureText(etiquette).width + 12;
+        // L'etiquette se pose au-dessus du bloc, ou dedans s'il touche le haut de l'image.
+        const yTexte = y > 26 ? y - 8 : y + 20;
+        c.fillStyle = 'rgba(11,12,15,.78)';
+        c.fillRect(Math.min(x, W - large), yTexte - 15, large, 21);
+        c.fillStyle = '#FFD9CC';
+        c.fillText(etiquette, Math.min(x, W - large) + 6, yTexte);
+    }
+
+    // Bandeau : ce qui est facture, en toutes lettres. C'est ce que le client doit pouvoir
+    // relire sans ouvrir le devis.
+    const zonesRetenues = apercuZonesDeLaFace();
+    c.fillStyle = '#12141a';
+    c.fillRect(0, H, W, APERCU_BANDEAU);
+    c.fillStyle = '#FF5722';
+    c.fillRect(0, H, 5, APERCU_BANDEAU);
+    c.fillStyle = '#F2F3F5';
+    c.font = '700 22px system-ui, sans-serif';
+    c.fillText(`${RECO_LIBELLE[type] || type} — ${def.nom}`, 22, H + 36);
+    c.font = '400 16px system-ui, sans-serif';
+    c.fillStyle = '#8A8F9C';
+    const surface = surfaceVehicule();
+    c.fillText(`Surface facturée : ${surface.toFixed(2).replace('.', ',')} m² (toutes faces)`, 22, H + 62);
+    const nomsZones = zonesRetenues.map(z => z.nom).join(', ');
+    const visuels = blocsVisuels.filter(x => x.face === zoneFace).length;
+    const ligne = (nomsZones || 'aucune zone cochée sur cette face')
+        + (visuels ? ` · ${visuels} visuel${visuels > 1 ? 's' : ''} posé${visuels > 1 ? 's' : ''}` : '');
+    c.fillText(ligne.length > 92 ? ligne.slice(0, 91) + '…' : ligne, 22, H + 86);
+    c.fillStyle = '#5A5F6B';
+    c.font = '400 13px system-ui, sans-serif';
+    c.fillText('Aperçu indicatif — l\'implantation définitive est validée avant pose.', 22, H + 112);
+
+    return { data: toile.toDataURL('image/jpeg', 0.86), largeur: W, hauteur: H + APERCU_BANDEAU };
+}
+
+async function ouvrirApercu() {
+    const btn = document.getElementById('btn-apercu');
+    if (btn) { btn.disabled = true; btn.textContent = 'Préparation...'; }
+    try {
+        apercuCourant = await construireApercu();
+        document.getElementById('apercu-image').src = apercuCourant.data;
+        document.getElementById('apercu-joindre').disabled = false;
+        document.getElementById('apercu-joindre').textContent = 'Joindre au devis';
+        ouvrirModal('modal-apercu');
+    } catch (err) {
+        showNotification(err.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Aperçu client'; }
+    }
+}
+
+let apercuCourant = null;
+
+function telechargerApercu() {
+    if (!apercuCourant) return;
+    const a = document.createElement('a');
+    a.href = apercuCourant.data;
+    a.download = `apercu-${getDropdownValue('dd-v-type') || 'vehicule'}-${zoneFace}.jpg`;
+    a.click();
+}
+
+// L'apercu rejoint les photos du devis : meme stockage, meme rattachement au moment de
+// l'enregistrement. La face porte un prefixe pour ne jamais ecraser une vraie photo.
+async function joindreApercu() {
+    if (!apercuCourant) return;
+    const btn = document.getElementById('apercu-joindre');
+    btn.disabled = true; btn.textContent = 'Envoi...';
+    try {
+        await apiSend('/photos', 'POST', {
+            brouillon_id: brouillonCourant(),
+            face: ('ap-' + zoneFace).slice(0, 16),
+            data: apercuCourant.data,
+            largeur: apercuCourant.largeur, hauteur: apercuCourant.hauteur
+        });
+        btn.textContent = 'Joint au devis ✓';
+        showNotification('Aperçu joint au devis ✓', 'success');
+    } catch (err) {
+        btn.disabled = false; btn.textContent = 'Joindre au devis';
+        showNotification(err.message, 'error');
+    }
+}
+
 const PHOTO_FACES = [
     { cle: 'gauche',  nom: 'Profil gauche' },
     { cle: 'droite',  nom: 'Profil droit' },
@@ -4074,6 +4259,9 @@ async function photosInit() {
     try {
         const liste = await apiFetch('/photos?brouillon_id=' + encodeURIComponent(brouillonCourant()));
         for (const ligne of liste) {
+            // V34 — les apercus partagent la table des photos : ils ne sont pas des prises de
+            // vue et n'ont rien a faire dans les cinq cases de faces.
+            if (String(ligne.face || '').startsWith('ap-')) continue;
             try {
                 const r = await fetch(`${API_URL}/photos/${ligne.id}/image`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!r.ok) continue;

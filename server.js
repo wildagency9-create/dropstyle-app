@@ -242,6 +242,11 @@ async function ensureSourcesEquipe(conn, equipeId) {
 // rattachees au devis au moment de son enregistrement. Les octets vivent en base et non
 // sur le disque : Railway efface le systeme de fichiers a chaque redeploiement.
 const FACES_PHOTO = ['gauche', 'droite', 'avant', 'arriere', 'toit'];
+// V34 — l'apercu client est range avec les photos : meme table, meme rattachement au
+// devis. Le prefixe 'ap-' garde les deux series distinctes, et un apercu refait remplace
+// le precedent au lieu de s'empiler.
+const FACES_APERCU = FACES_PHOTO.map(f => 'ap-' + f);
+const FACES_ACCEPTEES = [...FACES_PHOTO, ...FACES_APERCU];
 const POIDS_MAX_PHOTO = 900 * 1024;   // large pour une photo recompressee a 1400 px par le navigateur
 const JOURS_BROUILLON = 7;            // au-dela, un brouillon sans devis est considere abandonne
 
@@ -1036,7 +1041,7 @@ app.delete('/api/devis/:id', verifyToken, async (req, res) => {
 app.post('/api/photos', verifyToken, async (req, res) => {
     try {
         const face = String(req.body.face || '');
-        if (!FACES_PHOTO.includes(face)) return res.status(400).json({ error: 'Face inconnue' });
+        if (!FACES_ACCEPTEES.includes(face)) return res.status(400).json({ error: 'Face inconnue' });
         const brouillon = String(req.body.brouillon_id || '');
         if (!/^[a-z0-9-]{8,40}$/i.test(brouillon)) return res.status(400).json({ error: 'Identifiant de brouillon invalide' });
         // Le navigateur envoie une data-URL ; on n'accepte que des images, et on verifie le
