@@ -272,6 +272,28 @@
             display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
         }
         .tb-cloche:hover { transform: none; color: var(--text-primary); }
+        #pop-notifs {
+            position: fixed; top: 14px; right: 14px; z-index: 900;
+            display: flex; flex-direction: column; gap: 8px; max-width: 340px;
+        }
+        .pop-notif {
+            display: flex; gap: 10px; align-items: flex-start; text-align: left;
+            background: var(--bg-card); border: 1px solid rgba(255,87,34,.45);
+            border-left: 3px solid var(--primary); border-radius: 12px;
+            padding: 11px 13px; cursor: pointer; width: 100%;
+            box-shadow: 0 18px 40px -18px rgba(0,0,0,.95);
+        }
+        .pop-notif .pic { font-size: 16px; line-height: 1.1; flex: none; }
+        .pop-notif .qui { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; }
+        .pop-notif .titre { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 2px; }
+        .pop-notif .msg { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+        .pop-notif .fermer {
+            margin-left: auto; background: none; border: none; color: var(--text-light);
+            font-size: 14px; padding: 0 2px; cursor: pointer; box-shadow: none; flex: none;
+        }
+        .pop-notif .fermer:hover { color: var(--text-primary); transform: none; }
+        @media (max-width: 860px) { #pop-notifs { top: 10px; left: 10px; right: 10px; max-width: none; } }
+
         .tb-cloche .nb {
             position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; border-radius: 99px;
             background: var(--primary); color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px;
@@ -561,7 +583,7 @@
                     <div class="tb-resultats" id="tb-resultats"></div>
                 </div>
                 <button class="tb-cloche" id="tb-cloche" title="Notifications"
-                        onclick="switchTab('notifs', this); initNotifs()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.2 7.5-2.2 7.5h16.4S18 14.5 18 8.5"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg></button>
+                        onclick="switchTab('notifs', this); initNotifs()"><span class="nb" id="tb-cloche-nb" style="display:none">0</span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.2 7.5-2.2 7.5h16.4S18 14.5 18 8.5"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg></button>
                 <div class="tb-compte"><span class="tb-av" id="tb-initiale">—</span>
                     <div><div class="tb-qn" id="tb-nom">—</div><div class="tb-qr">Administrateur</div></div></div>
                 <button class="tb-dispo" id="tb-dispo-btn" onclick="tbDispoBasculer()">Personnaliser</button>
@@ -1220,6 +1242,8 @@ window.addEventListener('DOMContentLoaded', () => {
     tbAppliquerDispo();
     loadAll();
     chargerTableauBord();
+    surveillerNotifs();
+    setInterval(surveillerNotifs, 45000);
 });
 
 async function loadAll() {
@@ -1284,6 +1308,55 @@ async function apiAdmin(chemin, methode, corps) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'Erreur serveur');
     return d;
+}
+
+// V37 — l'admin ne voyait RIEN arriver : sa cloche n'avait ni compteur ni releve. Elle
+// surveille desormais comme le calculateur, et annonce ce qui tombe.
+let notifsVuesAdmin = null;
+
+function popNotifAdmin(n) {
+    let pile = document.getElementById('pop-notifs');
+    if (!pile) {
+        pile = document.createElement('div');
+        pile.id = 'pop-notifs';
+        document.body.appendChild(pile);
+    }
+    while (pile.children.length >= 3) pile.firstElementChild.remove();
+    const icone = { reunion: '📅', client: '👤', devis: '📄' }[n.type] || '💬';
+    const el = document.createElement('div');
+    el.className = 'pop-notif';
+    el.setAttribute('role', 'status');
+    el.innerHTML = `<span class="pic" aria-hidden="true">${icone}</span>
+        <span style="min-width:0;">
+            <span class="qui">${escapeHtml(n.de_nom || 'Collègue')}</span>
+            <div class="titre">${escapeHtml(n.titre)}</div>
+            ${n.message ? `<div class="msg">${escapeHtml(String(n.message).slice(0, 90))}</div>` : ''}
+        </span>
+        <button type="button" class="fermer" aria-label="Fermer">✕</button>`;
+    el.querySelector('.fermer').addEventListener('click', e => { e.stopPropagation(); el.remove(); });
+    el.addEventListener('click', () => {
+        el.remove();
+        document.getElementById('tb-cloche').click();
+    });
+    pile.appendChild(el);
+    setTimeout(() => el.remove(), 9000);
+}
+
+async function surveillerNotifs() {
+    try {
+        const d = await apiAdmin('/notifications');
+        const badge = document.getElementById('tb-cloche-nb');
+        if (badge) {
+            badge.textContent = d.nonLus;
+            badge.style.display = d.nonLus > 0 ? '' : 'none';
+        }
+        const ids = new Set((d.notifications || []).map(n => n.id));
+        if (notifsVuesAdmin === null) notifsVuesAdmin = ids;   // premiere releve : on ne crie pas
+        else {
+            (d.notifications || []).filter(n => !n.lu && !notifsVuesAdmin.has(n.id)).reverse().forEach(popNotifAdmin);
+            notifsVuesAdmin = ids;
+        }
+    } catch (err) { /* une notification indisponible ne doit pas gener l'administration */ }
 }
 
 async function initNotifs() {

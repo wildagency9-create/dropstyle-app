@@ -604,6 +604,36 @@
             z-index: 999;
         }
         .notification.error { border-color: var(--danger); }
+
+        /* V37 — arrivee d'une notification. Jusqu'ici seul le compteur de la cloche
+           changeait, en silence : un message pouvait attendre des heures sans que
+           personne ne le voie. */
+        #pop-notifs {
+            position: fixed; top: 14px; right: 14px; z-index: 900;
+            display: flex; flex-direction: column; gap: 8px; max-width: 340px;
+        }
+        .pop-notif {
+            display: flex; gap: 10px; align-items: flex-start; text-align: left;
+            background: var(--bg-card); border: 1px solid rgba(255,87,34,.45);
+            border-left: 3px solid var(--primary); border-radius: 12px;
+            padding: 11px 13px; cursor: pointer; width: 100%;
+            box-shadow: 0 18px 40px -18px rgba(0,0,0,.95);
+            animation: popEntre .22s ease;
+        }
+        @keyframes popEntre { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .pop-notif { animation: none; } }
+        .pop-notif .pic { font-size: 16px; line-height: 1.1; flex: none; }
+        .pop-notif .qui { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; }
+        .pop-notif .titre { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 2px; }
+        .pop-notif .msg { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+        .pop-notif .fermer {
+            margin-left: auto; background: none; border: none; color: var(--text-light);
+            font-size: 14px; padding: 0 2px; cursor: pointer; box-shadow: none; flex: none;
+        }
+        .pop-notif .fermer:hover { color: var(--text-primary); transform: none; }
+        @media (max-width: 860px) {
+            #pop-notifs { top: 10px; left: 10px; right: 10px; max-width: none; }
+        }
         /* V35 — sur telephone le message passait derriere la barre de navigation et la
            barre de prix : il remonte au-dessus des deux, sur toute la largeur. */
         @media (max-width: 860px) {
@@ -3622,9 +3652,49 @@ async function chargerEquipe() {
     catch (err) { equipeMembres = []; }
 }
 
+// Les notifications deja vues a l'ecran. Au tout premier chargement on remplit cette
+// liste SANS rien afficher : sinon, ouvrir le logiciel ferait surgir d'un coup tous les
+// messages en attente, ce qui serait du bruit, pas de l'information.
+let notifsVues = null;
+
+function popNotif(n) {
+    let pile = document.getElementById('pop-notifs');
+    if (!pile) {
+        pile = document.createElement('div');
+        pile.id = 'pop-notifs';
+        document.body.appendChild(pile);
+    }
+    // Au-dela de trois, les plus anciennes cedent la place.
+    while (pile.children.length >= 3) pile.firstElementChild.remove();
+
+    const icone = { reunion: '📅', client: '👤', devis: '📄' }[n.type] || '💬';
+    const el = document.createElement('div');
+    el.className = 'pop-notif';
+    el.setAttribute('role', 'status');
+    el.innerHTML = `<span class="pic" aria-hidden="true">${icone}</span>
+        <span style="min-width:0;">
+            <span class="qui">${escapeHtml(n.de_nom || 'Collègue')}</span>
+            <div class="titre">${escapeHtml(n.titre)}</div>
+            ${n.message ? `<div class="msg">${escapeHtml(String(n.message).slice(0, 90))}</div>` : ''}
+        </span>
+        <button type="button" class="fermer" aria-label="Fermer">✕</button>`;
+    el.querySelector('.fermer').addEventListener('click', e => { e.stopPropagation(); el.remove(); });
+    el.addEventListener('click', () => { el.remove(); ouvrirNotif(n.id, n.ref_type || '', n.ref_id || null); });
+    pile.appendChild(el);
+    // Elle s'efface seule : la cloche garde la trace, la banniere n'est qu'une alerte.
+    setTimeout(() => el.remove(), 9000);
+}
+
 async function chargerNotifs() {
     try {
         const d = await apiFetch('/notifications');
+        // Nouveautes depuis la derniere releve : on n'annonce que ce qui n'est pas lu.
+        const ids = new Set((d.notifications || []).map(n => n.id));
+        if (notifsVues === null) notifsVues = ids;
+        else {
+            (d.notifications || []).filter(n => !n.lu && !notifsVues.has(n.id)).reverse().forEach(popNotif);
+            notifsVues = ids;
+        }
         const badge = document.getElementById('bell-count');
         badge.textContent = d.nonLus;
         badge.classList.toggle('on', d.nonLus > 0);
