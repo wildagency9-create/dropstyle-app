@@ -689,7 +689,12 @@
 
     <!-- V12 — NOTIFICATIONS ET INVITATIONS -->
     <div class="tab-content" id="tab-notifs">
-        <div class="section-header"><div class="section-title">Notifications</div></div>
+        <div class="section-header"><div class="section-title">Notifications</div>
+            <button class="calc-btn" id="btn-push" onclick="activerPush(this)">Activer les notifications</button>
+        </div>
+        <p class="note" style="margin-top:-8px;margin-bottom:16px;">
+            Les notifications système arrivent même DropStyle fermé. Sur iPhone, il faut d'abord
+            ajouter DropStyle à l'écran d'accueil.</p>
 
         <div style="display:flex;gap:8px;margin-bottom:20px;">
             <button id="mode-interne" onclick="choisirMode('interne')">Notification interne</button>
@@ -1312,6 +1317,94 @@ async function apiAdmin(chemin, methode, corps) {
 
 // V37 — l'admin ne voyait RIEN arriver : sa cloche n'avait ni compteur ni releve. Elle
 // surveille desormais comme le calculateur, et annonce ce qui tombe.
+/* ===== V38 — notifications systeme =====
+   La banniere ne s'affiche que si le logiciel est ouvert. Le push, lui, arrive meme
+   ferme — a condition que l'utilisateur l'accepte, et, sur iPhone, que le logiciel ait
+   ete ajoute a l'ecran d'accueil : Safari ne propose le push qu'aux applications
+   installees. On le dit plutot que de laisser chercher. */
+const pushPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function pushEtat() {
+    if (!pushPossible()) return 'impossible';
+    if (Notification.permission === 'denied') return 'refuse';
+    if (Notification.permission === 'granted') return 'accorde';
+    return 'a-demander';
+}
+
+// La cle publique voyage en base64url : le navigateur la veut en octets.
+function cleEnOctets(base64) {
+    const comble = '='.repeat((4 - base64.length % 4) % 4);
+    const brut = atob((base64 + comble).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...brut].map(c => c.charCodeAt(0)));
+}
+
+async function activerPush(bouton) {
+    const majBouton = (txt, actif) => { if (bouton) { bouton.textContent = txt; bouton.disabled = !actif; } };
+    if (!pushPossible()) {
+        showMessage('Ce navigateur ne gère pas les notifications système', 'error');
+        return;
+    }
+    const estIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const installee = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (estIOS && !installee) {
+        showMessage("Sur iPhone : ajoutez d'abord DropStyle à l'écran d'accueil (Partager ▸ Sur l'écran d'accueil)", 'error');
+        return;
+    }
+    majBouton('Activation…', false);
+    try {
+        const info = await apiAdmin('/push/cle');
+        if (!info || !info.disponible || !info.cle) {
+            showMessage("Le serveur n'a pas de clé de notification configurée", 'error');
+            // On relit l etat reel plutot que de reafficher une invitation : si le
+            // navigateur a refuse, le bouton doit le dire.
+            if (bouton && bouton.id) majBoutonPush(bouton.id); else majBouton('Activer les notifications', true);
+            return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            // Un refus est definitif tant que l'utilisateur ne revient pas dans les
+            // reglages du navigateur : il faut le dire, sinon il reclique sans effet.
+            showMessage(permission === 'denied'
+                ? 'Notifications refusées — à réautoriser dans les réglages du navigateur'
+                : 'Notifications non activées', 'error');
+            majBouton(pushEtat() === 'refuse' ? 'Refusées par le navigateur' : 'Activer les notifications', pushEtat() !== 'refuse');
+            return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const existant = await reg.pushManager.getSubscription();
+        const abo = existant || await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: cleEnOctets(info.cle)
+        });
+        const j = abo.toJSON();
+        await apiAdmin('/push/abonnement', 'POST', { endpoint: j.endpoint, keys: j.keys });
+        showMessage('Notifications activées sur cet appareil ✓', 'success');
+        majBouton('Notifications activées ✓', false);
+    } catch (err) {
+        showMessage('Activation impossible — ' + err.message, 'error');
+        if (bouton && bouton.id) majBoutonPush(bouton.id); else majBouton('Activer les notifications', true);
+    }
+}
+
+// Le libelle dit l'etat reel : rien n'est plus desagreable qu'un bouton qui ment.
+async function majBoutonPush(id) {
+    const b = document.getElementById(id);
+    if (!b) return;
+    const etat = pushEtat();
+    if (etat === 'impossible') { b.style.display = 'none'; return; }
+    b.style.display = '';
+    if (etat === 'refuse') { b.textContent = 'Refusées par le navigateur'; b.disabled = true; return; }
+    if (etat === 'accorde') {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            const abo = await reg.pushManager.getSubscription();
+            if (abo) { b.textContent = 'Notifications activées ✓'; b.disabled = true; return; }
+        } catch (e) { /* on retombe sur le libelle d'invitation */ }
+    }
+    b.textContent = 'Activer les notifications';
+    b.disabled = false;
+}
+
 let notifsVuesAdmin = null;
 
 function popNotifAdmin(n) {
@@ -1360,6 +1453,7 @@ async function surveillerNotifs() {
 }
 
 async function initNotifs() {
+    majBoutonPush('btn-push');
     try {
         const d = await apiAdmin('/equipe');
         // Une reponse de forme inattendue ne doit pas casser l'onglet : on retombe sur une

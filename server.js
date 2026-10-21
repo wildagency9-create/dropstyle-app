@@ -207,6 +207,20 @@ async function ensureV11Tables(existingConn) {
         // V33 — etat du formulaire au moment du calcul : c'est ce qui rend un devis
         // modifiable. Les devis plus anciens gardent NULL et ne sont pas recalculables.
         `ALTER TABLE devis ADD COLUMN saisie JSON DEFAULT NULL`,
+        // V38 — abonnements aux notifications systeme. Un enregistrement par appareil :
+        // le meme utilisateur peut etre sur son telephone et sur l'ordinateur de l'atelier.
+        `CREATE TABLE IF NOT EXISTS push_abonnements (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            user_id INT NOT NULL,
+            equipe_id INT NOT NULL,
+            endpoint VARCHAR(500) NOT NULL,
+            p256dh VARCHAR(255) NOT NULL,
+            auth VARCHAR(255) NOT NULL,
+            agent VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_endpoint (endpoint(255)),
+            INDEX idx_user (user_id)
+        )`,
         `ALTER TABLE devis ADD COLUMN modifie_le DATETIME DEFAULT NULL`,
         `ALTER TABLE devis ADD COLUMN modifie_par INT DEFAULT NULL`,
         // V15 — trace des recapitulatifs deja envoyes. En base et non en memoire : un
@@ -1044,6 +1058,82 @@ app.get('/api/devis', verifyToken, async (req, res) => {
 // est ce qui permet de calculer un vrai taux de transformation.
 const STATUTS_DEVIS = ['calcule', 'valide', 'refuse'];
 
+// ===== V38 — NOTIFICATIONS SYSTEME (WEB PUSH) =====
+// Sans cles VAPID, le push est simplement indisponible : le reste du logiciel, lui,
+// continue de fonctionner, et les notifications restent visibles dans la cloche.
+const webpush = require('web-push');
+const PUSH_PUBLIQUE = process.env.VAPID_PUBLIC || '';
+const PUSH_PRIVEE = process.env.VAPID_PRIVATE || '';
+const PUSH_SUJET = process.env.VAPID_SUJET || 'mailto:contact@dropstyle.fr';
+let pushPret = false;
+try {
+    if (PUSH_PUBLIQUE && PUSH_PRIVEE) {
+        webpush.setVapidDetails(PUSH_SUJET, PUSH_PUBLIQUE, PUSH_PRIVEE);
+        pushPret = true;
+    } else {
+        console.warn('V38 : VAPID_PUBLIC / VAPID_PRIVATE absents — notifications systeme desactivees.');
+    }
+} catch (e) { console.error('V38 config push :', e.message); }
+
+// La cle publique sert au navigateur pour s'abonner ; elle n'a rien de secret.
+app.get('/api/push/cle', verifyToken, (req, res) => {
+    res.json({ disponible: pushPret, cle: pushPret ? PUSH_PUBLIQUE : null });
+});
+
+app.post('/api/push/abonnement', verifyToken, async (req, res) => {
+    try {
+        const { endpoint, keys } = req.body || {};
+        if (!endpoint || !keys || !keys.p256dh || !keys.auth) return res.status(400).json({ error: 'Abonnement incomplet' });
+        await ensureV11Tables();
+        await avecConnexion(conn => conn.query(
+            `INSERT INTO push_abonnements (user_id, equipe_id, endpoint, p256dh, auth, agent)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), equipe_id = VALUES(equipe_id),
+                                     p256dh = VALUES(p256dh), auth = VALUES(auth), agent = VALUES(agent)`,
+            [req.authUserId, req.userId, String(endpoint).slice(0, 500), keys.p256dh, keys.auth,
+             String(req.headers['user-agent'] || '').slice(0, 255)]));
+        res.status(201).json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/push/abonnement', verifyToken, async (req, res) => {
+    try {
+        const endpoint = String((req.body && req.body.endpoint) || '');
+        if (!endpoint) return res.status(400).json({ error: 'Endpoint requis' });
+        await avecConnexion(conn => conn.query(
+            'DELETE FROM push_abonnements WHERE endpoint = ? AND user_id = ?', [endpoint.slice(0, 500), req.authUserId]));
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Envoi a tous les appareils d'un utilisateur. Un abonnement expire (404/410) est
+// supprime : le garder ferait echouer tous les envois suivants pour rien.
+async function envoyerPush(userId, charge) {
+    if (!pushPret) return 0;
+    let envoyes = 0;
+    try {
+        const [abos] = await avecConnexion(conn => conn.query(
+            'SELECT id, endpoint, p256dh, auth FROM push_abonnements WHERE user_id = ?', [userId]));
+        const morts = [];
+        await Promise.all(abos.map(async (a) => {
+            try {
+                await webpush.sendNotification(
+                    { endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } },
+                    JSON.stringify(charge));
+                envoyes++;
+            } catch (e) {
+                if (e && (e.statusCode === 404 || e.statusCode === 410)) morts.push(a.id);
+                else console.error('V38 envoi push :', e && e.message);
+            }
+        }));
+        if (morts.length) {
+            await avecConnexion(conn => conn.query(
+                'DELETE FROM push_abonnements WHERE id IN (' + morts.map(() => '?').join(',') + ')', morts));
+        }
+    } catch (e) { console.error('V38 push :', e.message); }
+    return envoyes;
+}
+
 app.put('/api/devis/:id/statut', verifyToken, async (req, res) => {
     try {
         // Verifie avant d'ouvrir une connexion : inutile de solliciter la base pour
@@ -1690,6 +1780,14 @@ app.post('/api/notifications', verifyToken, async (req, res) => {
                 `${de} vous a envoyé un message dans DropStyle :\n\n${titre.trim()}\n${message || ''}${quand}`,
                 `${de} · DropStyle`);
         }
+        // Hors du chemin critique : la notification est deja en base et s'affichera sur la
+        // cloche meme si le push echoue. On n'attend pas non plus les serveurs de push.
+        envoyerPush(vers_user_id, {
+            titre: titre.trim(),
+            message: (message || '').trim().slice(0, 120),
+            de: expediteur.length ? expediteur[0].nom : 'Un collègue',
+            url: '/app'
+        }).catch(() => { /* deja journalise */ });
         res.status(201).json({ message: 'OK', envoi });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
