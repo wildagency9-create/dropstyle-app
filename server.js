@@ -1014,7 +1014,19 @@ app.put('/api/devis/:id', verifyToken, async (req, res) => {
             return r.affectedRows;
         });
         if (!touche) return res.status(404).json({ error: 'Devis introuvable' });
-        res.json({ message: 'OK', id: Number(req.params.id) });
+        // Volontairement hors du chemin critique, comme a la creation : le devis est deja
+        // enregistre, et un echec ici ne doit pas faire croire a une mise a jour ratee.
+        let photos = 0;
+        if (/^[a-z0-9-]{8,40}$/i.test(String(req.body.brouillon_id || ''))) {
+            try {
+                await ensureV26Tables();
+                const [r] = await avecConnexion(conn => conn.query(
+                    'UPDATE devis_photos SET devis_id = ?, brouillon_id = NULL WHERE equipe_id = ? AND brouillon_id = ? AND devis_id IS NULL',
+                    [req.params.id, req.userId, req.body.brouillon_id]));
+                photos = r.affectedRows;
+            } catch (e) { console.error('Rattachement photos (maj) :', e.message); }
+        }
+        res.json({ message: 'OK', id: Number(req.params.id), photos });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

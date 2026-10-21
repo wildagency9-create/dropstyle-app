@@ -2837,6 +2837,7 @@ async function modifierDevis(id) {
             return;
         }
         devisEnEdition = { id, client: d.client, client_id: d.client_id };
+        await chargerPhotosDuDevis(id);
         await restaurerSaisie(saisie);
         majBandeauEdition();
         showNotification('Devis repris — modifie puis enregistre', 'success');
@@ -4560,6 +4561,28 @@ async function photoSupprimer(face) {
 
 // Reprise apres rechargement : les photos deja envoyees pour ce brouillon sont reaffichees.
 // Le jeton passe par l'en-tete, donc on recupere les octets en fetch pour en faire une URL locale.
+// V36 — reprise d'un devis : ses photos sont en base, rattachees au devis. On les
+// recharge pour que la scene, le calage et les visuels se retrouvent comme ils etaient.
+async function chargerPhotosDuDevis(devisId) {
+    for (const f of PHOTO_FACES) {
+        const p = photosPrises[f.cle];
+        if (p && p.url && p.url.startsWith('blob:')) URL.revokeObjectURL(p.url);
+        delete photosPrises[f.cle];
+    }
+    try {
+        const liste = await apiFetch('/photos?devis_id=' + encodeURIComponent(devisId));
+        for (const ligne of liste) {
+            if (String(ligne.face || '').startsWith('ap-')) continue;   // les apercus ne sont pas des prises de vue
+            try {
+                const r = await fetch(`${API_URL}/photos/${ligne.id}/image`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!r.ok) continue;
+                photosPrises[ligne.face] = { id: ligne.id, url: URL.createObjectURL(await r.blob()), largeur: ligne.largeur, hauteur: ligne.hauteur };
+            } catch (e) { /* une photo manquante ne doit pas empecher la reprise */ }
+        }
+    } catch (err) { showNotification('Photos du devis non rechargées — ' + err.message, 'error'); }
+    renderPhotos();
+}
+
 async function photosInit() {
     renderPhotos();
     try {
