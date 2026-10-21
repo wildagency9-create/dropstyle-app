@@ -608,7 +608,7 @@
            barre de prix : il remonte au-dessus des deux, sur toute la largeur. */
         @media (max-width: 860px) {
             .notification {
-                left: 12px; right: 12px; bottom: 86px; font-size: 13px;
+                left: 12px; right: 12px; bottom: calc(var(--m-barre-h, 70px) + 16px); font-size: 13px;
                 box-shadow: 0 14px 34px -14px rgba(0,0,0,.9);
             }
         }
@@ -808,12 +808,24 @@
                 backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             }
             .m-nav {
-                display: flex; flex-direction: column; align-items: center; gap: 4px;
-                font-size: 9.5px; color: var(--text-secondary); width: 62px; cursor: pointer;
-                background: none; border: none; padding: 0; text-transform: none; font-weight: 500;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+                font-size: 9.5px; color: var(--text-secondary); width: 62px; min-height: 44px; cursor: pointer;
+                background: none; border: none; padding: 2px 0; text-transform: none; font-weight: 500;
+                /* La regle generale des boutons ajoutait un liseré clair en haut et un halo
+                   orange dessous : dans une barre de navigation, cela dessinait un cadre
+                   autour de chaque entree. Ici, rien de tout cela. */
+                box-shadow: none; letter-spacing: normal;
             }
-            .m-nav.on { color: var(--primary); }
+            .m-nav:hover, .m-nav:active { transform: none; box-shadow: none; filter: none; }
+            .m-nav.on { color: var(--primary); font-weight: 700; }
             .m-nav svg { display: block; }
+            /* Pastille de l'onglet courant : on voit ou l'on est sans dependre de la
+               seule couleur, et la cible du pouce atteint les 44 px recommandes. */
+            .m-ico {
+                display: grid; place-items: center; width: 54px; height: 28px;
+                border-radius: 11px; transition: background .18s ease;
+            }
+            .m-nav.on .m-ico { background: rgba(255,87,34,.14); }
             .m-fab {
                 width: 56px; height: 56px; border-radius: 20px; padding: 0;
                 background: linear-gradient(135deg, var(--primary), var(--primary-clair));
@@ -824,7 +836,7 @@
 
             /* Barre de prix collante : le prix reste visible pendant la saisie */
             #m-prixbar.on {
-                display: block; position: fixed; left: 0; right: 0; bottom: 70px; z-index: 69;
+                display: block; position: fixed; left: 0; right: 0; bottom: var(--m-barre-h, 70px); z-index: 69;
                 padding: 0 14px 10px;
                 background: linear-gradient(180deg, rgba(10,10,10,0), var(--bg-dark) 34%);
             }
@@ -2956,7 +2968,8 @@ function allerAuResultat() {
     if (!res) return;
     requestAnimationFrame(() => {
         const r = res.getBoundingClientRect();
-        const hauteurUtile = window.innerHeight - (surMobile() ? 190 : 0);   // barres fixes du bas
+        const barreH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--m-barre-h')) || 70;
+        const hauteurUtile = window.innerHeight - (surMobile() ? barreH + 120 : 0);   // barres fixes du bas
         const dejaVu = r.top >= 0 && r.top < hauteurUtile - 60;
         if (dejaVu) return;
         res.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4769,7 +4782,8 @@ const surMobile = () => window.matchMedia('(max-width: 820px)').matches;
 
 function mBarre() {
     const item = (cle, nom, icone) =>
-        `<button class="m-nav ${mVueCourante === cle ? 'on' : ''}" onclick="mAller('${cle}')">${ico(icone)}${nom}</button>`;
+        `<button class="m-nav ${mVueCourante === cle ? 'on' : ''}" onclick="mAller('${cle}')"
+            aria-current="${mVueCourante === cle ? 'page' : 'false'}"><span class="m-ico">${ico(icone)}</span>${nom}</button>`;
     document.getElementById('m-barre').innerHTML =
         item('accueil', 'Accueil', 'accueil') +
         item('devis', 'Devis', 'devis') +
@@ -4778,7 +4792,18 @@ function mBarre() {
          </button>` +
         item('clients', 'Clients', 'clients') +
         item('profil', 'Profil', 'profil');
+    mMesurerBarre();
 }
+
+// Hauteur reelle de la barre : tout ce qui se pose au-dessus s'y refere, plutot que de
+// repeter un nombre qu'un changement de style rendrait faux.
+function mMesurerBarre() {
+    const barre = document.getElementById('m-barre');
+    if (!barre) return;
+    const h = Math.round(barre.getBoundingClientRect().height);
+    if (h > 0) document.documentElement.style.setProperty('--m-barre-h', h + 'px');
+}
+window.addEventListener('resize', () => { if (typeof mMesurerBarre === 'function') mMesurerBarre(); });
 
 function mAller(vue) {
     mVueCourante = vue;
