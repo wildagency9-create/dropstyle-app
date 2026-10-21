@@ -52,6 +52,25 @@
                 radial-gradient(760px 520px at 50% 118%, rgba(255,138,80,.08), transparent 60%);
         }
         /* Les chiffres ne doivent pas danser quand ils changent. */
+        /* V35 — ce qui manque doit se voir LA OU ON REGARDE : le message partait dans le
+           bloc resultat, tout en bas, invisible sur telephone apres un clic sur Calculer. */
+        .alerte-calcul {
+            display: flex; align-items: flex-start; gap: 9px; margin: 0 0 12px;
+            padding: 12px 14px; border-radius: 12px;
+            background: rgba(255,90,90,.12); border: 1px solid var(--danger);
+            color: #ffc9c9; font-size: 13px; font-weight: 600; line-height: 1.35;
+        }
+        .alerte-calcul .pic { font-size: 15px; line-height: 1; flex: none; }
+        .alerte-calcul .quoi { display: block; font-weight: 500; font-size: 12px; color: #ffa5a5; margin-top: 3px; }
+        .manque > label::after,
+        .manque > .zone-titre::after { content: ' *'; color: var(--danger); font-weight: 800; }
+        .manque .dropdown-btn,
+        .manque input, .manque select {
+            border-color: var(--danger) !important;
+            box-shadow: 0 0 0 3px rgba(255,90,90,.14);
+        }
+        .manque-bloc { outline: 2px solid var(--danger); outline-offset: 4px; border-radius: 10px; }
+
         .price-value, .price-ht, .breakdown-row span:last-child, .m-prixht,
         .laize-card-value, .jauge-pct, .recap-vente .gros, .heros .val {
             font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
@@ -568,6 +587,14 @@
             z-index: 999;
         }
         .notification.error { border-color: var(--danger); }
+        /* V35 — sur telephone le message passait derriere la barre de navigation et la
+           barre de prix : il remonte au-dessus des deux, sur toute la largeur. */
+        @media (max-width: 860px) {
+            .notification {
+                left: 12px; right: 12px; bottom: 86px; font-size: 13px;
+                box-shadow: 0 14px 34px -14px rgba(0,0,0,.9);
+            }
+        }
 
         .exa-link {
             display: inline-block;
@@ -797,6 +824,13 @@
                 -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
             }
             .m-prixlb { font-size: 9.5px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .7px; }
+            .m-chevron { font-size: 16px; color: var(--text-secondary); transition: transform .2s ease; display: inline-block; }
+            .m-chevron.ouvert { transform: rotate(180deg); }
+            .m-detail {
+                margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border);
+                max-height: 40vh; overflow-y: auto;
+            }
+            .m-detail .breakdown-row { font-size: 11.5px; }
             .m-prixbox .duo-actions { margin-top: 10px; }
             .m-prixbox .duo-actions button { padding: 11px; font-size: 10px; }
 
@@ -1903,6 +1937,56 @@ function calculateLaizeUsage(laize, stickerW, stickerH, qty, espace = 6, margePl
     };
 }
 
+/* ===== V35 — signaler ce qui manque =====
+   Les messages d'erreur partaient tous dans le bloc resultat, en bas de page : sur
+   telephone, cliquer sur « Calculer » ne montrait donc rien du tout. Desormais le message
+   s'affiche juste au-dessus du bouton, les champs fautifs sont etoiles, et l'ecran va
+   chercher le premier d'entre eux. */
+function effacerManques() {
+    document.querySelectorAll('.manque').forEach(e => e.classList.remove('manque'));
+    document.querySelectorAll('.manque-bloc').forEach(e => e.classList.remove('manque-bloc'));
+    document.querySelectorAll('.alerte-calcul').forEach(e => e.remove());
+}
+
+// Une cible peut etre un champ (on etoile son groupe) ou un bloc entier (on l'entoure).
+function marquerManque(cible) {
+    const el = typeof cible === 'string' ? document.querySelector(cible) : cible;
+    if (!el) return null;
+    const groupe = el.closest('.form-group');
+    if (groupe) { groupe.classList.add('manque'); return groupe; }
+    el.classList.add('manque-bloc');
+    return el;
+}
+
+function manque(message, cibles, detail) {
+    effacerManques();
+    const marques = (cibles || []).map(marquerManque).filter(Boolean);
+
+    // Le bandeau se pose au-dessus du bouton de calcul de l'onglet affiche : c'est l'endroit
+    // que l'utilisateur regarde a la seconde ou il clique.
+    const onglet = document.querySelector('.tab-content.active');
+    const bouton = onglet && onglet.querySelector('.btn-block');
+    const alerte = document.createElement('div');
+    alerte.className = 'alerte-calcul';
+    alerte.innerHTML = `<span class="pic" aria-hidden="true">⚠</span><span>${escapeHtml(message)}`
+        + (detail ? `<span class="quoi">${escapeHtml(detail)}</span>` : '')
+        + (marques.length ? '<span class="quoi">Les champs à compléter sont marqués d\'une étoile.</span>' : '')
+        + '</span>';
+    if (bouton && bouton.parentElement) bouton.parentElement.insertBefore(alerte, bouton);
+    else if (onglet) onglet.prepend(alerte);
+
+    // Le bloc resultat garde le message : il reste la trace de ce qui bloque.
+    const res = document.getElementById('result');
+    if (res) res.innerHTML = `<div class="empty-state"><p style="color:var(--danger);">⚠️ ${escapeHtml(message)}</p></div>`;
+    devisCourant = null;
+    if (typeof mMajPrixBar === 'function') mMajPrixBar();
+
+    showNotification(message, 'error');
+    // On va chercher le premier champ fautif, sinon le bandeau lui-meme.
+    const vers = marques[0] || alerte;
+    if (vers && vers.scrollIntoView) vers.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function calcStickers() {
     const shapes = getShapes();
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-st-vinyle'));
@@ -1917,7 +2001,7 @@ async function calcStickers() {
     const echForfait = parseFloat(getDropdownValue('dd-st-ech-forfait')) || 50;
 
     if (!vinyle) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
+        manque('Choisissez le vinyle des stickers', ['#dd-st-vinyle']);
         return;
     }
 
@@ -1940,7 +2024,8 @@ async function calcStickers() {
     }).filter(c => c !== null);
 
     if (candidats.length === 0) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Une des formes est trop grande pour les laizes disponibles</p></div>';
+        manque('Une forme dépasse la largeur du rouleau', ['#st-shapes'],
+            'Réduisez ses dimensions, ou ajoutez une laize plus large dans l\'admin.');
         return;
     }
     // Deux notions distinctes : la laize la moins couteuse (l'optimale, toujours la meme)
@@ -2066,7 +2151,7 @@ async function calcVehicule() {
     if (mode === 'forfait') {
         const forfait = allForfaits.find(f => f.id == getDropdownValue('dd-v-forfait'));
         if (!forfait) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un forfait</p></div>';
+            manque('Choisissez un forfait véhicule', ['#dd-v-forfait']);
             return;
         }
         const t = computeTotal(0, parseFloat(forfait.prix) * qty, delai);
@@ -2084,11 +2169,14 @@ async function calcVehicule() {
     const parZones = mode === 'zones';
     const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-v-vinyle'));
     if (!type || !vinyle || (!parZones && !marquage)) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez les champs</p></div>';
+        manque('Il manque des informations sur le véhicule',
+            [!type ? '#dd-v-type' : null, !vinyle ? '#dd-v-vinyle' : null,
+             (!parZones && !marquage) ? '#dd-v-marquage' : null].filter(Boolean));
         return;
     }
     if (parZones && surfaceVehicule() <= 0) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Cochez au moins une zone à habiller</p></div>';
+        manque('Aucune zone à habiller n\'est cochée', ['#v-zones-cond'],
+            'Cochez les parties du véhicule à couvrir, ou posez un visuel dessus.');
         return;
     }
     const lamination = allLaminations.find(l => l.id == getDropdownValue('dd-v-lam'));
@@ -2346,7 +2434,7 @@ async function calcSignaletique() {
     const paoRow = paoHT > 0 ? { label: paoMode === 'forfait' ? 'PAO forfait' : `PAO (${paoHours}h × ${num('pao_horaire', 60)}€/h)`, val: `${paoHT.toFixed(2)}€`, stage: 1 } : null;
 
     if (!type) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un type de support</p></div>';
+        manque('Choisissez le type de support', ['#dd-s-type']);
         return;
     }
 
@@ -2354,7 +2442,7 @@ async function calcSignaletique() {
     const visuelCheck = document.getElementById('s-visuel-check').checked;
     const visuelVinyle = visuelCheck ? allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle')) : null;
     if (visuelCheck && !visuelVinyle) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne le vinyle du visuel</p></div>';
+        manque('Choisissez le vinyle du visuel imprimé', ['#dd-s-vinyle']);
         return;
     }
 
@@ -2362,7 +2450,7 @@ async function calcSignaletique() {
     if (type === 'rollup') {
         const lignes = getRollupLines().map(l => ({ ...l, kit: allKits.find(k => k.id == l.kitId) }));
         if (!lignes.length || lignes.some(l => !l.kit)) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un kit roll-up pour chaque ligne</p></div>';
+            manque('Chaque ligne a besoin de son kit roll-up', ['#s-rollup-lines']);
             return;
         }
 
@@ -2406,12 +2494,12 @@ async function calcSignaletique() {
     if (type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage') {
         const vinyle = allVinyles.find(v => v.id == getDropdownValue('dd-s-vinyle-direct'));
         if (!vinyle) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un vinyle</p></div>';
+            manque('Choisissez le vinyle', ['#dd-s-vinyle-direct']);
             return;
         }
         const lignes = getDirectLines();
         if (!lignes.length) {
-            document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Ajoute au moins une ligne</p></div>';
+            manque('Ajoutez au moins une ligne', ['#s-direct-lines']);
             return;
         }
         const imprime = document.getElementById('s-direct-imprime-check').checked;
@@ -2451,7 +2539,7 @@ async function calcSignaletique() {
     // ===== PANNEAU / BACHE PVC : plusieurs lignes matiere+dimensions + visuel imprime contrecolle optionnel partage =====
     const lignes = getPanneauLines().map(l => ({ ...l, mat: allMateriaux.find(m => m.id == l.matId) }));
     if (!lignes.length || lignes.some(l => !l.mat)) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Sélectionne un matériau pour chaque ligne</p></div>';
+        manque('Chaque ligne a besoin de son matériau', ['#s-panneau-lines']);
         return;
     }
 
@@ -2514,7 +2602,9 @@ function calcImpression() {
     const quantite = parseInt(getDropdownValue('dd-i-quantite'));
 
     if (!type || !format || !grammage || !finition || !quantite) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Complétez tous les champs</p></div>';
+        manque('Il manque des informations sur l\'impression',
+            [!type ? '#dd-i-type' : null, !format ? '#dd-i-format' : null, !grammage ? '#dd-i-grammage' : null,
+             !finition ? '#dd-i-finition' : null, !quantite ? '#dd-i-quantite' : null].filter(Boolean));
         return;
     }
 
@@ -2525,7 +2615,8 @@ function calcImpression() {
     );
 
     if (!impression) {
-        document.getElementById('result').innerHTML = '<div class="empty-state"><p style="color:var(--danger);">⚠️ Combinaison non trouvée. Demande à l\'admin d\'ajouter ce prix.</p></div>';
+        manque('Ce tarif d\'impression n\'existe pas encore', ['#dd-i-quantite'],
+            'Cette combinaison n\'est pas dans la grille : demandez à l\'admin de l\'ajouter.');
         return;
     }
 
@@ -2774,6 +2865,23 @@ function showResult(title, ttc, ht, tva, rows, type, qty, warnings = [], prefixH
         coutRevient: coutRevientDepuisRows(rows)
     };
     rendreResultat();
+    effacerManques();
+    allerAuResultat();
+}
+
+// Le resultat s'affiche en bas de page : sur telephone, cliquer sur « Calculer » ne
+// changeait donc rien a l'ecran. On y va, mais seulement s'il n'est pas deja visible —
+// sinon la page sauterait sous les doigts a chaque recalcul.
+function allerAuResultat() {
+    const res = document.getElementById('result');
+    if (!res) return;
+    requestAnimationFrame(() => {
+        const r = res.getBoundingClientRect();
+        const hauteurUtile = window.innerHeight - (surMobile() ? 190 : 0);   // barres fixes du bas
+        const dejaVu = r.top >= 0 && r.top < hauteurUtile - 60;
+        if (dejaVu) return;
+        res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 }
 
 function rendreResultat() {
@@ -4550,6 +4658,15 @@ function mRendreProfil() {
 
 // La barre de prix mobile reprend le meme prix et les memes actions que le panneau Resultat :
 // une seule source, donc aucun risque que les deux affichages divergent.
+// Le detail du calcul, deplie depuis la barre de prix. Il etait cense s'ouvrir au clic
+// sur le chevron, qui ne faisait en realite que defiler vers un bloc souvent deja a
+// l'ecran — donc, vu du telephone, « rien ne se passe ».
+let mDetailOuvert = false;
+function mBasculerDetail() {
+    mDetailOuvert = !mDetailOuvert;
+    mMajPrixBar();
+}
+
 function mMajPrixBar() {
     const bar = document.getElementById('m-prixbar');
     if (!bar) return;
@@ -4566,15 +4683,21 @@ function mMajPrixBar() {
     bar.classList.add('on');
     bar.innerHTML = `
         <div class="m-prixbox">
-            <div class="m-prixhaut" onclick="document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'})">
+            <div class="m-prixhaut" role="button" tabindex="0" aria-expanded="${mDetailOuvert}"
+                 onclick="mBasculerDetail()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();mBasculerDetail()}">
                 <div>
                     <div class="m-prixlb">${ajuste ? 'Prix de vente HT' : 'Total HT'}</div>
                     <div class="m-prixht">${fmt(vente)} €</div>
                     ${ajuste ? `<div class="ajust-ligne ${ecart < 0 ? 'neg' : ''}" style="margin-top:2px;">
                         Calculé ${fmt(d.htCalcule)} € · ${ecart >= 0 ? '+' : '−'} ${Math.abs(pct).toFixed(1).replace('.', ',')} %</div>` : ''}
                 </div>
-                <span style="font-size:16px;color:var(--text-secondary);">⌃</span>
+                <span class="m-chevron${mDetailOuvert ? ' ouvert' : ''}" aria-hidden="true">⌃</span>
             </div>
+            ${mDetailOuvert ? `<div class="m-detail">${renderBreakdownRows(d.rows)}
+                <div class="breakdown-row total"><span>${ajuste ? 'PRIX CALCULÉ HT' : 'TOTAL HT'}</span><span>${fmt(d.htCalcule)} €</span></div>
+                <div class="breakdown-row"><span>TVA</span><span>${fmt(vente * d.tvaRate)} €</span></div>
+                <div class="breakdown-row total"><span>TOTAL TTC</span><span>${fmt(vente * (1 + d.tvaRate))} €</span></div>
+            </div>` : ''}
             <div class="duo-actions">
                 <button class="btn-sec" onclick="ouvrirAjustement()">Ajuster</button>
                 <button class="btn-pri" onclick="saveDevis('${d.type}', ${d.qty}, ${vente.toFixed(2)}, ${(vente * (1 + d.tvaRate)).toFixed(2)}, this)">Enregistrer</button>
