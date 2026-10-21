@@ -416,6 +416,23 @@
         .zone-total .valeur { font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
         .zone-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
 
+        /* V36 — calage des zones sur la photo. Les contours du schema sont poses sur le
+           vehicule reel par quatre coins, ce qui rend les zones cliquables sur la photo. */
+        .cal-poignee {
+            position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+            border-radius: 50%; border: 2px solid #fff; background: rgba(255,87,34,.85);
+            box-shadow: 0 2px 10px rgba(0,0,0,.6); cursor: grab; touch-action: none; z-index: 8;
+            display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff;
+        }
+        .cal-poignee:active { cursor: grabbing; transform: scale(1.12); }
+        .cal-cadre { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+        .cal-cadre polygon { fill: rgba(255,87,34,.10); stroke: #FF5722; stroke-width: 2; stroke-dasharray: 7 5; }
+        .cal-aide {
+            position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 9;
+            background: rgba(11,12,15,.86); border: 1px solid var(--border); border-radius: 10px;
+            padding: 8px 11px; font-size: 11.5px; color: var(--text-secondary); text-align: center;
+        }
+
         /* V29 — blocs texte et logo poses sur le vehicule. Le bloc montre OU se trouve le
            visuel ; sa surface vient des dimensions saisies, jamais de sa taille a l'ecran. */
         .bloc-visuel {
@@ -1042,6 +1059,8 @@
                     <div class="zone-liste" id="blocs-liste" style="margin-top:8px;"></div>
                     <div class="zone-actions">
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-fond" onclick="basculerFond()">Voir le schéma</button>
+                        <button type="button" class="choix-btn" style="flex:none;display:none;" id="btn-calage">Caler les zones sur la photo</button>
+                        <button type="button" class="choix-btn" style="flex:none;display:none;" id="btn-calage-off" onclick="effacerCalage()">Effacer le calage</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-apercu" onclick="ouvrirApercu()">Aperçu client</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-texte" onclick="ajouterBloc('texte')">+ Texte</button>
                         <button type="button" class="choix-btn" style="flex:none;" id="btn-ajout-logo" onclick="ajouterBloc('logo')">+ Logo</button>
@@ -1687,7 +1706,7 @@ function selectDropdownItem(item) {
     }
     // V28 — changer de vehicule change les zones et leurs surfaces : la selection precedente
     // ne veut plus rien dire, on repart a zero plutot que de garder des cases d'un autre type.
-    if (dd.id === 'dd-v-type') { zonesChoisies.clear(); blocsVisuels = []; zonesRender(); }
+    if (dd.id === 'dd-v-type') { zonesChoisies.clear(); blocsVisuels = []; calages = {}; calageEnCours = null; zonesRender(); }
     // V27 — le mode PAO n'est plus un menu deroulant mais deux boutons : voir choisirPAO().
     if (dd.id === 'dd-st-ech-mode') {
         const mode = item.dataset.value;
@@ -2750,6 +2769,7 @@ function capturerSaisie(type) {
     if (type === 'vehicule') {
         saisie.zones = [...zonesChoisies];
         saisie.blocs = blocsVisuels.map(b => ({ ...b }));
+        saisie.calages = JSON.parse(JSON.stringify(calages));
     }
     // Le prix vendu peut avoir ete ajuste a la main apres le calcul : sans cela, rouvrir
     // un devis le ramenerait au prix du moteur sans prevenir.
@@ -2788,6 +2808,8 @@ async function restaurerSaisie(saisie) {
     if (type === 'vehicule') {
         zonesChoisies = new Set(saisie.zones || []);
         blocsVisuels = (saisie.blocs || []).map(b => ({ ...b }));
+        calages = saisie.calages ? JSON.parse(JSON.stringify(saisie.calages)) : {};
+        calageEnCours = null;
         if (typeof zonesRender === 'function') zonesRender();
     }
 
@@ -3724,6 +3746,122 @@ function surfaceZonesChoisies() {
     return total;
 }
 
+/* ===== V36 — caler les zones sur la photo =====
+   Les contours des zones sont dessines pour une silhouette de 480 x 200. Sur une photo,
+   ils ne tombaient donc nulle part, et il fallait cocher les zones dans la liste sans
+   voir ou elles sont. On demande quatre coins — avant-bas, avant-haut, arriere-haut,
+   arriere-bas — et toute la silhouette vient se poser sur le vehicule reel.
+
+   Une homographie, et non une simple interpolation : un flanc de vehicule est un plan,
+   et un plan photographie de biais ne se redresse correctement que comme ceci. */
+let calages = {};        // face -> [hg, hd, bd, bg], en % de la scene
+let calageEnCours = null; // face en cours de reglage
+
+function homographieDepuisCarre(q) {
+    const [p0, p1, p2, p3] = q;
+    const dx1 = p1.x - p2.x, dy1 = p1.y - p2.y;
+    const dx2 = p3.x - p2.x, dy2 = p3.y - p2.y;
+    const sx = p0.x - p1.x + p2.x - p3.x;
+    const sy = p0.y - p1.y + p2.y - p3.y;
+    let g, h;
+    if (Math.abs(sx) < 1e-10 && Math.abs(sy) < 1e-10) { g = 0; h = 0; }
+    else {
+        const det = dx1 * dy2 - dx2 * dy1;
+        if (Math.abs(det) < 1e-12) return null;   // coins alignes : transformation impossible
+        g = (sx * dy2 - dx2 * sy) / det;
+        h = (dx1 * sy - sx * dy1) / det;
+    }
+    return { a: p1.x - p0.x + g * p1.x, b: p3.x - p0.x + h * p3.x, c: p0.x,
+             d: p1.y - p0.y + g * p1.y, e: p3.y - p0.y + h * p3.y, f: p0.y, g, h };
+}
+
+function projeterPoint(H, u, v) {
+    const w = H.g * u + H.h * v + 1;
+    return { x: (H.a * u + H.b * v + H.c) / w, y: (H.d * u + H.e * v + H.f) / w };
+}
+
+// Les points d'un polygone de silhouette, projetes dans le quadrilatere de calage.
+function pointsProjetes(points, H) {
+    return String(points).trim().split(/\s+/).map(p => {
+        const [x, y] = p.split(',').map(Number);
+        if (!isFinite(x) || !isFinite(y)) return null;
+        const q = projeterPoint(H, x / 480, y / 200);
+        return q.x.toFixed(2) + ',' + q.y.toFixed(2);
+    }).filter(Boolean).join(' ');
+}
+
+const calageDeLaFace = () => calages[zoneFace] || null;
+
+// Position de depart : un cadre large, que l'on ajuste ensuite. Mieux vaut partir d'un
+// rectangle evident a corriger que d'une estimation qui aurait l'air juste sans l'etre.
+function calageParDefaut() {
+    return [{ x: 8, y: 26 }, { x: 92, y: 26 }, { x: 92, y: 88 }, { x: 8, y: 88 }];
+}
+
+function demarrerCalage() {
+    calageEnCours = zoneFace;
+    if (!calages[zoneFace]) calages[zoneFace] = calageParDefaut();
+    zonesRender();
+}
+
+function finirCalage() {
+    calageEnCours = null;
+    zonesRender();
+}
+
+function effacerCalage() {
+    delete calages[zoneFace];
+    calageEnCours = null;
+    zonesRender();
+}
+
+// Dessine les quatre poignees et le cadre. Les coins se deplacent au doigt comme a la
+// souris ; les zones se recalculent a la fin du geste, pas a chaque pixel.
+function rendreCalage(scene) {
+    const q = calages[zoneFace];
+    const cadre = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    cadre.setAttribute('class', 'cal-cadre');
+    cadre.setAttribute('viewBox', '0 0 100 100');
+    cadre.setAttribute('preserveAspectRatio', 'none');
+    cadre.innerHTML = `<polygon vector-effect="non-scaling-stroke" points="${q.map(p => p.x + ',' + p.y).join(' ')}"/>`;
+    scene.appendChild(cadre);
+
+    const noms = ['1', '2', '3', '4'];
+    q.forEach((p, i) => {
+        const el = document.createElement('div');
+        el.className = 'cal-poignee';
+        el.style.left = p.x + '%';
+        el.style.top = p.y + '%';
+        el.textContent = noms[i];
+        el.addEventListener('pointerdown', e => {
+            e.preventDefault(); e.stopPropagation();
+            el.setPointerCapture(e.pointerId);
+            const r = scene.getBoundingClientRect();
+            const bouger = (ev) => {
+                if (!(r.width > 0 && r.height > 0)) return;   // scene non mesurable : on ne divise pas par zero
+                p.x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100));
+                p.y = Math.max(0, Math.min(100, ((ev.clientY - r.top) / r.height) * 100));
+                el.style.left = p.x + '%'; el.style.top = p.y + '%';
+                cadre.querySelector('polygon').setAttribute('points', q.map(c => c.x + ',' + c.y).join(' '));
+            };
+            const finir = () => {
+                el.removeEventListener('pointermove', bouger);
+                el.removeEventListener('pointerup', finir);
+                el.removeEventListener('pointercancel', finir);
+            };
+            el.addEventListener('pointermove', bouger);
+            el.addEventListener('pointerup', finir);
+            el.addEventListener('pointercancel', finir);
+        });
+        scene.appendChild(el);
+    });
+
+    const aide = document.createElement('div');
+    aide.className = 'cal-aide';
+    aide.textContent = 'Placez 1 et 2 en haut du véhicule, 3 et 4 en bas — puis « Terminé ».';
+    scene.appendChild(aide);
+}
+
 function zonesRender() {
     const cond = document.getElementById('v-zones-cond');
     if (!cond) return;
@@ -3784,11 +3922,33 @@ function zonesRender() {
         scene.style.transform = '';
         scene.style.aspectRatio = (photo.largeur && photo.hauteur) ? `${photo.largeur} / ${photo.hauteur}` : '480 / 200';
         img.src = photo.url; img.hidden = false;
-        svg.innerHTML = '';
+        // V36 — les zones se posent sur la photo des que la face est calee.
+        const cal = calageDeLaFace();
+        const H = cal ? homographieDepuisCarre(cal) : null;
+        if (H && !calageEnCours) {
+            svg.setAttribute('viewBox', '0 0 100 100');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.innerHTML = zones.map(z => {
+                const pts = silhouette && silhouette.zones[z.cle];
+                if (!pts) return '';
+                const coche = zonesChoisies.has(zoneClef(z, def.cote));
+                return `<polygon class="zone-poly${coche ? ' on' : ''}" vector-effect="non-scaling-stroke"
+                          points="${pointsProjetes(pts, H)}" role="button" tabindex="0"
+                          aria-pressed="${coche}" aria-label="${z.nom}, ${z.surface_m2} m²"
+                          onclick="zonesBasculer('${zoneClef(z, def.cote)}')"
+                          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();zonesBasculer('${zoneClef(z, def.cote)}')}"/>`;
+            }).join('');
+        } else {
+            svg.setAttribute('viewBox', '0 0 480 200');
+            svg.removeAttribute('preserveAspectRatio');
+            svg.innerHTML = '';
+        }
     } else if (fond === 'silhouette') {
         scene.style.display = '';
         scene.style.transform = def.cote === 'd' ? 'scaleX(-1)' : '';
         scene.style.aspectRatio = '480 / 200';
+        svg.setAttribute('viewBox', '0 0 480 200');
+        svg.removeAttribute('preserveAspectRatio');
         img.hidden = true; img.removeAttribute('src');
         svg.innerHTML = silhouette.fond + zones.map(z => {
             const pts = silhouette.zones[z.cle];
@@ -3804,6 +3964,20 @@ function zonesRender() {
         img.hidden = true; img.removeAttribute('src');
     }
 
+    // V36 — l'outil de calage se superpose a la scene pendant le reglage.
+    scene.querySelectorAll('.cal-poignee, .cal-cadre, .cal-aide').forEach(e => e.remove());
+    if (fond === 'photo' && calageEnCours === zoneFace && calages[zoneFace]) rendreCalage(scene);
+
+    const btnCal = document.getElementById('btn-calage');
+    if (btnCal) {
+        const possible = fond === 'photo' && !!silhouette && zones.length > 0;
+        btnCal.style.display = possible ? '' : 'none';
+        btnCal.textContent = calageEnCours ? 'Terminé' : (calageDeLaFace() ? 'Recaler les zones' : 'Caler les zones sur la photo');
+        btnCal.onclick = calageEnCours ? finirCalage : demarrerCalage;
+    }
+    const btnEff = document.getElementById('btn-calage-off');
+    if (btnEff) btnEff.style.display = (fond === 'photo' && calageDeLaFace() && !calageEnCours) ? '' : 'none';
+
     // Le bouton de bascule n'a de sens que si les deux fonds existent pour cette face.
     const bascule = document.getElementById('btn-fond');
     if (bascule) {
@@ -3811,8 +3985,10 @@ function zonesRender() {
         bascule.style.display = possible ? '' : 'none';
         bascule.textContent = fondPhoto ? 'Voir le schéma' : 'Voir la photo';
     }
+    // La note n'a plus lieu d'etre une fois la face calee : les zones sont alors
+    // cliquables au bon endroit, ce qu'elle disait justement impossible.
     const note = document.getElementById('zone-note-photo');
-    if (note) note.style.display = (fond === 'photo' && zones.length) ? '' : 'none';
+    if (note) note.style.display = (fond === 'photo' && zones.length && !calageDeLaFace()) ? '' : 'none';
 
     liste.innerHTML = zones.length ? zones.map(z => {
         const clef = zoneClef(z, def.cote);
@@ -4090,6 +4266,28 @@ async function construireApercu() {
     if (miroir) { c.translate(W, 0); c.scale(-1, 1); }
     if (fond === 'photo') {
         c.drawImage(await chargerImage(photo.url), 0, 0, W, H);
+        // V36 — les zones retenues, posees sur la photo par le calage de la face.
+        const cal = calageDeLaFace();
+        const Hcal = cal ? homographieDepuisCarre(cal) : null;
+        const silPhoto = ZONE_SILHOUETTES[ZONE_FAMILLE[type]];
+        if (Hcal && silPhoto) {
+            for (const z of zonesDeLaFace().liste) {
+                const pts = silPhoto.zones[z.cle];
+                if (!pts || !zonesChoisies.has(zoneClef(z, def.cote))) continue;
+                const coords = pointsProjetes(pts, Hcal).split(' ').map(p => p.split(',').map(Number));
+                if (coords.length < 3) continue;
+                c.beginPath();
+                coords.forEach(([x, y], i) => {
+                    const px = (x / 100) * W, py = (y / 100) * H;
+                    if (i) c.lineTo(px, py); else c.moveTo(px, py);
+                });
+                c.closePath();
+                c.fillStyle = 'rgba(255,87,34,.42)';
+                c.fill();
+                c.strokeStyle = '#FF5722'; c.lineWidth = 2.5;
+                c.stroke();
+            }
+        }
     } else {
         const silhouette = ZONE_SILHOUETTES[ZONE_FAMILLE[type]];
         const polys = zonesDeLaFace().liste.map(z => {
