@@ -1598,9 +1598,18 @@ function escapeHtml(s) {
 }
 
 async function apiFetch(path) {
-    const r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    let r;
+    try {
+        r = await fetch(`${API_URL}${path}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    } catch (e) {
+        // Coupure reseau, serveur injoignable : il faut le dire, pas rendre une liste vide.
+        throw new Error('Serveur injoignable — vérifiez votre connexion');
+    }
     if (r.status === 401 || r.status === 403) { logout(); throw new Error('Session expirée'); }
-    return r.json();
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((data && data.error) || `Erreur serveur (${r.status})`);
+    if (data && data.error) throw new Error(data.error);
+    return data;
 }
 function num(cle, def) { const v = parseFloat(PARAMS[cle]); return isNaN(v) ? def : v; }
 function delaiMult(d) { return d === 'express' ? num('coef_express', 1.25) : d === 'urgent' ? num('coef_urgent', 1.15) : 1; }
@@ -1762,7 +1771,27 @@ async function loadTarifs() {
         document.getElementById('list-v-forfait').innerHTML = allForfaits.length ? allForfaits.map(f =>
             `<div class="dropdown-item" data-value="${f.id}" onclick="selectDropdownItem(this)">${f.nom} — ${parseFloat(f.prix).toFixed(2)}€</div>`).join('')
             : emptyItem('Aucun forfait — à créer dans l\'admin (onglet Moteur)');
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+        panneChargement('Les tarifs n\'ont pas pu être chargés', err.message, 'loadTarifs');
+    }
+}
+
+// Un chargement vital qui echoue doit le DIRE et proposer de reessayer : une liste vide
+// laisse croire a un catalogue vide, et on cherche le probleme du mauvais cote.
+function panneChargement(titre, detail, fonction) {
+    const id = 'panne-chargement';
+    document.getElementById(id)?.remove();
+    const el = document.createElement('div');
+    el.id = id;
+    el.className = 'alerte-calcul';
+    el.style.cssText = 'position:sticky;top:0;z-index:60;margin:0 0 12px;';
+    el.innerHTML = `<span class="pic" aria-hidden="true">⚠</span><span>${escapeHtml(titre)}
+        <span class="quoi">${escapeHtml(String(detail || '').slice(0, 120))}</span></span>
+        <button type="button" style="margin-left:auto;font-size:11px;padding:6px 12px;flex:none;"
+                onclick="this.closest('#${id}').remove(); ${fonction}()">Réessayer</button>`;
+    const hote = document.querySelector('.container') || document.body;
+    hote.prepend(el);
 }
 
 function rebuildLaizes() {
@@ -3204,7 +3233,7 @@ async function changerStatut(id, statut) {
 
 async function renderHistorique() {
     try {
-        const devis = await fetch(`${API_URL}/devis`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
+        const devis = await apiFetch('/devis');
         if (devis.length === 0) {
             document.getElementById('historique-list').innerHTML = '<div class="empty-state"><p>Aucun devis</p></div>';
             return;
@@ -3238,7 +3267,12 @@ async function renderHistorique() {
                 </div>
             </div>`;
         }).join('');
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+        document.getElementById('historique-list').innerHTML =
+            `<div class="empty-state"><p style="color:var(--danger);">Historique indisponible — ${escapeHtml(err.message)}</p>
+             <button class="btn-sec" style="margin-top:10px;" onclick="renderHistorique()">Réessayer</button></div>`;
+    }
 }
 
 function toggleHistoriqueDetail(i) {
@@ -3249,7 +3283,7 @@ function toggleHistoriqueDetail(i) {
 async function deleteDevis(id) {
     if (!confirm('Supprimer définitivement ce devis ?')) return;
     try {
-        await fetch(`${API_URL}/devis/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        await apiSend('/devis/' + id, 'DELETE');
         showNotification('Devis supprimé', 'success');
         renderHistorique();
     } catch (err) { showNotification('Erreur', 'error'); }
@@ -3287,7 +3321,10 @@ function optionsSources(selectId, valeur) {
 async function chargerClientsEtSources() {
     try {
         [allClients, allSources] = await Promise.all([apiFetch('/clients'), apiFetch('/sources-client')]);
-    } catch (err) { allClients = []; allSources = []; }
+    } catch (err) {
+        allClients = []; allSources = [];
+        showNotification('Clients non chargés — ' + err.message, 'error');
+    }
 }
 
 // ---- Liste des clients ----
@@ -3712,7 +3749,7 @@ let zonesErreur = null;   // message du dernier echec de chargement, affiche a l
 async function chargerZones() {
     try {
         const d = await apiFetch('/zones-vehicule');
-        // apiFetch ne regarde pas le code HTTP : une erreur du serveur arrive donc ici sous
+        // apiFetch leve desormais sur une erreur serveur ; ce controle reste au cas ou
         // la forme { error: "..." }, et passait jusqu'ici pour une reponse vide.
         if (d && d.error) throw new Error(d.error);
         toutesZones = d.zones || {};
