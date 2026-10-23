@@ -141,3 +141,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Fichier temporaire de cles VAPID : ne doit JAMAIS etre commite
+CLES-VAPID-A-SUPPRIMER.txt

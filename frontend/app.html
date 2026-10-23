@@ -3700,11 +3700,12 @@ async function activerPush(bouton) {
         }
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            // Un refus est definitif tant que l'utilisateur ne revient pas dans les
-            // reglages du navigateur : il faut le dire, sinon il reclique sans effet.
+            // Deux issues distinctes. Un refus est definitif tant que l'utilisateur ne
+            // revient pas dans les reglages ; une demande simplement ignoree ou bloquee
+            // par le navigateur se relance, mais encore faut-il dire par ou.
             showNotification(permission === 'denied'
                 ? 'Notifications refusées — à réautoriser dans les réglages du navigateur'
-                : 'Notifications non activées', 'error');
+                : "La demande n'a pas abouti — cliquez sur l'icône à gauche de l'adresse, autorisez les notifications, puis réessayez", 'error');
             majBouton(pushEtat() === 'refuse' ? 'Refusées par le navigateur' : 'Activer les notifications', pushEtat() !== 'refuse');
             return;
         }
