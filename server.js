@@ -1356,6 +1356,11 @@ async function contexteAssistant(userId) {
 }
 
 app.post('/api/chat', verifyToken, async (req, res) => {
+    // Le SDK Anthropic a besoin de fetch, absent avant Node 18. Sans ce controle,
+    // l'utilisateur recoit un message sur des polyfills, incomprehensible pour lui.
+    if (typeof fetch !== 'function') {
+        return res.status(503).json({ error: "Serveur sur une version de Node trop ancienne (fetch absent) : cette fonction a besoin de Node 18 ou plus." });
+    }
     if (!process.env.ANTHROPIC_API_KEY) {
         return res.status(503).json({ error: "Assistant non configuré : la clé ANTHROPIC_API_KEY n'est pas définie sur le serveur." });
     }
@@ -1450,6 +1455,11 @@ const OUTIL_VEHICULE = {
 };
 
 app.post('/api/reconnaitre-vehicule', verifyToken, async (req, res) => {
+    // Le SDK Anthropic a besoin de fetch, absent avant Node 18. Sans ce controle,
+    // l'utilisateur recoit un message sur des polyfills, incomprehensible pour lui.
+    if (typeof fetch !== 'function') {
+        return res.status(503).json({ error: "Serveur sur une version de Node trop ancienne (fetch absent) : cette fonction a besoin de Node 18 ou plus." });
+    }
     if (!process.env.ANTHROPIC_API_KEY) {
         return res.status(503).json({ error: "Reconnaissance non configurée : la clé ANTHROPIC_API_KEY n'est pas définie sur le serveur." });
     }
