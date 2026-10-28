@@ -32,6 +32,10 @@
             --gold: #d4af37;
             --verre-haut: rgba(255,255,255,0.075);
             --halo: rgba(255,87,34,0.42);
+            /* Surfaces FLOTTANTES (panneaux, modales, bandeaux) : opaques, parce qu'elles
+               passent par-dessus le contenu. Le verre est reserve aux cartes posees dans la
+               page, qui ont le fond sombre derriere elles — sinon on lit le texte au travers. */
+            --bg-flottant: linear-gradient(160deg, #191c24, #12141a);
             --r: 18px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -598,7 +602,7 @@
             bottom: 20px;
             right: 20px;
             padding: 12px 18px;
-            background: var(--bg-card);
+            background: var(--bg-flottant);
             border-left: 3px solid var(--success);
             border-radius: 6px;
             z-index: 999;
@@ -614,7 +618,7 @@
         }
         .pop-notif {
             display: flex; gap: 10px; align-items: flex-start; text-align: left;
-            background: var(--bg-card); border: 1px solid rgba(255,87,34,.45);
+            background: var(--bg-flottant); border: 1px solid rgba(255,87,34,.45);
             border-left: 3px solid var(--primary); border-radius: 12px;
             padding: 11px 13px; cursor: pointer; width: 100%;
             box-shadow: 0 18px 40px -18px rgba(0,0,0,.95);
@@ -693,21 +697,22 @@
                       display: none; align-items: center; justify-content: center; padding: 0 4px; }
         .bell-count.on { display: flex; }
         .notif-panel { position: absolute; top: 52px; right: 0; width: 340px; max-width: calc(100vw - 24px);
-                       max-height: 420px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border);
+                       max-height: 420px; overflow-y: auto; background: var(--bg-flottant); border: 1px solid var(--border);
                        border-radius: 10px; padding: 10px; z-index: 60; display: none;
                        box-shadow: 0 10px 30px rgba(0,0,0,.5); }
         .notif-panel.open { display: block; }
         .notif-item { border-bottom: 1px solid var(--border); padding: 9px 4px; font-size: 12px; cursor: pointer; }
         .notif-item:last-child { border-bottom: 0; }
+        .notif-vide { font-size: 11.5px; color: var(--text-light); padding: 10px 6px; margin: 0; }
         .notif-item.neuf { background: rgba(255,87,34,.08); border-radius: 6px; }
         .notif-item .qui { color: var(--text-secondary); font-size: 10px; }
         .notif-item .titre { font-weight: 600; margin: 2px 0; }
         .notif-item .msg { color: var(--text-secondary); white-space: pre-wrap; }
 
-        .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100;
+        .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.78); z-index: 100;
                       display: none; align-items: center; justify-content: center; padding: 16px; }
         .modal-back.open { display: flex; }
-        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+        .modal { background: var(--bg-flottant); border: 1px solid var(--border); border-radius: 12px;
                  padding: 20px; width: 420px; max-width: 100%; max-height: 90vh; overflow-y: auto; }
         .modal h3 { font-size: 15px; margin-bottom: 14px; }
         .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
@@ -1001,7 +1006,7 @@
             </div>
             <div style="position:relative;">
                 <button class="bell" onclick="toggleNotifs(event)" title="Notifications">🔔<span class="bell-count" id="bell-count">0</span></button>
-                <div class="notif-panel" id="notif-panel"></div>
+                <div class="notif-panel" id="notif-panel"><p class="notif-vide">Chargement…</p></div>
             </div>
             <button id="btn-installer" onclick="installerApp()" style="display:none;background:rgba(76,175,80,.15);color:#4caf50;border:1px solid #4caf50;">⬇ Installer</button>
             <button class="admin-btn" id="admin-btn" onclick="window.location.href='/admin'" style="display:none;">Admin</button>
@@ -3803,9 +3808,14 @@ async function chargerNotifs() {
                 <div class="titre">${escapeHtml(n.titre)}</div>
                 ${rdv}${n.message ? `<div class="msg">${escapeHtml(n.message)}</div>` : ''}
             </div>`;
-        }).join('') : '<p style="font-size:11px;color:var(--text-light);padding:8px 4px;">Aucun message.</p>');
+        }).join('') : '<p class="notif-vide">Aucun message.</p>');
         majBoutonPush('btn-push');
-    } catch (err) { /* silencieux : une notification indisponible ne doit pas gener le chiffrage */ }
+    } catch (err) {
+        // Silencieux pour le chiffrage, mais pas pour l'oeil : un panneau qui s'ouvre vide
+        // passe pour une panne. On dit ce qui se passe.
+        const panel = document.getElementById('notif-panel');
+        if (panel) panel.innerHTML = '<p class="notif-vide">Notifications indisponibles pour le moment.</p>';
+    }
 }
 
 function toggleNotifs(e) {

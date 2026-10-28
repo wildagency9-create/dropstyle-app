@@ -113,7 +113,12 @@
         button.success { background: linear-gradient(135deg, #3d9140, var(--success)); box-shadow: 0 6px 20px -8px rgba(76,175,80,.5); }
         button.small { padding: 6px 10px; font-size: 10px; border-radius: 6px; }
         .header-actions { display: flex; gap: 10px; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .container {
+            /* Element flex : sans min-width: 0 il refuse de retrecir sous la largeur de son
+               contenu, et un seul tableau large fait partir toute la page de travers. */
+            min-width: 0;
+            max-width: 1400px; margin: 0 auto; padding: 24px;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -463,7 +468,10 @@
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid var(--border);
             border-radius: 14px;
-            overflow: hidden;
+            /* Le tableau defile a l'interieur de sa carte. En "hidden", un tableau trop large
+               elargissait le conteneur et c'est la page entiere qui partait de travers. */
+            overflow-x: auto;
+            overflow-y: hidden;
             box-shadow: 0 20px 44px -30px rgba(0,0,0,.95);
         }
         table { width: 100%; border-collapse: collapse; }
@@ -554,6 +562,12 @@
             h1 { font-size: 18px; }
             .row2, .row3 { grid-template-columns: 1fr; }
             .stat-value { font-size: 28px; }
+            /* Le titre et ses boutons tiennent sur deux lignes plutot que de sortir de l'ecran */
+            .section-header { flex-wrap: wrap; gap: 10px; }
+            .section-header > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; }
+            /* Les colonnes gardent une largeur lisible ; c'est le tableau qui defile, pas la page */
+            .table-wrap table { min-width: 560px; }
+            th, td { padding-left: 10px; padding-right: 10px; }
         }
     </style>
 </head>
