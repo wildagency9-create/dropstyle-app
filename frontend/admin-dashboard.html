@@ -891,6 +891,7 @@
                 <div class="form-group"><label>P21 · Taux horaire atelier (€/h)</label><input type="number" step="1" id="param-taux_horaire_atelier"></div>
                 <div class="form-group"><label>P24 · Coef pose sous-traitant (×)</label><input type="number" step="0.05" id="param-coef_pose_st"></div>
                 <div class="form-group"><label>P22 · Coef impression Exaprint (×)</label><input type="number" step="0.05" id="param-coef_impression"></div>
+                <div class="form-group"><label>Œillet de bâche (€ HT / unité)</label><input type="number" step="0.1" id="param-prix_oeillet"></div>
             </div>
         </div>
 
@@ -2794,7 +2795,9 @@ function mtSel(id, attr) { const s = document.getElementById(id); if (!s || !s.s
 
 const PARAM_KEYS = ['coefficient','tva','minimum_commande','frais_dossier','arrondi','coef_urgent','coef_express','remise_qte2','remise_qte3','chute_vehicule','chute_signaletique','lamination_m2','impression_m2','espace_stickers','marge_plotteur_mm','coef_materiaux','coef_impression_interne','coef_forme_rond','coef_forme_custom','pao_forfait','pao_horaire','pose_atelier_jour','pose_atelier_demi','pose_site_point','taux_horaire_atelier','coef_pose_st','coef_impression','seuil_stock_defaut',
     // V24 — habillage saisonnier (visuel uniquement, jamais lu par le moteur)
-    'theme_mode','theme_force','theme_intensite','theme_anim'];
+    'theme_mode','theme_force','theme_intensite','theme_anim',
+    // Prix de vente d'un oeillet de bache (ligne vente, ajoutee telle quelle)
+    'prix_oeillet'];
 
 // --- V24 : habillage saisonnier ---
 // Les periodes sont redites ici pour l'affichage de l'admin ; la reference reste

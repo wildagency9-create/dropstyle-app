@@ -1230,6 +1230,27 @@
                     <button type="button" onclick="addPanneauLine()" style="width:100%;margin-bottom:16px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une ligne</button>
                 </div>
 
+                <!-- Bache PVC : la bache EST le support imprime. Ni materiau panneau, ni
+                     lamination, ni vinyle contrecolle — d'ou sa propre branche. -->
+                <div class="conditional" id="s-bache-cond">
+                    <div class="form-group"><label>Type de bâche</label>
+                        <div class="dropdown" id="dd-s-bache">
+                            <button class="dropdown-btn" onclick="toggleDropdown('dd-s-bache')"><span class="dropdown-label">— Chargement... —</span></button>
+                            <div class="dropdown-list" id="list-s-bache"></div>
+                        </div>
+                    </div>
+                    <div class="checkbox-row"><input type="checkbox" id="s-bache-imprime-check" checked><label for="s-bache-imprime-check">Bâche imprimée (ajoute le coût d'impression)</label></div>
+                    <div id="s-bache-lines"></div>
+                    <button type="button" onclick="addBacheLine()" style="width:100%;margin-bottom:12px;background:transparent;border:1px dashed var(--border);color:var(--text-secondary);">+ Ajouter une ligne</button>
+                    <div class="form-group">
+                        <label>Œillets (nb)</label>
+                        <input type="number" id="s-bache-oeillets" value="0" min="0" step="1" oninput="oeilletsTouche = true; majOeillets();">
+                        <p id="s-bache-oeillets-info" style="font-size:10px;color:var(--text-light);margin-top:4px;"></p>
+                        <button type="button" id="s-bache-oeillets-reset" onclick="reprendreOeillets()"
+                                style="display:none;margin-top:6px;padding:5px 9px;font-size:9px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);text-transform:none;letter-spacing:0;">↺ Revenir à la proposition</button>
+                    </div>
+                </div>
+
                 <!-- Vitrophanie / Adhesif mural / Lettrage decoupe : pose directe, pas de support, plusieurs lignes -->
                 <div class="conditional" id="s-vinyle-direct-cond">
                     <div class="form-group"><label>Vinyle</label>
@@ -1707,6 +1728,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupDropdownListeners();
     addShapeRow();
     addPanneauLine();
+    addBacheLine();
     addDirectLine();
     addRollupLine();
     // V24 — l'habillage saisonnier attend les parametres : son reglage vient de l'admin.
@@ -1808,6 +1830,14 @@ async function loadTarifs() {
         document.getElementById('list-st-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-s-vinyle').innerHTML = vinyleHTML;
         document.getElementById('list-s-vinyle-direct').innerHTML = vinyleHTML;
+
+        // La bache ne propose que des baches. La categorie vient du classeur ; tant qu'elle
+        // n'est pas renseignee, on se rabat sur le nom pour que l'onglet reste utilisable.
+        const parCategorie = allVinyles.filter(v => (v.categorie || '').toLowerCase() === 'bache');
+        const baches = parCategorie.length ? parCategorie : allVinyles.filter(v => /b[âa]che/i.test(v.name));
+        document.getElementById('list-s-bache').innerHTML = baches.length
+            ? baches.map(v => `<div class="dropdown-item" data-value="${v.id}" onclick="selectDropdownItem(this)">${v.name} (${parseFloat(v.price).toFixed(2)}€/m² achat)</div>`).join('')
+            : emptyItem('Aucune bâche — renseignez la colonne Catégorie du classeur puis lancez la synchro');
 
         kitOptionsHTML = allKits.length ? allKits.map(k =>
             `<div class="dropdown-item" data-value="${k.id}" onclick="selectDropdownItem(this)">${k.nom} (${parseFloat(k.prix).toFixed(2)}€)</div>`).join('')
@@ -1967,13 +1997,18 @@ function toggleVisuel() {
 // d'un materiau, un roll-up d'un kit a prix fixe, et vitrophanie/adhesif/lettrage n'ont
 // ni l'un ni l'autre puisqu'ils se posent directement sur une surface existante.
 function updateSignaletiqueFields(type) {
-    const isPanneau = type === 'panneau' || type === 'bache';
+    // La bache a sa propre branche depuis la V34 : elle est elle-meme le support imprime,
+    // elle ne prend donc ni materiau panneau, ni lamination, ni vinyle contrecolle.
+    const isPanneau = type === 'panneau';
+    const isBache = type === 'bache';
     const isDirect = type === 'vitrophanie' || type === 'adhesif' || type === 'lettrage';
     const isRollup = type === 'rollup';
     document.getElementById('s-materiau-cond').classList.toggle('active', isPanneau);
+    document.getElementById('s-bache-cond').classList.toggle('active', isBache);
+    if (isBache) majOeillets();
     document.getElementById('s-vinyle-direct-cond').classList.toggle('active', isDirect);
     document.getElementById('s-kit-cond').classList.toggle('active', isRollup);
-    document.getElementById('s-lam-cond').classList.toggle('active', !isRollup);
+    document.getElementById('s-lam-cond').classList.toggle('active', !isRollup && !isBache);
     document.getElementById('s-visueloverlay-cond').classList.toggle('active', isPanneau || isRollup);
     document.getElementById('s-visuel-dims-cond').classList.toggle('active', isRollup);
     if (!(isPanneau || isRollup)) {
@@ -2377,6 +2412,7 @@ function updateLineM2(el) {
     const haut = parseFloat(row.querySelector('.s-line-haut').value) || 0;
     const qty = parseInt(row.querySelector('.s-line-qty').value) || 1;
     row.querySelector('.s-line-m2').value = ((larg * haut) / 1000000 * qty).toFixed(3);
+    if (row.closest('#s-bache-lines')) majOeillets();
     if (row.querySelector('.s-plaque-info')) refreshPlaqueSuggestion(row);
 }
 
@@ -2497,6 +2533,51 @@ function directLineHTML(idx) {
         ${idx > 0 ? `<button type="button" onclick="this.closest('.line-row').remove()" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:9px;background:var(--danger);">✕</button>` : ''}
     </div>`;
 }
+// ===== BACHE : lignes de dimensions + oeillets =====
+// Les oeillets sont proposes d'apres le pourtour (un tous les 50 cm) et restent modifiables :
+// des que l'utilisateur touche le champ, on ne le recalcule plus sous ses doigts.
+let sBacheLineCounter = 0;
+let oeilletsTouche = false;
+
+function addBacheLine() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = directLineHTML(sBacheLineCounter++);
+    document.getElementById('s-bache-lines').appendChild(wrap.firstElementChild);
+    majOeillets();
+}
+function getBacheLines() {
+    return [...document.querySelectorAll('#s-bache-lines .line-row')].map(row => ({
+        larg: parseFloat(row.querySelector('.s-line-larg').value) || 1000,
+        haut: parseFloat(row.querySelector('.s-line-haut').value) || 1000,
+        qty: parseInt(row.querySelector('.s-line-qty').value) || 1,
+        m2: parseFloat(row.querySelector('.s-line-m2').value) || 0
+    }));
+}
+function oeilletsSuggeres() {
+    return getBacheLines().reduce((somme, l) => {
+        const perimetre = 2 * (l.larg + l.haut) / 1000;        // en metres
+        return somme + Math.max(4, Math.ceil(perimetre / 0.5)) * l.qty;   // 4 minimum : les coins
+    }, 0);
+}
+function majOeillets() {
+    const champ = document.getElementById('s-bache-oeillets');
+    const info = document.getElementById('s-bache-oeillets-info');
+    if (!champ || !info) return;
+    const n = oeilletsSuggeres();
+    if (!oeilletsTouche) champ.value = n;
+    info.textContent = oeilletsTouche
+        ? n + ' seraient proposés — un tous les 50 cm sur le pourtour, 4 au minimum.'
+        : n + ' proposés — un tous les 50 cm sur le pourtour, 4 au minimum. Modifiable.';
+    const bouton = document.getElementById('s-bache-oeillets-reset');
+    if (bouton) bouton.style.display = oeilletsTouche && Number(champ.value) !== n ? 'inline-block' : 'none';
+}
+
+// Rend la main au calcul automatique apres une saisie manuelle.
+function reprendreOeillets() {
+    oeilletsTouche = false;
+    majOeillets();
+}
+
 function addDirectLine() {
     const wrap = document.createElement('div');
     wrap.innerHTML = directLineHTML(sDirectLineCounter++);
@@ -2609,6 +2690,55 @@ async function calcSignaletique() {
 
         const warningsRollup = visuelCheck ? [checkStockWarning(visuelVinyle.name, visuelVinyle, conso)].filter(Boolean) : [];
         showResult(`${SIGNALETIQUE_LABELS[type]} × ${totalQty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', totalQty, warningsRollup);
+        return;
+    }
+
+    // ===== BACHE PVC : la bache est elle-meme le support imprime =====
+    // Pas de lamination ni de vinyle contrecolle : on imprime directement dessus. Les oeillets
+    // sont une ligne de VENTE (prix fini au client), pas un debourse multiplie par P01.
+    if (type === 'bache') {
+        const bache = allVinyles.find(v => v.id == getDropdownValue('dd-s-bache'));
+        if (!bache) {
+            manque('Choisissez le type de bâche', ['#dd-s-bache']);
+            return;
+        }
+        const lignes = getBacheLines();
+        if (!lignes.length) {
+            manque('Ajoutez au moins une ligne', ['#s-bache-lines']);
+            return;
+        }
+        const imprime = document.getElementById('s-bache-imprime-check').checked;
+        const nbOeillets = parseInt(document.getElementById('s-bache-oeillets').value) || 0;
+        const prixOeillet = num('prix_oeillet', 1.5);
+
+        const totalQty = lignes.reduce((s, l) => s + l.qty, 0);
+        const totalM2 = lignes.reduce((s, l) => s + l.m2, 0);
+        const conso = totalM2 * num('chute_signaletique', 1.1);
+        const coutM2 = parseFloat(bache.price);
+        const coutMatiereSupport = conso * coutM2;
+        const coutM2Impression = imprime ? num('impression_m2', 12) : 0;
+        const coutMatiereImpression = conso * coutM2Impression;
+        const coefImpressionInterne = num('coef_impression_interne', 3.75);
+        const venteImpression = coutMatiereImpression * coefImpressionInterne;
+        const venteOeillets = nbOeillets * prixOeillet;
+
+        const t = computeTotal(coutMatiereSupport, poseHT + paoHT + venteImpression + venteOeillets, delai);
+        const venteSupport = coutMatiereSupport * t.coefficient;
+
+        const rows = [
+            { label: `Surface ${totalM2.toFixed(2)}m² (${lignes.length} ligne${lignes.length > 1 ? 's' : ''}) × chute ${num('chute_signaletique', 1.1).toFixed(2)} = ${conso.toFixed(2)}m²`, val: '', stage: 1 },
+            { label: `Coût bâche (${coutM2.toFixed(2)}€/m² : ${bache.name})`, val: `${coutMatiereSupport.toFixed(2)}€`, stage: 1 },
+            { label: `Vente bâche (déboursé × ${t.coefficient.toFixed(2)})`, val: `${venteSupport.toFixed(2)}€`, stage: 1 },
+            paoRow,
+            imprime ? { label: `Coût impression (${coutM2Impression.toFixed(2)}€/m² × ${conso.toFixed(2)}m²)`, val: `${coutMatiereImpression.toFixed(2)}€`, stage: 2 } : null,
+            imprime ? { label: `Vente impression (déboursé × ${coefImpressionInterne.toFixed(2)})`, val: `${venteImpression.toFixed(2)}€`, stage: 2 } : null,
+            nbOeillets > 0 ? { label: `Œillets (${nbOeillets} × ${prixOeillet.toFixed(2)}€)`, val: `${venteOeillets.toFixed(2)}€`, stage: 3 } : null,
+            poseRow,
+            ...moteurRows(t, delai)
+        ].filter(Boolean);
+
+        const warningsBache = [checkStockWarning(bache.name, bache, conso)].filter(Boolean);
+        showResult(`Bâche ${totalM2.toFixed(2)}m² × ${totalQty}`, t.ttc, t.ht, t.tva, rows, 'signaletique', totalQty, warningsBache);
         return;
     }
 
@@ -2816,6 +2946,7 @@ const SAISIE_VERSION = 1;
 const SAISIE_LIGNES = {
     signaletique: [
         { conteneur: 's-panneau-lines', ajouter: 'addPanneauLine' },
+        { conteneur: 's-bache-lines', ajouter: 'addBacheLine' },
         { conteneur: 's-direct-lines', ajouter: 'addDirectLine' },
         { conteneur: 's-rollup-lines', ajouter: 'addRollupLine' }
     ]
@@ -3258,7 +3389,23 @@ function appliquerDevisIA(d) {
             updateLineM2(row.querySelector('.s-line-larg'));
         });
         if (!lignes.length) addDirectLine();
-    } else { // panneau / bache
+    } else if (type === 'bache') {
+        // La bache se choisit dans les supports (vinyle_id), pas dans les materiaux panneaux.
+        setDropdown('dd-s-bache', d.vinyle_id);
+        document.getElementById('s-bache-imprime-check').checked = imprime;
+        document.getElementById('s-bache-lines').innerHTML = '';
+        lignes.forEach(l => {
+            addBacheLine();
+            const row = document.querySelector('#s-bache-lines .line-row:last-child');
+            row.querySelector('.s-line-larg').value = l.largeur_mm;
+            row.querySelector('.s-line-haut').value = l.hauteur_mm;
+            row.querySelector('.s-line-qty').value = l.quantite;
+            updateLineM2(row.querySelector('.s-line-larg'));
+        });
+        if (!lignes.length) addBacheLine();
+        oeilletsTouche = false;
+        majOeillets();
+    } else { // panneau
         document.getElementById('s-panneau-lines').innerHTML = '';
         lignes.forEach(l => {
             addPanneauLine();

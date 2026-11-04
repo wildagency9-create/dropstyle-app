@@ -455,6 +455,17 @@ async function ensureZonesEquipe(conn, equipeId) {
 }
 
 // V7 — kits signaletique a prix fixe (roll-up / totem), meme logique que les forfaits vehicule.
+// V25 — categorie du support (vinyle, bache, rollup, papier, sol). Elle vient du classeur
+// et sert au calculateur a ne proposer que les supports qui conviennent au travail demande.
+// Colonne facultative : tant que le classeur ne la renseigne pas, elle reste nulle et
+// l'ancien comportement est conserve.
+async function ensureV25Tables(existingConn) {
+    const conn = existingConn || await pool.getConnection();
+    try { await conn.query(`ALTER TABLE vinyles ADD COLUMN categorie VARCHAR(40) DEFAULT NULL`); }
+    catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V25 init:', e.message); }
+    if (!existingConn) await conn.release();
+}
+
 async function ensureV7Tables(existingConn) {
     return avecConnexionPartagee(existingConn, async (conn) => {
         try { await conn.query(`CREATE TABLE IF NOT EXISTS kits_signaletique (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, nom VARCHAR(255) NOT NULL, prix DECIMAL(10, 2) NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`); }
@@ -482,6 +493,8 @@ async function initDB() {
         await ensureV6Tables(conn);
         // V7 — Kits signaletique a prix fixe
         await ensureV7Tables(conn);
+        // V25 — Categorie des supports
+        await ensureV25Tables(conn);
         // V8 — Suivi de stock
         await ensureV8Tables(conn);
         // V9 — Nom du client sur les devis
@@ -700,6 +713,7 @@ const DEFAULT_PARAMS = {
     coef_impression_interne: 3.75, // coefficient sur l'impression numerique interne (P23), distinct de P01 (vinyle/lamination) et P22 (Exaprint sous-traite) — calibre sur facture reelle, hors codes P01-P24
     // V24 — habillage saisonnier (cinq fetes). Purement visuel : aucune de ces quatre
     // valeurs n'entre dans un calcul de prix. Elles sont reglables depuis l'admin.
+    prix_oeillet: 1.50,          // prix de VENTE d'un oeillet de bache (ligne vente, ajoutee telle quelle)
     theme_mode: 1,               // 0 jamais · 1 automatique selon la date · 2 forcer une fete
     theme_force: 0,              // fete forcee : 0 Halloween · 1 Noel · 2 Jour de l'an · 3 Saint-Valentin · 4 Paques
     theme_intensite: 1,          // 0 discret · 1 normal · 2 fete
@@ -858,11 +872,13 @@ async function fetchSheetsData() {
     // pour tolerer toute restructuration du Sheets par l'entreprise.
     const tables = { vinyles: [], laminations: [], tapes: [], materiaux: [] };
     let current = null, pendingHeader = false;
-    let colPrix = 1, colValide = -1, colLaizes = 3;
+    let colPrix = 1, colValide = -1, colLaizes = 3, colCategorie = -1;
     for (const row of parseCSV(csvTarifs)) {
         const a = (row[0] || '').trim();
         const aU = a.toUpperCase();
-        if (aU.startsWith('VINYLES')) { current = 'vinyles'; pendingHeader = true; continue; }
+        // "SUPPORTS" est le nouveau nom de la section ; "VINYLES" reste accepte pour ne pas
+        // casser un classeur qui n'a pas encore ete renomme.
+        if (aU.startsWith('VINYLES') || aU.startsWith('SUPPORTS')) { current = 'vinyles'; pendingHeader = true; continue; }
         if (aU.startsWith('LAMINATIONS')) { current = 'laminations'; pendingHeader = true; continue; }
         if (aU.startsWith('TAPES')) { current = 'tapes'; pendingHeader = true; continue; }
         if (aU.startsWith('MATÉRIAUX') || aU.startsWith('MATERIAUX')) { current = 'materiaux'; pendingHeader = true; continue; }
@@ -874,7 +890,9 @@ async function fetchSheetsData() {
             const iPrix = lower.findIndex(c => c.includes('prix') && !c.includes('valid'));
             const iValide = lower.findIndex(c => c.includes('valid'));
             const iLaizes = lower.findIndex(c => c.includes('laize') || c.includes('format'));
+            const iCateg = lower.findIndex(c => c.includes('catég') || c.includes('categ'));
             pendingHeader = false;
+            colCategorie = iCateg;
             if (iPrix >= 0 || iLaizes >= 0) {
                 colPrix = iPrix >= 0 ? iPrix : 1;
                 colValide = iValide;
@@ -882,14 +900,18 @@ async function fetchSheetsData() {
                 continue;
             }
             // pas une ligne d'en-tetes (elle a ete supprimee ?) : colonnes par defaut, et la ligne est traitee comme une donnee
-            colPrix = 1; colValide = -1; colLaizes = 2;
+            colPrix = 1; colValide = -1; colLaizes = 2; colCategorie = -1;
         }
         if (a.startsWith('(')) continue;
         let prix = null;
         if (colValide >= 0) prix = cleanNum(row[colValide]);
         if (prix === null) prix = cleanNum(row[colPrix]);
         if (prix === null) continue;
-        tables[current].push({ nom: a, prix, laizes: (row[colLaizes] || '').trim() });
+        // Normalisee : le classeur peut ecrire "Bâche", "BACHE" ou "bache", le moteur voit "bache".
+        const categorie = colCategorie >= 0
+            ? String(row[colCategorie] || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') || null
+            : null;
+        tables[current].push({ nom: a, prix, laizes: (row[colLaizes] || '').trim(), categorie });
     }
     return { parametres, tables };
 }
@@ -931,6 +953,7 @@ app.get('/api/sync-sheets/preview', verifyToken, async (req, res) => {
 app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
     try {
         await ensureV6Tables();
+        await ensureV25Tables();   // la colonne categorie doit exister avant d'y ecrire
         const data = await fetchSheetsData();
         await avecConnexion(async (conn) => {
             for (const [cle, valeur] of Object.entries(data.parametres)) {
@@ -938,7 +961,7 @@ app.post('/api/sync-sheets/apply', verifyToken, async (req, res) => {
             }
             if (data.tables.vinyles.length) {
                 await conn.query('DELETE FROM vinyles WHERE user_id = ?', [req.userId]);
-                for (const v of data.tables.vinyles) await conn.query('INSERT INTO vinyles (user_id, name, price, type, laizes) VALUES (?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'sheets', v.laizes]);
+                for (const v of data.tables.vinyles) await conn.query('INSERT INTO vinyles (user_id, name, price, type, laizes, categorie) VALUES (?, ?, ?, ?, ?, ?)', [req.userId, v.nom, v.prix, 'sheets', v.laizes, v.categorie]);
             }
             if (data.tables.laminations.length) {
                 await conn.query('DELETE FROM laminations WHERE user_id = ?', [req.userId]);
@@ -1323,13 +1346,13 @@ const OUTIL_DEVIS = {
                         largeur_mm: { type: 'number' },
                         hauteur_mm: { type: 'number' },
                         quantite: { type: 'integer' },
-                        materiau_id: { type: ['integer', 'null'], description: 'Id du materiau panneau, uniquement pour type_support panneau ou bache' }
+                        materiau_id: { type: ['integer', 'null'], description: 'Id du materiau panneau, uniquement pour type_support panneau' }
                     },
                     required: ['largeur_mm', 'hauteur_mm', 'quantite', 'materiau_id'],
                     additionalProperties: false
                 }
             },
-            vinyle_id: { type: ['integer', 'null'] },
+            vinyle_id: { type: ['integer', 'null'], description: 'Id du support : le vinyle, ou la bache elle-meme quand type_support vaut bache' },
             lamination_id: { type: ['integer', 'null'], description: 'null = sans lamination' },
             kit_id: { type: ['integer', 'null'], description: 'Roll-up uniquement' },
             quantite_kit: { type: ['integer', 'null'], description: 'Roll-up uniquement' },
