@@ -1487,6 +1487,16 @@ app.put('/api/zones-vehicule', verifyToken, async (req, res) => {
 // navigateur qui chiffre avec les coefficients calibres. La cle API reste cote serveur.
 const Anthropic = require('@anthropic-ai/sdk');
 
+// V40 — une cle creee au niveau de l'ORGANISATION n'appartient a aucun espace de travail,
+// et l'API refuse alors la demande tant qu'on ne dit pas lequel utiliser. On le precise par
+// cet entete, lu dans ANTHROPIC_WORKSPACE_ID. Une cle creee DANS un espace de travail porte
+// deja l'information : la variable peut rester vide, et tout fonctionne comme avant.
+// Les trois usages de Claude passent par ici, pour qu'un reglage les serve tous.
+function clientAnthropic() {
+    const espace = String(process.env.ANTHROPIC_WORKSPACE_ID || '').trim();
+    return new Anthropic(espace ? { defaultHeaders: { 'anthropic-workspace-id': espace } } : {});
+}
+
 // Schema strict : l'IA ne peut renvoyer que des champs que le frontend sait appliquer.
 const OUTIL_DEVIS = {
     name: 'remplir_devis',
@@ -1554,7 +1564,7 @@ app.post('/api/chat', verifyToken, async (req, res) => {
         if (!message || !String(message).trim()) return res.status(400).json({ error: 'Message vide' });
 
         const ctx = await contexteAssistant(req.userId);
-        const client = new Anthropic();
+        const client = clientAnthropic();
 
         const system = `Tu es l'assistant de DropStyle, une entreprise de signalétique et de covering de véhicules. Tu aides à préparer des devis et à retrouver des informations sur les devis déjà enregistrés.
 
@@ -1657,7 +1667,7 @@ app.post('/api/reconnaitre-vehicule', verifyToken, async (req, res) => {
             'SELECT mime, octets FROM devis_photos WHERE id = ? AND equipe_id = ?', [photoId, req.userId]));
         if (!rows.length) return res.status(404).json({ error: 'Photo introuvable' });
 
-        const client = new Anthropic();
+        const client = clientAnthropic();
         const reponse = await client.messages.create({
             // Haiku suffit pour ranger une carrosserie dans six categories, et l'appel a lieu
             // a chaque photo : inutile d'y mettre le modele le plus cher.
@@ -3015,7 +3025,7 @@ app.post('/api/prod/lire-fiche', verifyToken, async (req, res) => {
         // comme pour la reconnaissance de vehicule. Sonnet 5.5, lui, REFUSE qu'on lui impose un
         // outil : la demande revient en erreur 400. On le lui propose donc, en le nommant dans
         // la consigne — avec strict, les champs restent aussi surs que si on l'avait impose.
-        const client = new Anthropic();
+        const client = clientAnthropic();
         const consigne = "Relève les informations de ce dossier de fabrication en appelant l'outil fiche_lue, et uniquement par lui. Recopie les numéros EXACTEMENT comme ils sont écrits, sans rien compléter ni corriger. Ce qui n'est pas lisible ou pas présent doit rester null : une case vide vaut mieux qu'une valeur inventée.";
         const reponse = await client.messages.create({
             model: estPdf ? 'claude-haiku-5-5' : 'claude-sonnet-5-5',
