@@ -3007,30 +3007,48 @@ app.post('/api/prod/lire-fiche', verifyToken, async (req, res) => {
             ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: octets.toString('base64') } }
             : { type: 'image', source: { type: 'base64', media_type: mime, data: octets.toString('base64') } };
 
+        // Le PDF du logiciel de gestion est du texte propre : Haiku le releve sans peine.
+        // Une PHOTO de fiche, elle, peut etre de travers, annotee a la main ou mal eclairee :
+        // on y met Sonnet, sinon on recopie des numeros faux.
+        //
+        // Les deux modeles ne s'adressent PAS de la meme maniere. Sur Haiku on impose l'outil,
+        // comme pour la reconnaissance de vehicule. Sonnet 5.5, lui, REFUSE qu'on lui impose un
+        // outil : la demande revient en erreur 400. On le lui propose donc, en le nommant dans
+        // la consigne — avec strict, les champs restent aussi surs que si on l'avait impose.
         const client = new Anthropic();
+        const consigne = "Relève les informations de ce dossier de fabrication en appelant l'outil fiche_lue, et uniquement par lui. Recopie les numéros EXACTEMENT comme ils sont écrits, sans rien compléter ni corriger. Ce qui n'est pas lisible ou pas présent doit rester null : une case vide vaut mieux qu'une valeur inventée.";
         const reponse = await client.messages.create({
-            // Le PDF du logiciel de gestion est du texte propre : Haiku le releve sans peine.
-            // Une PHOTO de fiche, elle, peut etre de travers, annotee a la main ou mal
-            // eclairee : on y met Sonnet, sinon on recopie des numeros faux.
             model: estPdf ? 'claude-haiku-5-5' : 'claude-sonnet-5-5',
-            max_tokens: 1000,
+            // Sonnet reflechit avant de repondre, et cela consomme des jetons : avec 1000, la
+            // reponse serait coupee avant l'appel de l'outil. L'effort reste bas, relever des
+            // champs sur une fiche ne demande pas de longue reflexion.
+            max_tokens: estPdf ? 1000 : 4000,
             tools: [OUTIL_FICHE],
-            tool_choice: { type: 'tool', name: 'fiche_lue' },
-            messages: [{
-                role: 'user',
-                content: [
-                    piece,
-                    { type: 'text', text: "Relève les informations de ce dossier de fabrication avec l'outil. Recopie les numéros EXACTEMENT comme ils sont écrits, sans rien compléter ni corriger. Ce qui n'est pas lisible ou pas présent doit rester null : une case vide vaut mieux qu'une valeur inventée." }
-                ]
-            }]
+            ...(estPdf
+                ? { tool_choice: { type: 'tool', name: 'fiche_lue' } }
+                : { tool_choice: { type: 'auto' }, output_config: { effort: 'low' } }),
+            messages: [{ role: 'user', content: [piece, { type: 'text', text: consigne }] }]
         });
         const appel = reponse.content.find(b => b.type === 'tool_use');
-        if (!appel) return res.status(502).json({ error: "La lecture n'a rien renvoyé d'exploitable." });
+        if (!appel) {
+            // Arrive si le modele a repondu en texte, ou s'il a ete coupe par la limite de
+            // jetons. On le dit tel quel : la saisie a la main reste possible derriere.
+            const coupe = reponse.stop_reason === 'max_tokens';
+            return res.status(502).json({
+                error: coupe
+                    ? "La lecture a été interrompue avant la fin. Réessayez, ou saisissez la fiche à la main."
+                    : "La lecture n'a rien renvoyé d'exploitable — saisissez la fiche à la main."
+            });
+        }
         res.json(appel.input);
     } catch (err) {
         if (err instanceof Anthropic.AuthenticationError) return res.status(502).json({ error: 'Clé API Anthropic invalide.' });
         if (err instanceof Anthropic.RateLimitError) return res.status(502).json({ error: 'Trop de demandes, réessayez dans un instant.' });
-        if (err instanceof Anthropic.APIError) return res.status(502).json({ error: `Lecture indisponible (${err.status}).` });
+        // Le detail compte ici : une requete refusee dit POURQUOI, et sans ce message on
+        // ne peut que deviner.
+        if (err instanceof Anthropic.APIError) {
+            return res.status(502).json({ error: `Lecture indisponible (${err.status}) : ${err.message}` });
+        }
         res.status(500).json({ error: err.message });
     }
 });

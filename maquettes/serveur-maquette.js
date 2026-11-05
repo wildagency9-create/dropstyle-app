@@ -168,8 +168,11 @@ const serveur = http.createServer((req, res) => {
         const api = chemin.replace('/api', '');
 
         // --- connexion : n'importe quoi fonctionne, c'est une maquette ---
-        if (api === '/login' || api === '/register') {
-            return envoyer(res, 200, { token: 'maquette', user: EQUIPE[0] });
+        if (api === '/login' || api === '/register' || api === '/auth/login' || api === '/auth/register') {
+            // On renvoie ce qu'on a recu sur le souvenir : c'est ce qui permet de verifier
+            // que la case de la page de connexion arrive bien jusqu'au serveur.
+            console.log('connexion — souvenir :', recu.souvenir === false ? 'non' : 'oui');
+            return envoyer(res, 200, { token: 'maquette', user: EQUIPE[0], souvenir: recu.souvenir !== false });
         }
 
         // --- production ---
