@@ -320,6 +320,16 @@
                     <input type="password" id="login-password" name="password" autocomplete="current-password" placeholder="••••••••" required />
                 </div>
 
+                <!-- V40 — se souvenir de moi. Cochee par defaut : sur son propre poste,
+                     se reconnecter chaque jour n'apporte rien. -->
+                <label style="display:flex;align-items:center;gap:9px;margin:-4px 0 18px;cursor:pointer;
+                              font-size:13px;color:var(--text-secondary);font-weight:500;
+                              text-transform:none;letter-spacing:0;">
+                    <input type="checkbox" id="login-souvenir" checked
+                           style="width:auto;margin:0;flex:0 0 auto;accent-color:var(--primary);cursor:pointer;" />
+                    Se souvenir de moi
+                </label>
+
                 <button type="submit" id="login-btn">Connexion</button>
                 <div class="loader" id="login-loader"></div>
             </form>
@@ -393,7 +403,7 @@ async function handleLogin(event) {
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password, souvenir: document.getElementById('login-souvenir').checked })
         });
 
         const data = await response.json();
@@ -403,6 +413,12 @@ async function handleLogin(event) {
         } else {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
+            // L'e-mail n'est retenu que si la case l'est : decocher doit effacer ce qui
+            // avait ete retenu avant, sinon le prochain arrivant lit l'adresse du precedent.
+            try {
+                if (document.getElementById('login-souvenir').checked) localStorage.setItem('dropstyle_email', email);
+                else localStorage.removeItem('dropstyle_email');
+            } catch (e) { /* navigation privee : sans effet sur la connexion */ }
             
             if (data.user.role === 'admin') {
                 window.location.href = '/admin';
@@ -465,6 +481,18 @@ async function handleRegister(event) {
 
 // Check si déjà login
 window.addEventListener('DOMContentLoaded', () => {
+    // V40 — l'adresse retenue revient d'elle-meme, et la case garde son dernier etat.
+    try {
+        const retenu = localStorage.getItem('dropstyle_email');
+        const champ = document.getElementById('login-email');
+        const case_ = document.getElementById('login-souvenir');
+        if (retenu && champ) { champ.value = retenu; }
+        if (case_) case_.checked = !!retenu || localStorage.getItem('dropstyle_souvenir') !== 'non';
+        if (case_) case_.addEventListener('change', () => {
+            try { localStorage.setItem('dropstyle_souvenir', case_.checked ? 'oui' : 'non'); } catch (e) { /* sans effet */ }
+        });
+    } catch (e) { /* la page reste utilisable sans memoire */ }
+
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     

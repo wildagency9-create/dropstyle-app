@@ -764,6 +764,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
+        // V40 — « Se souvenir de moi ». Case absente (vieille page en cache, lien
+        // d'invitation) : on garde le comportement long, celui d'avant.
+        const souvenir = req.body.souvenir !== false;
         const bcrypt = require('bcrypt');
         const jwt = require('jsonwebtoken');
         const [rows] = await avecConnexion(conn => conn.query('SELECT * FROM users WHERE email = ?', [email]));
@@ -776,7 +779,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         try {
             await avecConnexion(conn => conn.query('UPDATE users SET derniere_connexion = NOW(), nb_connexions = COALESCE(nb_connexions, 0) + 1 WHERE id = ?', [user.id]));
         } catch (e) { console.error('Suivi connexion :', e.message); }
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, equipe_id: user.equipe_id || user.id }, JWT_SECRET, { expiresIn: '7d' });
+        // Coche : un mois sans avoir a se reconnecter. Decoche : la journee, de quoi
+        // travailler sans laisser une session ouverte un mois sur un poste partage.
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, equipe_id: user.equipe_id || user.id }, JWT_SECRET, { expiresIn: souvenir ? '30d' : '1d' });
         res.json({ token, user: { id: user.id, email: user.email, nom: user.nom, role: user.role } });
     } catch (err) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
