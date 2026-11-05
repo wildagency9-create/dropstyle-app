@@ -1149,6 +1149,59 @@
             .pr-new { margin-left: 0; width: 100%; }
         }
         @media (max-width: 480px) { .pr-board { grid-template-columns: 1fr; } }
+        /* ===== V41 — calendrier et modification d'un dossier ===== */
+        .pr-cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .pr-cal-head h4 { font-size: 15px; font-weight: 800; text-transform: capitalize; min-width: 170px; }
+        .pr-cal-nav {
+            background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+            border-radius: 10px; padding: 6px 12px; font-size: 13px; font-weight: 700;
+            text-transform: none; letter-spacing: 0; box-shadow: none;
+        }
+        .pr-cal-nav:hover { transform: none; box-shadow: none; filter: none; background: rgba(255,255,255,.05); }
+        .pr-cal-jours { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+        .pr-cal-jours span { font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+                             color: var(--text-light); text-align: center; font-weight: 700; }
+        .pr-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+        .pr-case { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px;
+                   min-height: 92px; padding: 7px 7px 8px; display: flex; flex-direction: column; gap: 5px; }
+        .pr-case.vide { background: none; border-color: transparent; }
+        .pr-case.ajd { border-color: var(--primary); background: rgba(255,87,34,.06); }
+        .pr-case.weekend { background: rgba(255,255,255,0.008); }
+        .pr-case b { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+        .pr-case.ajd b { color: var(--primary-clair); }
+        .pr-chip {
+            font-size: 10.5px; font-weight: 700; border-radius: 7px; padding: 3px 6px; cursor: pointer;
+            background: var(--bg-input); color: var(--text-secondary);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            border-left: 3px solid var(--text-light);
+        }
+        .pr-chip:hover { color: var(--text-primary); background: rgba(255,255,255,.08); }
+        .pr-chip.en_prod { border-left-color: #58a6ff; }
+        .pr-chip.impression { border-left-color: #a78bfa; }
+        .pr-chip.finition { border-left-color: var(--primary-clair); }
+        .pr-chip.pose { border-left-color: var(--gold); }
+        .pr-chip.fini { border-left-color: var(--success); opacity: .55; }
+        .pr-chip.retard { border-left-color: var(--danger); color: #ff8f8f; }
+        .pr-plus { font-size: 10px; color: var(--text-light); cursor: pointer; }
+        .pr-plus:hover { color: var(--text-primary); }
+        .pr-sansdate { margin-top: 14px; }
+        .pr-modif { width: 100%; margin-top: 14px; background: var(--bg-input); color: var(--text-primary);
+                    box-shadow: none; font-size: 11px; }
+        .pr-modif:hover { transform: none; box-shadow: none; filter: none; background: rgba(255,255,255,.1); }
+        @media (max-width: 820px) {
+            .pr-case { min-height: 74px; }
+            .pr-chip { font-size: 9.5px; }
+        }
+        /* ===== V42 — L'INTERFACE DE L'ATELIER =====
+           Un graphiste, un poseur ou quelqu'un de la prod n'a que faire du calculateur de
+           devis. Lui montrer neuf onglets de chiffrage, c'est lui demander de chercher le
+           sien a chaque fois. On retire donc ce qui ne le concerne pas, et le tableau de
+           production prend toute la largeur, comme l'ecran d'administration. */
+        .app.atelier .tabs { display: none; }
+        .app.atelier .main-grid { grid-template-columns: 1fr; }
+        .app.atelier .panel-right { display: none; }
+        .app.atelier .panel-left { border-right: none; }
+        .app.atelier .pr-vues { margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -1668,6 +1721,7 @@
                 <div class="pr-vues">
                     <button class="pr-vue-btn on" onclick="prVue('tableau', this)">Tableau de production</button>
                     <button class="pr-vue-btn" onclick="prVue('planning', this)">Planning atelier</button>
+                    <button class="pr-vue-btn" onclick="prVue('calendrier', this); prRendreCalendrier()">Calendrier</button>
                     <button class="pr-new" id="pr-btn-new" onclick="prNouvelle()" style="display:none;">📷 Nouvelle fiche de fab</button>
                 </div>
                 <div class="pr-kpis" id="pr-kpis"></div>
@@ -1676,6 +1730,9 @@
                 </div>
                 <div class="pr-vue" id="pr-vue-planning">
                     <div id="pr-planning"></div>
+                </div>
+                <div class="pr-vue" id="pr-vue-calendrier">
+                    <div id="pr-calendrier"></div>
                 </div>
                 <div class="pr-vue" id="pr-vue-fiche">
                     <div id="pr-fiche"></div>
@@ -1975,6 +2032,10 @@ window.addEventListener('DOMContentLoaded', () => {
     // V28 — zones du vehicule, chargees une fois pour les six types.
     chargerZones();
     chargerEquipe().then(chargerNotifs);
+    // V42 — les casquettes decident de la forme de la page : chargees ici, et non a
+    // l'ouverture de l'onglet, sinon l'atelier verrait le calculateur avant de le voir
+    // disparaitre.
+    prProfilInit();
     setInterval(chargerNotifs, 45000);
 
     // V18 — coque mobile. Sur telephone on demarre sur l'accueil ; sur ordinateur
@@ -5339,14 +5400,22 @@ function mBarre() {
     const item = (cle, nom, icone) =>
         `<button class="m-nav ${mVueCourante === cle ? 'on' : ''}" onclick="mAller('${cle}')"
             aria-current="${mVueCourante === cle ? 'page' : 'false'}"><span class="m-ico">${ico(icone)}</span>${nom}</button>`;
-    document.getElementById('m-barre').innerHTML =
-        item('accueil', 'Accueil', 'accueil') +
-        item('devis', 'Devis', 'devis') +
-        `<button class="m-fab" onclick="mChoisirType()" aria-label="Nouveau devis">
+    const plus = (quoi, etiquette) =>
+        `<button class="m-fab" onclick="${quoi}" aria-label="${etiquette}">
             <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-         </button>` +
-        item('clients', 'Clients', 'clients') +
-        item('profil', 'Profil', 'profil');
+         </button>`;
+    // V42 — a l'atelier, la barre du bas ne parle pas de devis : elle mene a la production,
+    // et le bouton central depose une fiche de fab au lieu d'ouvrir un calculateur.
+    document.getElementById('m-barre').innerHTML =
+        (typeof prAtelierSeul === 'function' && prAtelierSeul())
+        ? item('prod', 'Production', 'signal') +
+          plus('prNouvelle()', 'Nouvelle fiche de fab') +
+          item('profil', 'Profil', 'profil')
+        : item('accueil', 'Accueil', 'accueil') +
+          item('devis', 'Devis', 'devis') +
+          plus('mChoisirType()', 'Nouveau devis') +
+          item('clients', 'Clients', 'clients') +
+          item('profil', 'Profil', 'profil');
     mMesurerBarre();
 }
 
@@ -6121,7 +6190,7 @@ const PR_ETAPES = [
     { cle: 'pose',       libelle: 'Pose' },
     { cle: 'fini',       libelle: 'Fini' }
 ];
-let prOrdres = [], prCompteurs = null, prDroits = null, prEquipe = [];
+let prOrdres = [], prCompteurs = null, prDroits = null, prEquipe = [], prFicheCourante = null;
 let prVueCourante = 'tableau', prDossierOuvert = null, prFichier = null, prLu = null, prOccupe = false;
 
 // Une date de MySQL arrive en ISO complet ("2026-02-24T00:00:00.000Z") : on ne garde que le
@@ -6229,6 +6298,10 @@ function prRendre() {
     }).join('');
 
     prRendrePlanning();
+    // Le calendrier n'est redessine que s'il est a l'ecran : inutile de calculer un mois
+    // que personne ne regarde.
+    const cal = document.getElementById('pr-vue-calendrier');
+    if (cal && cal.classList.contains('on')) prRendreCalendrier();
 }
 
 function prCarte(o) {
@@ -6324,6 +6397,7 @@ async function prOuvrirDossier(id, silencieux) {
 }
 
 function prRendreFiche(d) {
+    prFicheCourante = d;
     const o = d.ordre;
     const det = prDetails(o);
     const iso = prJour(o.date_sortie);
@@ -6333,6 +6407,14 @@ function prRendreFiche(d) {
         && (prDroits.etapes.find(e => e.cle === suivante.cle) || {}).autorisee;
     const batBloque = !!o.bat_en_attente && suivante
         && PR_ETAPES.findIndex(e => e.cle === suivante.cle) >= PR_ETAPES.findIndex(e => e.cle === 'impression');
+
+    // Qui peut corriger : l'atelier et l'admin a tout moment, le commercial tant que le
+    // dossier n'est pas parti en production — passee cette etape, une date changee en douce
+    // ne voudrait plus rien dire pour ceux qui produisent. Le serveur applique la meme regle,
+    // ceci evite seulement de proposer un bouton qui serait refuse.
+    const casq = (prDroits && prDroits.casquettes) || [];
+    const peutModifier = casq.includes('admin') || casq.includes('prod')
+        || (casq.includes('commercial') && o.etape === 'a_faire');
 
     const champ = (nom, valeur) => valeur
         ? `<div class="pr-champ"><span>${escapeHtml(nom)}</span><b>${escapeHtml(valeur)}</b></div>` : '';
@@ -6378,6 +6460,7 @@ function prRendreFiche(d) {
                     ${champ('Façonnage', det.faconnage)}
                     ${champ('Quantité', det.quantite)}
                     ${det.pose_incluse ? '<div class="pr-champ"><span>Pose</span><b>Comprise</b></div>' : ''}
+                    ${peutModifier ? '<button class="pr-modif" onclick="prModifier()">Modifier ce dossier</button>' : ''}
                 </div>
                 ${docs ? `<div class="pr-panneau"><h4>Pièces du dossier</h4><div class="pr-docs">${docs}</div></div>` : ''}
                 ${o.notes ? `<div class="pr-panneau"><h4>Notes pour l'atelier</h4><div class="pr-note">${escapeHtml(o.notes)}</div></div>` : ''}
@@ -6457,7 +6540,9 @@ async function prBat(id, valide) {
 
 // ---- Depot d'une fiche de fabrication ----
 function prNouvelle() {
-    prFichier = null; prLu = null;
+    prFichier = null; prLu = null; prEdition = null;
+    document.getElementById('pr-modal-titre').textContent = 'Nouveau dossier de production';
+    document.getElementById('pr-btn-creer').textContent = 'Créer le dossier';
     ['pr-f-numero', 'pr-f-devis', 'pr-f-reference', 'pr-f-client', 'pr-f-clientnum', 'pr-f-date', 'pr-f-notes']
         .forEach(k => { const el = document.getElementById(k); if (el) el.value = ''; });
     document.getElementById('pr-f-bat').checked = false;
@@ -6566,25 +6651,28 @@ async function prEnvoyer() {
     bouton.disabled = true;
     bouton.textContent = 'Enregistrement…';
     try {
-        const r = await apiSend('/prod/ordres', 'POST', corps);
+        const r = prEdition
+            ? await apiSend('/prod/ordres/' + prEdition, 'PUT', corps)
+            : await apiSend('/prod/ordres', 'POST', corps);
+        const idDossier = prEdition || r.id;
         // La fiche suit le dossier : si son depot echoue, le dossier existe quand meme et on
         // le dit, plutot que de faire croire a un echec complet.
         if (prFichier) {
             try {
                 await apiSend('/prod/documents', 'POST',
-                    { ordre_id: r.id, data: prFichier.data, nom: prFichier.nom, genre: 'fiche' });
+                    { ordre_id: idDossier, data: prFichier.data, nom: prFichier.nom, genre: 'fiche' });
             } catch (err) {
                 showNotification('Dossier créé, mais la fiche n\'a pas pu être jointe : ' + err.message, 'error');
             }
         }
         fermerModal('modal-prod');
-        showNotification('Dossier créé');
+        showNotification(prEdition ? 'Dossier modifié' : 'Dossier créé');
         await prCharger();
     } catch (err) { showNotification(err.message, 'error'); }
     finally {
         prOccupe = false;
         bouton.disabled = false;
-        bouton.textContent = 'Créer le dossier';
+        bouton.textContent = prEdition ? 'Enregistrer' : 'Créer le dossier';
     }
 }
 
@@ -6599,6 +6687,162 @@ function prAllerMobile() {
     if (btn) btn.click();
     window.scrollTo(0, 0);
     if (typeof mBarre === 'function') mBarre();
+}
+// ===== V41 — CALENDRIER DE L'ATELIER =====
+// Le planning dit dans quel ordre produire. Le calendrier dit quand : on y voit les semaines
+// chargees, les trous, et les jours ou tout tombe en meme temps. Deux lectures du meme
+// travail, et aucune donnee en plus.
+let prMois = null;   // 'AAAA-MM' affiche, null = le mois courant
+
+function prMoisCourant() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function prMoisDecale(pas) {
+    const [an, m] = (prMois || prMoisCourant()).split('-').map(Number);
+    const d = new Date(an, m - 1 + pas, 1);
+    prMois = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    prRendreCalendrier();
+}
+function prMoisAujourdhui() { prMois = null; prRendreCalendrier(); }
+
+function prRendreCalendrier() {
+    const el = document.getElementById('pr-calendrier');
+    if (!el) return;
+    const mois = prMois || prMoisCourant();
+    const [an, m] = mois.split('-').map(Number);
+    const aujourd = prAujourdhui();
+
+    // Les dossiers ranges par jour de sortie. Ceux qui n'en ont pas sont listes a part :
+    // les cacher ferait disparaitre du travail bien reel.
+    const parJour = {};
+    const sansDate = [];
+    prOrdres.forEach(o => {
+        const iso = prJour(o.date_sortie);
+        if (!iso) { sansDate.push(o); return; }
+        (parJour[iso] = parJour[iso] || []).push(o);
+    });
+
+    const nbJours = new Date(an, m, 0).getDate();
+    // getDay() rend 0 pour dimanche : on decale pour commencer la semaine au lundi.
+    const avant = (new Date(an, m - 1, 1).getDay() + 6) % 7;
+    const titre = new Date(an, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+    const chip = (o, iso) => {
+        const retard = iso < aujourd && o.etape !== 'fini' && !o.bat_en_attente;
+        return `<span class="pr-chip ${retard ? 'retard' : o.etape}" onclick="prOuvrirDossier(${o.id})"
+                      title="${escapeHtml([o.numero, o.reference, o.etape_libelle].filter(Boolean).join(' · '))}">
+                    ${escapeHtml(prTitre(o))}
+                </span>`;
+    };
+
+    let cases = '';
+    for (let i = 0; i < avant; i++) cases += '<div class="pr-case vide"></div>';
+    for (let j = 1; j <= nbJours; j++) {
+        const iso = `${an}-${String(m).padStart(2, '0')}-${String(j).padStart(2, '0')}`;
+        const dedans = parJour[iso] || [];
+        const jourSemaine = new Date(an, m - 1, j).getDay();
+        // Au-dela de trois, on compte : une case qui s'etire casse la lecture du mois.
+        const montres = dedans.slice(0, 3);
+        const reste = dedans.length - montres.length;
+        cases += `<div class="pr-case ${iso === aujourd ? 'ajd' : ''} ${jourSemaine === 0 || jourSemaine === 6 ? 'weekend' : ''}">
+            <b>${j}</b>
+            ${montres.map(o => chip(o, iso)).join('')}
+            ${reste > 0 ? `<span class="pr-plus" onclick="prOuvrirDossier(${dedans[montres.length].id})">+${reste} autre${reste > 1 ? 's' : ''}</span>` : ''}
+        </div>`;
+    }
+
+    el.innerHTML = `
+        <div class="pr-cal-head">
+            <button class="pr-cal-nav" onclick="prMoisDecale(-1)">‹</button>
+            <h4>${escapeHtml(titre)}</h4>
+            <button class="pr-cal-nav" onclick="prMoisDecale(1)">›</button>
+            <button class="pr-cal-nav" style="margin-left:auto;" onclick="prMoisAujourdhui()">Aujourd'hui</button>
+        </div>
+        <div class="pr-cal-jours">
+            <span>lun</span><span>mar</span><span>mer</span><span>jeu</span><span>ven</span><span>sam</span><span>dim</span>
+        </div>
+        <div class="pr-cal">${cases}</div>
+        ${sansDate.length ? `<div class="pr-jour pr-sansdate">
+            <div class="pr-jour-head"><h4>Sans date de sortie</h4>
+                <em>${sansDate.length} dossier${sansDate.length > 1 ? 's' : ''} à caler</em></div>
+            ${sansDate.map((o, i) => `
+                <div class="pr-ligne" onclick="prOuvrirDossier(${o.id})">
+                    <span class="pr-rang">${i + 1}</span>
+                    <span class="pr-l-txt">
+                        <span class="pr-l-cli">${escapeHtml(prTitre(o))}</span>
+                        <span class="pr-l-det">${escapeHtml([o.numero, o.reference].filter(Boolean).join(' · ') || '—')}</span>
+                    </span>
+                    <span class="pr-pill ${o.etape}">${escapeHtml(o.etape_libelle || o.etape)}</span>
+                </div>`).join('')}
+        </div>` : ''}`;
+}
+
+// ===== V41 — MODIFICATION D'UN DOSSIER =====
+// La meme fenetre sert a creer et a corriger : deux formulaires pour les memes champs
+// finiraient par diverger. Seuls le titre, le bouton et la destination changent.
+let prEdition = null;   // id du dossier en cours de correction, null si creation
+
+function prModifier() {
+    if (!prFicheCourante) return;
+    const o = prFicheCourante.ordre;
+    prNouvelle();
+    prEdition = o.id;
+    document.getElementById('pr-modal-titre').textContent = 'Modifier le dossier';
+    document.getElementById('pr-btn-creer').textContent = 'Enregistrer';
+    document.getElementById('pr-f-numero').value = o.numero || '';
+    document.getElementById('pr-f-devis').value = o.devis_externe || '';
+    document.getElementById('pr-f-reference').value = o.reference || '';
+    document.getElementById('pr-f-client').value = o.client_nom || '';
+    document.getElementById('pr-f-clientnum').value = o.client_numero || '';
+    document.getElementById('pr-f-date').value = prJour(o.date_sortie) || '';
+    document.getElementById('pr-f-suivi').value = o.suivi_par || '';
+    document.getElementById('pr-f-bat').checked = !!o.bat_requis;
+    document.getElementById('pr-f-notes').value = o.notes || '';
+    // Le detail lu sur la fiche est conserve tel quel : on ne le reecrit que si une nouvelle
+    // fiche est deposee et relue.
+    document.getElementById('pr-lecture').innerHTML =
+        '<p style="font-size:11.5px;color:var(--text-secondary);margin-bottom:12px;">' +
+        'Déposer une fiche ici ne remplace pas ce qui est déjà saisi : seuls les champs vides seront complétés.</p>';
+}
+// ===== V42 — L'INTERFACE DE L'ATELIER =====
+// Qui ne chiffre pas n'a pas besoin du calculateur. Mais personne ne doit perdre son
+// interface par accident : sans casquette, ou avec celle de commercial ou d'admin, tout
+// reste exactement comme avant. Seul un compte UNIQUEMENT atelier reçoit la version épurée,
+// et il suffit de lui cocher « Commercial » dans l'admin pour lui rendre le calculateur.
+function prAtelierSeul() {
+    const c = (prDroits && prDroits.casquettes) || [];
+    if (!c.length || c.includes('admin') || c.includes('commercial')) return false;
+    return c.includes('prod') || c.includes('graphiste') || c.includes('poseur');
+}
+
+// Charge au demarrage, et non a l'ouverture de l'onglet : c'est ce qui decide de la forme de
+// la page. Un echec ne change rien — l'interface complete reste, ce qui est le bon defaut.
+async function prProfilInit() {
+    try { prDroits = await apiFetch('/prod/casquettes'); }
+    catch (err) { return; }
+    const bouton = document.getElementById('pr-btn-new');
+    if (bouton) bouton.style.display = prDroits.peut_deposer ? '' : 'none';
+    if (typeof mBarre === 'function') mBarre();
+    if (prAtelierSeul()) prAppliquerAtelier();
+}
+
+function prAppliquerAtelier() {
+    document.querySelector('.app').classList.add('atelier');
+    const titre = document.querySelector('.panel-left .section-title');
+    if (titre) titre.textContent = 'Production';
+    // L'onglet Prod devient le seul ecran : on l'ouvre, et la barre d'onglets disparait.
+    const onglet = [...document.querySelectorAll('.tab-btn')]
+        .find(b => (b.getAttribute('onclick') || '').includes("'prod'"));
+    if (onglet) onglet.click();
+    // Sur telephone, l'accueil parle de devis : on n'y passe pas.
+    if (typeof surMobile === 'function' && surMobile()) {
+        mVueCourante = 'prod';
+        document.querySelector('.app').classList.remove('sur-vue');
+        document.querySelectorAll('.m-vue').forEach(v => v.classList.remove('on'));
+        if (typeof mBarre === 'function') mBarre();
+        window.scrollTo(0, 0);
+    }
 }
 </script>
 

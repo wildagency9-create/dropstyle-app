@@ -251,6 +251,20 @@ const serveur = http.createServer((req, res) => {
             });
             return envoyer(res, 201, { message: 'OK', id });
         }
+        const majOrdre = api.match(/^\/prod\/ordres\/(\d+)$/);
+        if (majOrdre && req.method === 'PUT') {
+            const o = ORDRES.find(x => x.id === Number(majOrdre[1]));
+            if (!o) return envoyer(res, 404, { error: 'Dossier introuvable' });
+            // Le vrai serveur garde le detail lu sur la fiche quand la correction n'en porte
+            // pas (COALESCE) : sans cette nuance, la maquette ferait croire qu'une simple
+            // correction de date efface le support et la finition.
+            const detail = recu.details || o.details;
+            Object.assign(o, recu, { bat_requis: recu.bat_requis ? 1 : 0, date_sortie: recu.date_sortie || null, details: detail });
+            const suivi = EQUIPE.find(m => m.id === Number(recu.suivi_par));
+            o.suivi_nom = suivi ? suivi.nom : null;
+            o.suivi_init = suivi ? suivi.initiales : null;
+            return envoyer(res, 200, { message: 'OK' });
+        }
         if (api === '/prod/documents' && req.method === 'POST') return envoyer(res, 201, { message: 'OK', id: 99 });
         if (api === '/prod/lire-fiche') {
             // Ce que Claude renvoie sur la vraie fiche CD04831, pour voir le bloc de lecture.
