@@ -989,6 +989,166 @@
         @media (prefers-reduced-motion: reduce) {
             .saison-sceau { animation: none; }
         }
+        /* ===== V39 — ONGLET PRODUCTION =====
+           Tout est prefixe pr- : dans une feuille de 1000 lignes, un `.col` ou un `.date`
+           sans prefixe finirait tot ou tard par croiser une autre classe. */
+
+        /* Le tableau a besoin de toute la largeur : sur cet onglet, le panneau de resultat
+           n'a rien a montrer, il s'efface le temps qu'on y est. */
+        .app.pr-large .main-grid { grid-template-columns: 1fr; }
+        .app.pr-large .panel-right { display: none; }
+
+        .pr-vues { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+        .pr-vue-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+            border-radius: 12px; padding: 8px 14px; font-size: 12.5px; font-weight: 600;
+            text-transform: none; letter-spacing: 0; box-shadow: none;
+        }
+        .pr-vue-btn:hover { transform: none; box-shadow: none; filter: none; background: rgba(255,255,255,.04); }
+        .pr-vue-btn.on { background: var(--verre-haut); color: var(--text-primary); border-color: rgba(255,255,255,.22); }
+        .pr-new { margin-left: auto; }
+        .pr-vue { display: none; }
+        .pr-vue.on { display: block; }
+
+        .pr-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+        .pr-kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; }
+        .pr-kpi b { display: block; font-size: 23px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; }
+        .pr-kpi small { display: block; font-size: 10.5px; color: var(--text-secondary); margin-top: 3px;
+                        text-transform: uppercase; letter-spacing: .5px; }
+        .pr-kpi.rouge b { color: var(--danger); }
+        .pr-kpi.orange b { color: var(--primary-clair); }
+        .pr-kpi.bleu b { color: #58a6ff; }
+        .pr-kpi.or b { color: var(--gold); }
+
+        /* Tableau : six colonnes, une par etape */
+        .pr-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px; align-items: start; }
+        .pr-col { background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+                  border-radius: 16px; padding: 10px; min-height: 110px; }
+        .pr-col h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--text-secondary);
+                     display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-weight: 700; }
+        .pr-col h3 i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--text-light); }
+        .pr-col h3 em { margin-left: auto; font-style: normal; background: var(--bg-input);
+                        border-radius: 6px; padding: 1px 6px; color: var(--text-light); }
+        .pr-col[data-etape="en_prod"] h3 i { background: #58a6ff; }
+        .pr-col[data-etape="impression"] h3 i { background: #a78bfa; }
+        .pr-col[data-etape="finition"] h3 i { background: var(--primary-clair); }
+        .pr-col[data-etape="pose"] h3 i { background: var(--gold); }
+        .pr-col[data-etape="fini"] h3 i { background: var(--success); }
+        .pr-vide { font-size: 11px; color: var(--text-light); text-align: center; padding: 10px 0; }
+
+        /* Carte d'un dossier */
+        .pr-of { background: var(--bg-flottant); border: 1px solid var(--border); border-radius: 12px;
+                 padding: 9px; margin-bottom: 8px; cursor: pointer; position: relative; overflow: hidden; }
+        .pr-of:hover { border-color: rgba(255,255,255,.25); }
+        .pr-of::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; }
+        .pr-of.retard::before { background: var(--danger); }
+        .pr-of.aujourdhui::before { background: var(--primary); }
+        .pr-of-num { font-size: 10px; color: var(--text-light); font-weight: 700; letter-spacing: .5px; }
+        .pr-of-cli { font-size: 13px; font-weight: 700; line-height: 1.25; margin: 1px 0 2px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pr-of-ref { font-size: 11px; color: var(--text-secondary); line-height: 1.3;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pr-of-bas { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+        .pr-date { font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 2.5px 7px;
+                   background: var(--bg-input); color: var(--text-secondary); }
+        .pr-date.red { background: rgba(255,90,90,.16); color: #ff8f8f; }
+        .pr-date.now { background: rgba(255,87,34,.18); color: var(--primary-clair); }
+        .pr-resp { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+                   font-size: 9px; font-weight: 800; background: rgba(88,166,255,.18); color: #58a6ff; flex: 0 0 auto; }
+        .pr-bat { font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; letter-spacing: .3px;
+                  background: rgba(212,175,55,.18); color: var(--gold); }
+
+        /* Planning de l'atelier */
+        .pr-jour { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+                   padding: 14px; margin-bottom: 12px; }
+        .pr-jour-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .pr-jour-head h4 { font-size: 14px; font-weight: 800; }
+        .pr-jour-head span { font-size: 11.5px; color: var(--text-secondary); }
+        .pr-jour-head em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--text-light); }
+        .pr-ligne { display: flex; align-items: center; gap: 10px; padding: 9px 0;
+                    border-top: 1px solid var(--border); cursor: pointer; }
+        .pr-ligne:first-of-type { border-top: none; }
+        .pr-ligne:hover .pr-l-cli { color: var(--primary-clair); }
+        .pr-rang { width: 20px; height: 20px; border-radius: 6px; background: var(--bg-input); display: grid;
+                   place-items: center; font-size: 10px; font-weight: 800; color: var(--text-light); flex: 0 0 auto; }
+        .pr-l-txt { flex: 1; min-width: 0; }
+        .pr-l-cli { font-size: 13px; font-weight: 700; }
+        .pr-l-det { font-size: 11px; color: var(--text-secondary); overflow: hidden;
+                    text-overflow: ellipsis; white-space: nowrap; }
+        .pr-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+                   border: 1px solid var(--border); color: var(--text-secondary); flex: 0 0 auto; }
+        .pr-pill.en_prod { background: rgba(88,166,255,.14); color: #58a6ff; border-color: transparent; }
+        .pr-pill.impression { background: rgba(167,139,250,.14); color: #a78bfa; border-color: transparent; }
+        .pr-pill.finition { background: rgba(255,138,80,.16); color: var(--primary-clair); border-color: transparent; }
+        .pr-pill.pose { background: rgba(212,175,55,.16); color: var(--gold); border-color: transparent; }
+        .pr-pill.fini { background: rgba(74,222,128,.14); color: var(--success); border-color: transparent; }
+        .pr-alerte { display: flex; gap: 9px; align-items: flex-start; background: rgba(255,90,90,.08);
+                     border: 1px solid rgba(255,90,90,.28); border-radius: 14px; padding: 11px 13px;
+                     margin-bottom: 12px; font-size: 12.5px; line-height: 1.45; }
+        .pr-alerte b { color: #ff8f8f; }
+        .pr-alerte.or { background: rgba(212,175,55,.07); border-color: rgba(212,175,55,.3); }
+        .pr-alerte.or b { color: var(--gold); }
+
+        /* Fiche d'un dossier */
+        .pr-retour { background: none; border: none; color: var(--text-secondary); font-size: 12px;
+                     padding: 0 0 12px; text-transform: none; letter-spacing: 0; font-weight: 600; box-shadow: none; }
+        .pr-retour:hover { transform: none; box-shadow: none; filter: none; color: var(--text-primary); }
+        .pr-fiche { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+        .pr-panneau { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+                      padding: 16px; margin-bottom: 14px; }
+        .pr-panneau h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+                         color: var(--text-secondary); margin-bottom: 12px; }
+        .pr-champ { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0;
+                    border-top: 1px solid var(--border); font-size: 13px; }
+        .pr-champ:first-of-type { border-top: none; }
+        .pr-champ span { color: var(--text-secondary); font-size: 12px; }
+        .pr-champ b { font-weight: 700; text-align: right; word-break: break-word; }
+        .pr-etapes { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
+        .pr-et { flex: 1; min-width: 62px; text-align: center; font-size: 10.5px; font-weight: 700;
+                 padding: 7px 4px; border-radius: 9px; background: var(--bg-input);
+                 color: var(--text-light); border: 1px solid transparent; }
+        .pr-et.done { background: rgba(74,222,128,.12); color: var(--success); }
+        .pr-et.cur { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
+                     box-shadow: 0 6px 18px -8px var(--halo); }
+        .pr-bandeau { display: flex; align-items: center; gap: 9px; background: rgba(74,222,128,.08);
+                      border: 1px solid rgba(74,222,128,.26); border-radius: 11px; padding: 9px 12px;
+                      margin-bottom: 12px; font-size: 12.5px; flex-wrap: wrap; }
+        .pr-bandeau b { color: var(--success); }
+        .pr-bandeau.att { background: rgba(212,175,55,.08); border-color: rgba(212,175,55,.3); }
+        .pr-bandeau.att b { color: var(--gold); }
+        .pr-bandeau button { margin-left: auto; padding: 6px 12px; font-size: 10px; }
+        .pr-histo { font-size: 12px; color: var(--text-secondary); line-height: 1.85; }
+        .pr-histo b { color: var(--text-primary); font-weight: 600; }
+        .pr-histo i { color: var(--text-light); font-style: normal; }
+        .pr-note { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary);
+                   background: var(--bg-input); border-radius: 10px; padding: 11px 12px; white-space: pre-wrap; }
+        .pr-docs { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pr-doc { display: flex; align-items: center; gap: 7px; background: var(--bg-input);
+                  border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px;
+                  font-size: 11.5px; color: var(--text-secondary); text-decoration: none; }
+        .pr-doc:hover { border-color: rgba(255,255,255,.25); color: var(--text-primary); }
+        .pr-futur { border-style: dashed; opacity: .72; }
+        .pr-futur h4::after { content: " · plus tard"; color: var(--text-light); letter-spacing: 0; text-transform: none; }
+
+        /* Lecture automatique de la fiche */
+        .pr-lu { background: rgba(255,87,34,.07); border: 1px solid rgba(255,87,34,.30);
+                 border-radius: 12px; padding: 12px 13px; margin: 12px 0; }
+        .pr-lu-t { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; font-weight: 800;
+                   color: var(--primary-clair); margin-bottom: 8px; }
+        .pr-lu-l { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 4.5px 0; }
+        .pr-lu-l em { font-style: normal; color: var(--text-secondary); }
+        .pr-lu-l b { font-weight: 700; text-align: right; }
+        .pr-lu-x { font-size: 11.5px; color: var(--text-secondary); line-height: 1.5; margin-top: 9px;
+                   border-top: 1px solid rgba(255,87,34,.22); padding-top: 9px; }
+
+        @media (max-width: 1240px) { .pr-board { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 820px) {
+            .pr-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .pr-kpis { grid-template-columns: repeat(2, 1fr); }
+            .pr-fiche { grid-template-columns: 1fr; }
+            .pr-new { margin-left: 0; width: 100%; }
+        }
+        @media (max-width: 480px) { .pr-board { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -1028,6 +1188,7 @@
                 <button class="tab-btn" onclick="switchTab('stats', this); renderStats(); renderClassement('semaine')">📈 Stats</button>
                 <button class="tab-btn" onclick="switchTab('tarifs', this); renderTarifs()">📖 Tarifs</button>
                 <button class="tab-btn" onclick="switchTab('historique', this); renderHistorique()">📊 Hist.</button>
+                <button class="tab-btn" onclick="switchTab('prod', this); prInit()">🏭 Prod</button>
             </div>
 
             <!-- VEHICULE (raccourci) -->
@@ -1497,6 +1658,29 @@
                 <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Tous tes devis sauvegardés</p>
                 <div id="historique-list"></div>
             </div>
+
+            <!-- V39 — PRODUCTION. Le dossier de fabrication est un objet a part entiere : il
+                 nait d'une fiche, pas d'un devis, donc l'atelier peut produire ce qui a ete
+                 chiffre ailleurs. Les boutons se montrent selon les casquettes, mais c'est le
+                 serveur qui tranche a chaque appel : ici on evite seulement de proposer ce qui
+                 sera refuse. -->
+            <div class="tab-content" id="tab-prod">
+                <div class="pr-vues">
+                    <button class="pr-vue-btn on" onclick="prVue('tableau', this)">Tableau de production</button>
+                    <button class="pr-vue-btn" onclick="prVue('planning', this)">Planning atelier</button>
+                    <button class="pr-new" id="pr-btn-new" onclick="prNouvelle()" style="display:none;">📷 Nouvelle fiche de fab</button>
+                </div>
+                <div class="pr-kpis" id="pr-kpis"></div>
+                <div class="pr-vue on" id="pr-vue-tableau">
+                    <div class="pr-board" id="pr-board"></div>
+                </div>
+                <div class="pr-vue" id="pr-vue-planning">
+                    <div id="pr-planning"></div>
+                </div>
+                <div class="pr-vue" id="pr-vue-fiche">
+                    <div id="pr-fiche"></div>
+                </div>
+            </div>
         </div>
 
         <div class="panel panel-right">
@@ -1547,6 +1731,56 @@
         <div id="mt-liste" style="margin-top:14px;"></div>
         <div class="modal-actions">
             <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-type')">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<!-- V39 — depot d'une fiche de fabrication. La lecture automatique remplit le formulaire
+     AVANT que le dossier existe : on relit toujours ce qui a ete lu avant d'enregistrer. -->
+<div class="modal-back" id="modal-prod" onclick="if(event.target===this)fermerModal('modal-prod')">
+    <div class="modal" style="width:560px;">
+        <h3 id="pr-modal-titre">Nouveau dossier de production</h3>
+
+        <div class="form-group">
+            <label>Fiche de fabrication — PDF ou photo</label>
+            <input type="file" id="pr-fichier" accept="application/pdf,image/jpeg,image/png,image/webp" onchange="prFichierChoisi(this)">
+            <p style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.45;">
+                Le PDF du logiciel de gestion est envoyé tel quel. Une photo est compressée avant l'envoi.
+                Facultatif : le dossier peut aussi être saisi à la main.
+            </p>
+        </div>
+        <div id="pr-lecture"></div>
+
+        <div class="row2">
+            <div class="form-group"><label>N° de commande</label>
+                <input type="text" id="pr-f-numero" placeholder="CD04831"></div>
+            <div class="form-group"><label>Devis d'origine</label>
+                <input type="text" id="pr-f-devis" placeholder="DE06750"></div>
+        </div>
+        <div class="form-group"><label>Référence du travail</label>
+            <input type="text" id="pr-f-reference" placeholder="Marquage MASTER L2H2"></div>
+        <div class="row2">
+            <div class="form-group"><label>Client</label><input type="text" id="pr-f-client"></div>
+            <div class="form-group"><label>N° client</label><input type="text" id="pr-f-clientnum"></div>
+        </div>
+        <div class="row2">
+            <div class="form-group"><label>À sortir le</label><input type="date" id="pr-f-date"></div>
+            <div class="form-group"><label>Dossier suivi par</label><select id="pr-f-suivi"></select></div>
+        </div>
+        <div class="form-group">
+            <label style="display:flex;align-items:center;gap:9px;text-transform:none;letter-spacing:0;font-size:13px;">
+                <input type="checkbox" id="pr-f-bat" style="width:auto;margin:0;flex:0 0 auto;"> Ce dossier attend un BAT
+            </label>
+            <p style="font-size:11px;color:var(--text-secondary);margin-top:5px;">
+                Tant qu'il n'est pas validé, l'impression reste bloquée.
+            </p>
+        </div>
+        <div class="form-group"><label>Notes pour l'atelier</label>
+            <textarea id="pr-f-notes" rows="2" placeholder="Ce qu'il faut savoir avant de lancer"></textarea></div>
+
+        <div class="modal-actions">
+            <button style="background:var(--bg-input);color:var(--text-primary);" onclick="fermerModal('modal-prod')">Annuler</button>
+            <button id="pr-btn-creer" onclick="prEnvoyer()" style="flex:1;">Créer le dossier</button>
         </div>
     </div>
 </div>
@@ -1919,6 +2153,9 @@ function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     btn.classList.add('active');
+    // V39 — le tableau de production a besoin de toute la largeur : sur cet onglet, le
+    // panneau de resultat n'a rien a montrer, il s'efface le temps qu'on y est.
+    document.querySelector('.app').classList.toggle('pr-large', tab === 'prod');
 }
 
 // V27 — choix du mode PAO. Le groupe porte le data-value que lit le calcul, et designe
@@ -5191,6 +5428,14 @@ async function mRendreAccueil() {
             ${M_CALCULATEURS.map(c => `<div class="m-tuile" onclick="mOuvrirCalculateur('${c.cle}')">
                 ${ico(c.icone, 22)}<span>${c.nom}</span></div>`).join('')}
         </div>
+        <div class="m-lien" onclick="prAllerMobile()">
+            <span style="display:flex;align-items:center;gap:12px;">
+                <span style="width:40px;height:40px;border-radius:11px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;font-size:18px;">🏭</span>
+                <span><span style="display:block;font-weight:600;">Production</span>
+                <span style="display:block;font-size:10.5px;color:var(--text-secondary);margin-top:2px;">Le planning de l'atelier</span></span>
+            </span>
+            <span style="color:var(--text-light);">›</span>
+        </div>
         <div class="m-srt"><b>Dernier devis</b><a onclick="mAller('devis')">Voir tout ›</a></div>
         <div id="m-dernier" class="m-carte"><p style="font-size:12px;color:var(--text-secondary);">Chargement...</p></div>
         <div class="m-srt"><b>🏆 Classement de la semaine</b></div>
@@ -5863,6 +6108,497 @@ function themeSaisonInit() {
         setTimeout(saisonPendule, 7000);
         setInterval(saisonPendule, 26000);
     }
+}
+// ===== V39 — ONGLET PRODUCTION =====
+// Le suivi d'atelier : le tableau par etape, le planning des sorties, et la fiche d'un
+// dossier. La lecture seule est ouverte a toute l'equipe — les commerciaux voient le
+// planning, comme demande. Ce sont les ACTIONS qui dependent des casquettes.
+const PR_ETAPES = [
+    { cle: 'a_faire',    libelle: 'À faire' },
+    { cle: 'en_prod',    libelle: 'En prod' },
+    { cle: 'impression', libelle: 'Impression' },
+    { cle: 'finition',   libelle: 'Finition' },
+    { cle: 'pose',       libelle: 'Pose' },
+    { cle: 'fini',       libelle: 'Fini' }
+];
+let prOrdres = [], prCompteurs = null, prDroits = null, prEquipe = [];
+let prVueCourante = 'tableau', prDossierOuvert = null, prFichier = null, prLu = null, prOccupe = false;
+
+// Une date de MySQL arrive en ISO complet ("2026-02-24T00:00:00.000Z") : on ne garde que le
+// jour, sans passer par un objet Date, sinon un fuseau en arriere decale la date d'un jour.
+function prJour(v) {
+    const m = String(v || '').match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : null;
+}
+function prAujourdhui() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// Midi comme heure : a minuit, un fuseau negatif rendrait la veille.
+function prDateCourte(iso) {
+    if (!iso) return 'Sans date';
+    const aujourd = prAujourdhui();
+    if (iso === aujourd) return "Aujourd'hui";
+    const d = new Date(iso + 'T12:00:00');
+    const demain = new Date(aujourd + 'T12:00:00');
+    demain.setDate(demain.getDate() + 1);
+    if (iso === prJour(demain.toISOString())) return 'Demain';
+    return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function prInitiales(o) {
+    if (o.suivi_init) return String(o.suivi_init).toUpperCase().slice(0, 3);
+    if (o.suivi_initiales) return String(o.suivi_initiales).toUpperCase().slice(0, 3);
+    if (o.suivi_nom) return o.suivi_nom.split(/\s+/).map(p => p[0]).join('').toUpperCase().slice(0, 2);
+    return '—';
+}
+function prDetails(o) {
+    if (!o.details) return {};
+    if (typeof o.details === 'object') return o.details;
+    try { return JSON.parse(o.details) || {}; } catch (e) { return {}; }
+}
+function prTitre(o) {
+    return o.client_nom || o.reference || o.numero || `Dossier ${o.id}`;
+}
+
+// Premiere ouverture de l'onglet : les droits d'abord, les dossiers ensuite. Appele a chaque
+// clic sur l'onglet, mais ne recharge les droits qu'une fois.
+async function prInit() {
+    if (!prDroits) {
+        try {
+            prDroits = await apiFetch('/prod/casquettes');
+        } catch (err) {
+            document.getElementById('pr-board').innerHTML =
+                `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+            return;
+        }
+        const bouton = document.getElementById('pr-btn-new');
+        if (bouton) bouton.style.display = prDroits.peut_deposer ? '' : 'none';
+        prEquipeCharger();
+    }
+    prCharger();
+}
+
+// Charge en arriere-plan : sans la liste, on peut encore creer un dossier, il manquera
+// seulement le choix du collegue a prevenir.
+async function prEquipeCharger() {
+    try { const d = await apiFetch('/prod/equipe'); prEquipe = d.membres || []; }
+    catch (err) { prEquipe = []; }
+}
+
+async function prCharger() {
+    try {
+        const d = await apiFetch('/prod/ordres');
+        prOrdres = d.ordres || [];
+        prCompteurs = d.compteurs || null;
+        prRendre();
+        // Le dossier ouvert suit : apres un changement d'etape, la fiche doit dire la verite.
+        if (prDossierOuvert) await prOuvrirDossier(prDossierOuvert, true);
+    } catch (err) {
+        document.getElementById('pr-board').innerHTML =
+            `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+function prVue(nom, btn) {
+    prVueCourante = nom;
+    document.querySelectorAll('#tab-prod .pr-vue').forEach(v => v.classList.remove('on'));
+    document.getElementById('pr-vue-' + nom).classList.add('on');
+    if (btn) {
+        document.querySelectorAll('#tab-prod .pr-vue-btn').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+    }
+    // La fiche d'un dossier n'a pas de bouton de vue : on y entre en cliquant un dossier.
+    if (nom === 'fiche') document.querySelectorAll('#tab-prod .pr-vue-btn').forEach(b => b.classList.remove('on'));
+    else prDossierOuvert = null;
+}
+
+function prRendre() {
+    const c = prCompteurs || { en_retard: 0, aujourdhui: 0, en_cours: 0, bat_en_attente: 0, par_etape: {} };
+    document.getElementById('pr-kpis').innerHTML = `
+        <div class="pr-kpi rouge"><b>${c.en_retard}</b><small>En retard</small></div>
+        <div class="pr-kpi orange"><b>${c.aujourdhui}</b><small>À sortir aujourd'hui</small></div>
+        <div class="pr-kpi bleu"><b>${c.en_cours}</b><small>En cours d'atelier</small></div>
+        <div class="pr-kpi or"><b>${c.bat_en_attente}</b><small>BAT en attente</small></div>`;
+
+    document.getElementById('pr-board').innerHTML = PR_ETAPES.map(e => {
+        const dedans = prOrdres.filter(o => o.etape === e.cle);
+        return `<div class="pr-col" data-etape="${e.cle}">
+            <h3><i></i>${escapeHtml(e.libelle)}<em>${dedans.length}</em></h3>
+            ${dedans.length ? dedans.map(prCarte).join('') : '<p class="pr-vide">—</p>'}
+        </div>`;
+    }).join('');
+
+    prRendrePlanning();
+}
+
+function prCarte(o) {
+    const iso = prJour(o.date_sortie);
+    const classeDate = o.en_retard ? 'red' : o.pour_aujourdhui ? 'now' : '';
+    return `<div class="pr-of ${o.en_retard ? 'retard' : o.pour_aujourdhui ? 'aujourdhui' : ''}"
+                 onclick="prOuvrirDossier(${o.id})">
+        ${o.numero ? `<div class="pr-of-num">${escapeHtml(o.numero)}</div>` : ''}
+        <div class="pr-of-cli">${escapeHtml(prTitre(o))}</div>
+        <div class="pr-of-ref">${escapeHtml(o.reference || '—')}</div>
+        <div class="pr-of-bas">
+            <span class="pr-date ${classeDate}">${escapeHtml(prDateCourte(iso))}</span>
+            ${o.bat_en_attente ? '<span class="pr-bat">BAT</span>' : ''}
+            <span class="pr-resp" title="${escapeHtml(o.suivi_nom || 'Personne en charge non renseignée')}">${escapeHtml(prInitiales(o))}</span>
+        </div>
+    </div>`;
+}
+
+// Le planning ne montre que ce qui reste a produire, groupe par jour de sortie. Les dossiers
+// qui attendent un BAT en sont sortis : ils n'attendent pas l'atelier, ils attendent le
+// client, et les laisser dans la file ferait croire a du travail disponible.
+function prRendrePlanning() {
+    const el = document.getElementById('pr-planning');
+    const restants = prOrdres.filter(o => o.etape !== 'fini');
+    const bloques = restants.filter(o => o.bat_en_attente);
+    const afaire = restants.filter(o => !o.bat_en_attente);
+    const retards = afaire.filter(o => o.en_retard);
+
+    let html = '';
+    if (retards.length) {
+        html += `<div class="pr-alerte"><span>⚠️</span><div><b>${retards.length} dossier${retards.length > 1 ? 's' : ''} en retard</b> —
+            ${escapeHtml(retards.slice(0, 3).map(prTitre).join(', '))}${retards.length > 3 ? '…' : ''}.
+            La date de sortie est passée et le dossier n'est pas fini.</div></div>`;
+    }
+    if (bloques.length) {
+        html += `<div class="pr-alerte or"><span>⏸</span><div><b>${bloques.length} dossier${bloques.length > 1 ? 's' : ''} en attente de BAT</b> —
+            ${escapeHtml(bloques.slice(0, 3).map(prTitre).join(', '))}${bloques.length > 3 ? '…' : ''}.
+            Hors de la file de l'atelier : l'impression est bloquée jusqu'à la validation.</div></div>`;
+    }
+
+    if (!afaire.length) {
+        html += `<div class="pr-jour"><p class="pr-vide">Rien à produire — tout est fini ou en attente de BAT.</p></div>`;
+        el.innerHTML = html;
+        return;
+    }
+
+    // Les dossiers arrivent deja tries par date, les sans-date en dernier : on garde cet
+    // ordre et on coupe simplement a chaque changement de jour.
+    const jours = [];
+    afaire.forEach(o => {
+        const iso = prJour(o.date_sortie);
+        let j = jours.find(x => x.iso === iso);
+        if (!j) { j = { iso, ordres: [] }; jours.push(j); }
+        j.ordres.push(o);
+    });
+
+    html += jours.map(j => {
+        const enRetard = j.iso && j.iso < prAujourdhui();
+        return `<div class="pr-jour">
+            <div class="pr-jour-head">
+                <h4>${escapeHtml(prDateCourte(j.iso))}</h4>
+                <span>${j.iso ? escapeHtml(new Date(j.iso + 'T12:00:00').toLocaleDateString('fr-FR')) : 'date de sortie à renseigner'}</span>
+                <em>${j.ordres.length} dossier${j.ordres.length > 1 ? 's' : ''}${enRetard ? ' · en retard' : ''}</em>
+            </div>
+            ${j.ordres.map((o, i) => `
+                <div class="pr-ligne" onclick="prOuvrirDossier(${o.id})">
+                    <span class="pr-rang">${i + 1}</span>
+                    <span class="pr-l-txt">
+                        <span class="pr-l-cli">${escapeHtml(prTitre(o))}</span>
+                        <span class="pr-l-det">${escapeHtml([o.numero, o.reference].filter(Boolean).join(' · ') || '—')}</span>
+                    </span>
+                    <span class="pr-pill ${o.etape}">${escapeHtml(o.etape_libelle || o.etape)}</span>
+                </div>`).join('')}
+        </div>`;
+    }).join('');
+    el.innerHTML = html;
+}
+
+async function prOuvrirDossier(id, silencieux) {
+    if (!silencieux) {
+        prVue('fiche');
+        document.getElementById('pr-fiche').innerHTML =
+            '<p style="font-size:12px;color:var(--text-secondary);">Chargement du dossier…</p>';
+    }
+    try {
+        const d = await apiFetch('/prod/ordres/' + id);
+        prDossierOuvert = id;
+        prRendreFiche(d);
+    } catch (err) {
+        document.getElementById('pr-fiche').innerHTML =
+            `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+function prRendreFiche(d) {
+    const o = d.ordre;
+    const det = prDetails(o);
+    const iso = prJour(o.date_sortie);
+    const idx = PR_ETAPES.findIndex(e => e.cle === o.etape);
+    const suivante = idx >= 0 && idx < PR_ETAPES.length - 1 ? PR_ETAPES[idx + 1] : null;
+    const droitEtape = suivante && prDroits
+        && (prDroits.etapes.find(e => e.cle === suivante.cle) || {}).autorisee;
+    const batBloque = !!o.bat_en_attente && suivante
+        && PR_ETAPES.findIndex(e => e.cle === suivante.cle) >= PR_ETAPES.findIndex(e => e.cle === 'impression');
+
+    const champ = (nom, valeur) => valeur
+        ? `<div class="pr-champ"><span>${escapeHtml(nom)}</span><b>${escapeHtml(valeur)}</b></div>` : '';
+
+    const bandeau = o.bat_requis
+        ? (o.bat_valide_le
+            ? `<div class="pr-bandeau"><span>✓</span><div><b>BAT validé</b> le ${escapeHtml(new Date(o.bat_valide_le).toLocaleDateString('fr-FR'))}</div>
+               ${prDroits && prDroits.peut_valider_bat ? `<button style="background:var(--bg-input);color:var(--text-primary);box-shadow:none;" onclick="prBat(${o.id}, false)">Remettre en attente</button>` : ''}</div>`
+            : `<div class="pr-bandeau att"><span>⏸</span><div><b>BAT en attente</b> — l'impression est bloquée jusqu'à la validation du client.</div>
+               ${prDroits && prDroits.peut_valider_bat ? `<button onclick="prBat(${o.id}, true)">BAT reçu</button>` : ''}</div>`)
+        : '';
+
+    const docs = (d.documents || []).map(doc => `
+        <a class="pr-doc" onclick="prVoirDocument(${doc.id})">
+            <span>${doc.mime === 'application/pdf' ? '📄' : '🖼'}</span>
+            <span>${escapeHtml(doc.nom || doc.genre || 'document')}<br>
+            <span style="color:var(--text-light);font-size:10px;">${Math.round((doc.poids || 0) / 1024)} ko</span></span>
+        </a>`).join('');
+
+    const histo = (d.historique || []).map(h => {
+        const quand = new Date(h.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const quoi = h.etape === 'bat' ? (h.commentaire || 'BAT')
+            : h.commentaire || `${(PR_ETAPES.find(e => e.cle === h.etape_avant) || {}).libelle || '—'} → ${(PR_ETAPES.find(e => e.cle === h.etape) || {}).libelle || h.etape}`;
+        return `<div><b>${escapeHtml(quoi)}</b> — ${escapeHtml(h.nom || 'quelqu\'un')} <i>· ${escapeHtml(quand)}</i></div>`;
+    }).join('') || '<div><i>Aucun mouvement pour le moment.</i></div>';
+
+    document.getElementById('pr-fiche').innerHTML = `
+        <button class="pr-retour" onclick="prRetour()">‹ Retour au tableau</button>
+        <div class="pr-fiche">
+            <div>
+                <div class="pr-panneau">
+                    <h4>Le dossier</h4>
+                    ${champ('N° de commande', o.numero)}
+                    ${champ('Devis d\'origine', o.devis_externe)}
+                    ${champ('Client', o.client_nom)}
+                    ${champ('N° client', o.client_numero)}
+                    ${champ('Référence', o.reference)}
+                    ${champ('À sortir le', iso ? new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR') : null)}
+                    ${champ('Suivi par', o.suivi_nom || o.suivi_initiales)}
+                    ${champ('Support', det.support)}
+                    ${champ('Impression', det.impression)}
+                    ${champ('Finition', det.finition)}
+                    ${champ('Façonnage', det.faconnage)}
+                    ${champ('Quantité', det.quantite)}
+                    ${det.pose_incluse ? '<div class="pr-champ"><span>Pose</span><b>Comprise</b></div>' : ''}
+                </div>
+                ${docs ? `<div class="pr-panneau"><h4>Pièces du dossier</h4><div class="pr-docs">${docs}</div></div>` : ''}
+                ${o.notes ? `<div class="pr-panneau"><h4>Notes pour l'atelier</h4><div class="pr-note">${escapeHtml(o.notes)}</div></div>` : ''}
+                <div class="pr-panneau pr-futur">
+                    <h4>Matière consommée</h4>
+                    <p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">
+                        La déduction du stock se branchera ici : la table est déjà en place, elle attend
+                        de savoir ce que chaque dossier consomme réellement.
+                    </p>
+                </div>
+            </div>
+            <div>
+                <div class="pr-panneau">
+                    <h4>Où en est-il</h4>
+                    ${bandeau}
+                    <div class="pr-etapes">
+                        ${PR_ETAPES.map((e, i) => `<div class="pr-et ${i < idx ? 'done' : i === idx ? 'cur' : ''}">${escapeHtml(e.libelle)}</div>`).join('')}
+                    </div>
+                    ${suivante ? `
+                        <button style="width:100%;" ${droitEtape && !batBloque ? '' : 'disabled'}
+                                onclick="prAvancer(${o.id}, '${suivante.cle}')">
+                            Passer en ${escapeHtml(suivante.libelle)}
+                        </button>
+                        ${batBloque ? '<p style="font-size:11.5px;color:var(--gold);text-align:center;margin-top:9px;">Le BAT n\'est pas validé : l\'impression reste bloquée.</p>'
+                          : !droitEtape ? `<p style="font-size:11.5px;color:var(--text-light);text-align:center;margin-top:9px;">Votre casquette ne permet pas de passer un dossier en « ${escapeHtml(suivante.libelle)} ».</p>` : ''}`
+                      : '<p style="font-size:12.5px;color:var(--success);text-align:center;">Dossier fini. La personne qui le suit a été prévenue.</p>'}
+                    ${idx > 0 ? `<button class="pr-retour" style="width:100%;text-align:center;padding:10px 0 0;"
+                        onclick="prAvancer(${o.id}, '${PR_ETAPES[idx - 1].cle}')">Revenir à ${escapeHtml(PR_ETAPES[idx - 1].libelle)}</button>` : ''}
+                </div>
+                <div class="pr-panneau">
+                    <h4>Historique</h4>
+                    <div class="pr-histo">${histo}</div>
+                </div>
+            </div>
+        </div>`;
+}
+
+function prRetour() {
+    prDossierOuvert = null;
+    const btn = document.querySelector('#tab-prod .pr-vue-btn');
+    prVue('tableau', btn);
+}
+
+// Le fichier est servi avec le jeton dans l'en-tete : un lien direct ne passerait pas
+// l'authentification. On recupere donc les octets puis on ouvre l'URL locale du blob.
+async function prVoirDocument(id) {
+    try {
+        const r = await fetch(`${API_URL}/prod/documents/${id}/fichier`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!r.ok) throw new Error('Document illisible');
+        const url = URL.createObjectURL(await r.blob());
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+async function prAvancer(id, etape) {
+    if (prOccupe) return;
+    prOccupe = true;
+    try {
+        const r = await apiSend(`/prod/ordres/${id}/etape`, 'PUT', { etape });
+        showNotification(r.notifie ? 'Dossier fini — la personne qui le suit est prévenue' : 'Étape enregistrée');
+        await prCharger();
+    } catch (err) { showNotification(err.message, 'error'); }
+    finally { prOccupe = false; }
+}
+
+async function prBat(id, valide) {
+    if (prOccupe) return;
+    prOccupe = true;
+    try {
+        await apiSend(`/prod/ordres/${id}/bat`, 'PUT', { valide });
+        showNotification(valide ? 'BAT validé — l\'impression est débloquée' : 'BAT remis en attente');
+        await prCharger();
+    } catch (err) { showNotification(err.message, 'error'); }
+    finally { prOccupe = false; }
+}
+
+// ---- Depot d'une fiche de fabrication ----
+function prNouvelle() {
+    prFichier = null; prLu = null;
+    ['pr-f-numero', 'pr-f-devis', 'pr-f-reference', 'pr-f-client', 'pr-f-clientnum', 'pr-f-date', 'pr-f-notes']
+        .forEach(k => { const el = document.getElementById(k); if (el) el.value = ''; });
+    document.getElementById('pr-f-bat').checked = false;
+    document.getElementById('pr-fichier').value = '';
+    document.getElementById('pr-lecture').innerHTML = '';
+    document.getElementById('pr-f-suivi').innerHTML =
+        '<option value="">— à préciser —</option>' +
+        prEquipe.map(m => `<option value="${m.id}">${escapeHtml(m.nom || m.email || ('Compte ' + m.id))}</option>`).join('');
+    ouvrirModal('modal-prod');
+}
+
+// Le PDF part tel quel : c'est du texte, le compresser n'aurait aucun sens. Une photo passe
+// par la recompression deja en place pour les photos de vehicule.
+async function prFichierChoisi(input) {
+    const f = input.files && input.files[0];
+    if (!f) { prFichier = null; return; }
+    const zone = document.getElementById('pr-lecture');
+    zone.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">Lecture de la fiche…</p>';
+    try {
+        if (f.type === 'application/pdf') {
+            if (f.size > 6 * 1024 * 1024) throw new Error('PDF trop lourd (6 Mo maximum)');
+            const data = await new Promise((ok, ko) => {
+                const lecteur = new FileReader();
+                lecteur.onload = () => ok(lecteur.result);
+                lecteur.onerror = () => ko(new Error('Fichier illisible'));
+                lecteur.readAsDataURL(f);
+            });
+            prFichier = { data, nom: f.name };
+        } else {
+            const { data } = await photoCompresser(f);
+            prFichier = { data, nom: f.name };
+        }
+        await prLireFiche();
+    } catch (err) {
+        prFichier = null;
+        zone.innerHTML = `<p style="font-size:12px;color:var(--danger);">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function prLireFiche() {
+    const zone = document.getElementById('pr-lecture');
+    try {
+        const d = await apiSend('/prod/lire-fiche', 'POST', { data: prFichier.data });
+        prLu = d;
+        const poser = (k, v) => { const el = document.getElementById(k); if (el && v && !el.value) el.value = v; };
+        poser('pr-f-numero', d.numero);
+        poser('pr-f-devis', d.devis_externe);
+        poser('pr-f-reference', d.reference);
+        poser('pr-f-client', d.client_nom);
+        poser('pr-f-clientnum', d.client_numero);
+        // Le collegue est retrouve par ses initiales quand elles correspondent a un seul compte.
+        if (d.suivi_initiales) {
+            const cible = prEquipe.find(m => (m.initiales || '').toUpperCase() === String(d.suivi_initiales).toUpperCase());
+            if (cible) document.getElementById('pr-f-suivi').value = cible.id;
+        }
+        const ligne = (nom, val) => val
+            ? `<div class="pr-lu-l"><em>${escapeHtml(nom)}</em><b>${escapeHtml(val)}</b></div>` : '';
+        zone.innerHTML = `<div class="pr-lu">
+            <div class="pr-lu-t">✨ Lu automatiquement sur la fiche</div>
+            ${ligne('N° de commande', d.numero)}
+            ${ligne('Devis', d.devis_externe)}
+            ${ligne('Client', d.client_nom)}
+            ${ligne('Référence', d.reference)}
+            ${ligne('Suivi par', d.suivi_initiales)}
+            ${ligne('Support', d.support)}
+            ${ligne('Impression', d.impression)}
+            ${ligne('Finition', d.finition)}
+            ${ligne('Façonnage', d.faconnage)}
+            ${ligne('Quantité', d.quantite)}
+            ${d.pose_incluse ? ligne('Pose', 'Comprise') : ''}
+            <div class="pr-lu-x">${escapeHtml(d.commentaire || '')}
+                ${d.confiance && d.confiance !== 'haute' ? ` <b>Confiance ${escapeHtml(d.confiance)} : relisez les numéros.</b>` : ''}</div>
+        </div>`;
+    } catch (err) {
+        // La lecture rate ne doit pas empecher de saisir a la main : le fichier reste joint.
+        zone.innerHTML = `<div class="pr-lu"><div class="pr-lu-t">Lecture automatique indisponible</div>
+            <div class="pr-lu-x">${escapeHtml(err.message)} — la fiche sera quand même jointe au dossier,
+            il reste à remplir les champs à la main.</div></div>`;
+    }
+}
+
+async function prEnvoyer() {
+    if (prOccupe) return;
+    const bouton = document.getElementById('pr-btn-creer');
+    const corps = {
+        numero: document.getElementById('pr-f-numero').value,
+        devis_externe: document.getElementById('pr-f-devis').value,
+        reference: document.getElementById('pr-f-reference').value,
+        client_nom: document.getElementById('pr-f-client').value,
+        client_numero: document.getElementById('pr-f-clientnum').value,
+        date_sortie: document.getElementById('pr-f-date').value,
+        suivi_par: document.getElementById('pr-f-suivi').value || null,
+        bat_requis: document.getElementById('pr-f-bat').checked,
+        notes: document.getElementById('pr-f-notes').value,
+        suivi_initiales: prLu ? prLu.suivi_initiales : null,
+        details: prLu ? {
+            support: prLu.support, impression: prLu.impression, finition: prLu.finition,
+            faconnage: prLu.faconnage, quantite: prLu.quantite, pose_incluse: !!prLu.pose_incluse
+        } : null
+    };
+    if (!corps.numero && !corps.client_nom && !corps.reference) {
+        showNotification('Indiquez au moins un numéro, un client ou une référence', 'error');
+        return;
+    }
+    prOccupe = true;
+    bouton.disabled = true;
+    bouton.textContent = 'Enregistrement…';
+    try {
+        const r = await apiSend('/prod/ordres', 'POST', corps);
+        // La fiche suit le dossier : si son depot echoue, le dossier existe quand meme et on
+        // le dit, plutot que de faire croire a un echec complet.
+        if (prFichier) {
+            try {
+                await apiSend('/prod/documents', 'POST',
+                    { ordre_id: r.id, data: prFichier.data, nom: prFichier.nom, genre: 'fiche' });
+            } catch (err) {
+                showNotification('Dossier créé, mais la fiche n\'a pas pu être jointe : ' + err.message, 'error');
+            }
+        }
+        fermerModal('modal-prod');
+        showNotification('Dossier créé');
+        await prCharger();
+    } catch (err) { showNotification(err.message, 'error'); }
+    finally {
+        prOccupe = false;
+        bouton.disabled = false;
+        bouton.textContent = 'Créer le dossier';
+    }
+}
+
+// Sur telephone, l'onglet se rejoint depuis l'accueil : la barre du bas garde ses cinq
+// entrees, en ajouter une sixieme la rendrait illisible au pouce.
+function prAllerMobile() {
+    mVueCourante = '';
+    document.querySelector('.app').classList.remove('sur-vue');
+    document.querySelectorAll('.m-vue').forEach(v => v.classList.remove('on'));
+    const btn = [...document.querySelectorAll('.tab-btn')]
+        .find(b => (b.getAttribute('onclick') || '').includes("'prod'"));
+    if (btn) btn.click();
+    window.scrollTo(0, 0);
+    if (typeof mBarre === 'function') mBarre();
 }
 </script>
 

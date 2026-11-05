@@ -24,7 +24,13 @@ app.use(cors());
 // porte sur tous les autres endpoints, qui n'echangent que de petits objets JSON.
 const jsonStandard = express.json();
 const jsonPhoto = express.json({ limit: '4mb' });
-app.use((req, res, next) => (req.path === '/api/photos' ? jsonPhoto : jsonStandard)(req, res, next));
+// V39 — une fiche de fabrication pese jusqu'a 6 Mo, et le base64 l'allonge d'un tiers :
+// les deux routes qui en portent une ont besoin de leur propre plafond, sinon le fichier
+// est refuse par l'analyseur de corps avant meme d'atteindre le code.
+const jsonFiche = express.json({ limit: '9mb' });
+const CHEMINS_FICHE = ['/api/prod/documents', '/api/prod/lire-fiche'];
+app.use((req, res, next) => (req.path === '/api/photos' ? jsonPhoto
+    : CHEMINS_FICHE.includes(req.path) ? jsonFiche : jsonStandard)(req, res, next));
 app.use(express.static(path.join(__dirname, 'frontend')));
 
 const pool = mysql.createPool({
@@ -2508,6 +2514,25 @@ app.get('/api/prod/casquettes', verifyToken, async (req, res) => {
             etapes: ETAPES_PROD.map(e => ({ cle: e, libelle: ETAPES_PROD_LIBELLE[e], autorisee: peutAmenerA(casq, e) })),
             peut_deposer: casq.has('admin') || casq.has('commercial') || casq.has('prod'),
             peut_valider_bat: casq.has('admin') || CASQUETTES_BAT.some(c => casq.has(c))
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Les collegues avec leurs initiales et leurs casquettes. C'est ce qui permet de relier le
+// « Dossier suivi par : MV » de la fiche de fab a un compte, et de regler les casquettes dans
+// l'admin. Route a part plutot qu'un ajout a /api/equipe : celle-la marche, on n'y touche pas.
+app.get('/api/prod/equipe', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const [rows] = await avecConnexion(conn => conn.query(
+            `SELECT id, nom, email, role, initiales, metiers FROM users
+              WHERE COALESCE(equipe_id, id) = ? ORDER BY nom`, [req.userId]));
+        res.json({
+            moi: req.authUserId,
+            membres: rows.map(m => ({
+                id: m.id, nom: m.nom, email: m.email, role: m.role, initiales: m.initiales,
+                casquettes: String(m.metiers || '').split(',').map(s => s.trim()).filter(c => CASQUETTES.includes(c))
+            }))
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

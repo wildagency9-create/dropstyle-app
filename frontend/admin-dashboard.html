@@ -690,6 +690,9 @@
         <!-- V13 — activite de l'equipe -->
         <div id="activite-equipe"></div>
 
+        <!-- V39 — casquettes de production -->
+        <div id="casq-prod"></div>
+
         <div class="table-wrap"><table>
             <thead><tr>
                 <th>Nom</th><th>Email</th><th>Rôle</th>
@@ -2380,6 +2383,7 @@ function carte(titre, valeur, teinte) {
 }
 
 async function loadUsers() {
+    casqRendre();   // V39 — en parallele : un echec ici ne doit pas vider l'onglet
     const zone = document.getElementById('activite-equipe');
     let d = null;
     try {
@@ -3148,6 +3152,59 @@ function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/';
+}
+/* ===== V39 — CASQUETTES DE PRODUCTION =====
+   Le role du compte (user / admin) ne se regle pas ici : ce sont deux choses differentes.
+   Une casquette dit ce qu'on fait dans l'atelier, le role dit si on administre le logiciel.
+   Les casquettes s'additionnent, et un administrateur les a toutes d'office. */
+const CASQ_PROD = [
+    { cle: 'commercial', nom: 'Commercial' },
+    { cle: 'graphiste',  nom: 'Graphiste' },
+    { cle: 'prod',       nom: 'Prod' },
+    { cle: 'poseur',     nom: 'Poseur' }
+];
+let casqMembres = [];
+
+async function casqRendre() {
+    const zone = document.getElementById('casq-prod');
+    if (!zone) return;
+    try {
+        const d = await apiAdmin('/prod/equipe');
+        casqMembres = d.membres || [];
+    } catch (err) {
+        zone.innerHTML = `<p style="font-size:11px;color:var(--danger);margin:18px 0;">Casquettes indisponibles : ${escapeHtml(err.message)}</p>`;
+        return;
+    }
+    zone.innerHTML = `
+        <div class="section-title" style="font-size:13px;margin:24px 0 8px;">Casquettes de production</div>
+        <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;line-height:1.55;">
+            Une même personne peut en porter plusieurs : les droits s'additionnent, le plus permissif gagne.
+            Les initiales relient le « Dossier suivi par » de la fiche de fab au bon compte — mettez-y
+            exactement ce qui est écrit sur la fiche. Un administrateur a toutes les casquettes d'office.
+        </p>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Nom</th><th>Initiales</th>${CASQ_PROD.map(c => `<th>${c.nom}</th>`).join('')}<th>Action</th></tr></thead>
+            <tbody>${casqMembres.map(m => `<tr>
+                <td>${escapeHtml(m.nom || m.email || ('Compte ' + m.id))}${m.role === 'admin' ? ' <span class="badge admin">admin</span>' : ''}</td>
+                <td><input type="text" id="cq-i-${m.id}" value="${escapeHtml(m.initiales || '')}" maxlength="8"
+                     placeholder="MV" style="width:72px;text-transform:uppercase;"></td>
+                ${CASQ_PROD.map(c => `<td><input type="checkbox" id="cq-${c.cle}-${m.id}"
+                     ${(m.casquettes || []).includes(c.cle) ? 'checked' : ''} style="width:auto;"></td>`).join('')}
+                <td><button class="small" onclick="casqEnregistrer(${m.id})">Enregistrer</button></td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+}
+
+async function casqEnregistrer(id) {
+    const casquettes = CASQ_PROD
+        .filter(c => document.getElementById(`cq-${c.cle}-${id}`).checked)
+        .map(c => c.cle);
+    const initiales = document.getElementById(`cq-i-${id}`).value;
+    try {
+        await apiAdmin(`/admin/users/${id}/casquettes`, 'PUT', { casquettes, initiales });
+        showMessage('Casquettes enregistrées');
+        casqRendre();
+    } catch (err) { showMessage(err.message, 'error'); }
 }
 </script>
 
