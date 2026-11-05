@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Production</title>
+<style>
+  :root{
+    --primary:#FF5722; --primary-dark:#E64A19; --primary-clair:#FF8A50;
+    --bg-dark:#070809; --bg-card:rgba(255,255,255,0.045); --bg-input:rgba(255,255,255,0.05);
+    --border:rgba(255,255,255,0.10); --text-primary:#F2F3F5; --text-secondary:#8A8F9C;
+    --text-light:#5A5F6B; --danger:#ff5a5a; --success:#4ade80; --gold:#d4af37;
+    --verre-haut:rgba(255,255,255,0.075); --halo:rgba(255,87,34,0.42);
+    --bg-flottant:linear-gradient(160deg,#191c24,#12141a); --r:18px;
+    --bleu:#58a6ff; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg-dark); color:var(--text-primary);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh; padding:0 0 60px;
+    background-image:radial-gradient(900px 500px at 80% -10%, rgba(255,87,34,0.10), transparent 60%);
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+  /* en-tete */
+  header{padding:18px 0 10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{font-weight:800;font-size:19px;letter-spacing:-.5px}
+  .logo span{color:var(--primary)}
+  .badge-maq{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);
+    border:1px solid rgba(212,175,55,.35);border-radius:999px;padding:3px 9px}
+  .spacer{flex:1}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--bg-input);border:1px solid var(--border);
+    display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--text-secondary)}
+  /* onglets */
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab-btn{flex:0 0 auto;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);
+    border-radius:999px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .tab-btn.active{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-color:transparent;
+    box-shadow:0 6px 20px -8px var(--halo)}
+  /* sous-vues */
+  .vues{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .vue-btn{background:transparent;border:1px solid var(--border);color:var(--text-secondary);border-radius:12px;
+    padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .vue-btn.on{background:var(--verre-haut);color:var(--text-primary);border-color:rgba(255,255,255,.22)}
+  .btn-new{margin-left:auto;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border:none;color:#fff;
+    border-radius:12px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 24px -10px var(--halo)}
+  /* bandeau chiffres */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+  .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:13px 14px}
+  .kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-1px;line-height:1.1}
+  .kpi small{display:block;font-size:11px;color:var(--text-secondary);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+  .kpi.rouge b{color:var(--danger)} .kpi.orange b{color:var(--primary-clair)}
+  .kpi.vert b{color:var(--success)} .kpi.bleu b{color:var(--bleu)}
+  /* kanban */
+  .board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;align-items:start}
+  .col{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:10px;min-height:120px}
+  .col h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-secondary);
+    display:flex;align-items:center;gap:6px;margin-bottom:10px;font-weight:700}
+  .col h3 i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .col h3 em{margin-left:auto;font-style:normal;background:var(--bg-input);border-radius:6px;padding:1px 6px;color:var(--text-light)}
+  .c-afaire i{background:var(--text-light)} .c-prod i{background:var(--bleu)}
+  .c-impr i{background:var(--violet)} .c-fini-tion i{background:var(--primary-clair)} .c-fini i{background:var(--success)}
+  .c-pose i{background:var(--gold)}
+  /* carte OF */
+  .of{background:var(--bg-flottant);border:1px solid var(--border);border-radius:12px;padding:9px;margin-bottom:8px;
+    cursor:pointer;position:relative;overflow:hidden}
+  .of:hover{border-color:rgba(255,255,255,.25)}
+  .of::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}
+  .of.retard::before{background:var(--danger)} .of.aujourdhui::before{background:var(--primary)}
+  .of-top{display:flex;gap:8px;align-items:flex-start}
+  .vignette{width:42px;height:52px;flex:0 0 auto;border-radius:7px;border:1px solid var(--border);
+    background:#e8e4da;position:relative;overflow:hidden}
+  .vignette::after{content:"";position:absolute;inset:6px 5px;
+    background:repeating-linear-gradient(to bottom,#9aa0a6 0 1px,transparent 1px 6px)}
+  .vignette.v2{background:#ded8c8} .vignette.v3{background:#efe9dc}
+  .of-txt{min-width:0;flex:1}
+  .of-num{font-size:10px;color:var(--text-light);font-weight:700;letter-spacing:.5px}
+  .of-cli{font-size:13px;font-weight:700;line-height:1.25;margin:1px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .of-prod{font-size:11px;color:var(--text-secondary);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .of-bas{display:flex;align-items:center;gap:6px;margin-top:8px}
+  .date{font-size:10.5px;font-weight:700;border-radius:6px;padding:2.5px 7px;background:var(--bg-input);color:var(--text-secondary)}
+  .date.red{background:rgba(255,90,90,.16);color:#ff8f8f} .date.now{background:rgba(255,87,34,.18);color:var(--primary-clair)}
+  .resp{margin-left:auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+    font-size:9px;font-weight:800;background:rgba(88,166,255,.18);color:var(--bleu)}
+  .resp.b{background:rgba(167,139,250,.18);color:var(--violet)}
+  .resp.c{background:rgba(74,222,128,.16);color:var(--success)}
+  /* planning */
+  .jour{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
+  .jour-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .jour-head h4{font-size:14px;font-weight:800}
+  .jour-head .j-sub{font-size:11.5px;color:var(--text-secondary)}
+  .charge{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-secondary)}
+  .jauge{width:110px;height:6px;border-radius:3px;background:var(--bg-input);overflow:hidden}
+  .jauge i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-clair))}
+  .jauge.full i{background:linear-gradient(90deg,#ff7a5a,var(--danger))}
+  .ligne{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border)}
+  .ligne:first-of-type{border-top:none}
+  .ordre{width:20px;height:20px;border-radius:6px;background:var(--bg-input);display:grid;place-items:center;
+    font-size:10px;font-weight:800;color:var(--text-light);flex:0 0 auto}
+  .ligne .l-txt{flex:1;min-width:0}
+  .ligne .l-cli{font-size:13px;font-weight:700}
+  .ligne .l-det{font-size:11px;color:var(--text-secondary)}
+  .pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary)}
+  .pill.prod{background:rgba(88,166,255,.14);color:var(--bleu);border-color:transparent}
+  .pill.impr{background:rgba(167,139,250,.14);color:var(--violet);border-color:transparent}
+  .pill.fin{background:rgba(255,138,80,.16);color:var(--primary-clair);border-color:transparent}
+  .pill.att{background:var(--bg-input);border-color:transparent}
+  .alerte{display:flex;gap:9px;align-items:flex-start;background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.28);
+    border-radius:14px;padding:11px 13px;margin-bottom:14px;font-size:12.5px;line-height:1.45}
+  .alerte b{color:#ff8f8f}
+  /* fiche */
+  .fiche{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .panneau{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:16px}
+  .panneau h4{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-secondary);margin-bottom:12px}
+  .photo-fab{width:100%;aspect-ratio:3/4;border-radius:12px;border:1px solid var(--border);background:#e8e4da;
+    position:relative;overflow:hidden;display:grid;place-items:center}
+  .photo-fab .faux{position:absolute;inset:14px;background:
+    repeating-linear-gradient(to bottom, rgba(40,44,52,.55) 0 1.5px, transparent 1.5px 13px)}
+  .photo-fab .tag{position:absolute;bottom:9px;left:9px;background:rgba(7,8,9,.78);border-radius:8px;
+    padding:4px 9px;font-size:10.5px;color:#cfd3da}
+  .champ{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--border);font-size:13px}
+  .champ:first-of-type{border-top:none}
+  .champ span{color:var(--text-secondary);font-size:12px}
+  .champ b{font-weight:700;text-align:right}
+  .etapes{display:flex;gap:6px;margin:4px 0 14px;flex-wrap:wrap}
+  .et{flex:1;min-width:64px;text-align:center;font-size:10.5px;font-weight:700;padding:7px 4px;border-radius:9px;
+    background:var(--bg-input);color:var(--text-light);border:1px solid transparent}
+  .et.done{background:rgba(74,222,128,.12);color:var(--success)}
+  .et.cur{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 6px 18px -8px var(--halo)}
+  .btn-suiv{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border:none;color:#fff;
+    border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 10px 26px -12px var(--halo)}
+  .histo{font-size:12px;color:var(--text-secondary);line-height:1.9}
+  .histo b{color:var(--text-primary);font-weight:600}
+  .histo i{color:var(--text-light);font-style:normal}
+  .note{font-size:12.5px;line-height:1.55;color:var(--text-secondary);background:var(--bg-input);
+    border-radius:10px;padding:11px 12px}
+  .futur{border-style:dashed;opacity:.72}
+  .futur h4::after{content:" · plus tard";color:var(--text-light);letter-spacing:0;text-transform:none}
+  .conso{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;border-top:1px solid var(--border)}
+  .conso:first-of-type{border-top:none}
+  .conso em{font-style:normal;color:var(--text-secondary)}
+  /* casquettes */
+  .casq{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:13px 15px;margin-bottom:16px}
+  .casq-t{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-secondary);margin-bottom:10px;font-weight:700}
+  .casq-l{display:flex;gap:7px;flex-wrap:wrap}
+  .cq{background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);border-radius:999px;
+    padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .cq.on{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-color:transparent;
+    box-shadow:0 6px 18px -9px var(--halo)}
+  .cq.on::before{content:"✓";font-size:10px}
+  .casq-x{font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-top:11px;
+    border-top:1px solid var(--border);padding-top:11px}
+  .casq-x b{color:var(--text-primary)}
+  .verrou{opacity:.45;pointer-events:none}
+  .ro{display:none;font-size:11.5px;color:var(--text-light);text-align:center;margin-top:10px}
+  .ro.on{display:block}
+  /* lecture auto de la fiche */
+  .lu{background:rgba(255,87,34,.07);border:1px solid rgba(255,87,34,.30);border-radius:12px;padding:12px 13px;margin-top:12px}
+  .lu-t{font-size:11px;text-transform:uppercase;letter-spacing:.7px;font-weight:800;color:var(--primary-clair);margin-bottom:8px}
+  .lu-l{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4.5px 0}
+  .lu-l em{font-style:normal;color:var(--text-secondary)}
+  .lu-l b{font-weight:700;text-align:right}
+  .lu-l small{color:var(--text-light);font-weight:400}
+  .lu-x{font-size:11.5px;color:var(--text-secondary);line-height:1.5;margin-top:9px;
+    border-top:1px solid rgba(255,87,34,.22);padding-top:9px}
+  .lu-x b{color:var(--text-primary)}
+  /* jalon BAT */
+  .bat{font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:5px;letter-spacing:.3px;
+    background:rgba(212,175,55,.18);color:var(--gold)}
+  .bandeau-bat{display:flex;align-items:center;gap:9px;background:rgba(74,222,128,.08);
+    border:1px solid rgba(74,222,128,.26);border-radius:11px;padding:9px 12px;margin-bottom:13px;font-size:12.5px}
+  .bandeau-bat b{color:var(--success)}
+  .bandeau-bat.att{background:rgba(212,175,55,.08);border-color:rgba(212,175,55,.3)}
+  .bandeau-bat.att b{color:var(--gold)}
+  /* matrice */
+  table.mat{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.mat th,table.mat td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:center}
+  table.mat th:first-child,table.mat td:first-child{text-align:left;color:var(--text-secondary);font-weight:600}
+  table.mat th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);font-weight:700}
+  table.mat td.o{color:var(--success);font-weight:800}
+  table.mat td.n{color:var(--text-light)}
+  table.mat td.l{color:var(--bleu);font-size:11px}
+  .mat-wrap{overflow-x:auto}
+  .vue{display:none} .vue.on{display:block}
+  @media (max-width:1100px){
+    .board{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (max-width:900px){
+    .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .fiche{grid-template-columns:1fr}
+  }
+  @media (max-width:520px){
+    .board{grid-template-columns:1fr}
+    .btn-new{margin-left:0;width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">Drop<span>Style</span></div>
+    <div class="badge-maq">Maquette — onglet Production</div>
+    <div class="spacer"></div>
+    <div class="avatar">SD</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn">🚗 Véhicule</button>
+    <button class="tab-btn">📋 Signal.</button>
+    <button class="tab-btn">🖨️ Print</button>
+    <button class="tab-btn">🏷️ Stickers</button>
+    <button class="tab-btn active">🏭 Prod</button>
+    <button class="tab-btn">👥 Clients</button>
+    <button class="tab-btn">📈 Stats</button>
+    <button class="tab-btn">📊 Hist.</button>
+  </div>
+
+  <div class="casq">
+    <div class="casq-t">Essaie la maquette avec les casquettes de Sébastien</div>
+    <div class="casq-l">
+      <button class="cq on" data-c="commercial">Commercial</button>
+      <button class="cq" data-c="graphiste">Graphiste / PAO</button>
+      <button class="cq" data-c="prod">Production</button>
+      <button class="cq" data-c="poseur">Poseur</button>
+      <button class="cq" data-c="admin">Admin</button>
+    </div>
+    <div class="casq-x" id="casq-x"></div>
+  </div>
+
+  <div class="vues">
+    <button class="vue-btn on" data-v="dash">Tableau de production</button>
+    <button class="vue-btn" data-v="plan">Planning atelier</button>
+    <button class="vue-btn" data-v="fiche">Fiche d'un dossier</button>
+    <button class="vue-btn" data-v="droits">Casquettes et droits</button>
+    <button class="btn-new">📷 Nouvelle fiche de fab</button>
+  </div>
+
+  <!-- ============ VUE 1 : DASHBOARD ============ -->
+  <section class="vue on" id="v-dash">
+    <div class="kpis">
+      <div class="kpi rouge"><b>2</b><small>En retard</small></div>
+      <div class="kpi orange"><b>3</b><small>À sortir aujourd'hui</small></div>
+      <div class="kpi bleu"><b>7</b><small>En production</small></div>
+      <div class="kpi vert"><b>11</b><small>Finis cette semaine</small></div>
+    </div>
+
+    <div class="board">
+      <div class="col">
+        <h3 class="c-afaire"><i></i>À faire <em>3</em></h3>
+        <div class="of retard">
+          <div class="of-top">
+            <div class="vignette"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04902</div>
+              <div class="of-cli">Garage Mercier</div>
+              <div class="of-prod">Panneau alu 2×1 m + lettrage</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date red">⚠ Hier</span><span class="resp">LM</span></div>
+        </div>
+        <div class="of aujourdhui">
+          <div class="of-top">
+            <div class="vignette v2"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04907</div>
+              <div class="of-cli">Boulangerie Thiry</div>
+              <div class="of-prod">Vitrophanie 4 vitrines</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date now">Aujourd'hui</span><span class="resp b">SD</span></div>
+        </div>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette v3"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04911</div>
+              <div class="of-cli">TP Lefèvre</div>
+              <div class="of-prod">Bâche 3×2 m, 8 œillets</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">Lun. 9</span><span class="bat">BAT ⏳</span><span class="resp c">KB</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="c-prod"><i></i>En prod <em>2</em></h3>
+        <div class="of retard">
+          <div class="of-top">
+            <div class="vignette v2"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04899</div>
+              <div class="of-cli">Ambulances Val</div>
+              <div class="of-prod">Covering complet Trafic</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date red">⚠ 2 j</span><span class="resp">LM</span></div>
+        </div>
+        <div class="of aujourdhui">
+          <div class="of-top">
+            <div class="vignette"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04906</div>
+              <div class="of-cli">Paysages Dubois</div>
+              <div class="of-prod">Semi-covering Kangoo</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date now">Aujourd'hui</span><span class="resp b">SD</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="c-impr"><i></i>Impression <em>2</em></h3>
+        <div class="of aujourdhui">
+          <div class="of-top">
+            <div class="vignette v3"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04905</div>
+              <div class="of-cli">Pizzeria Da Vinci</div>
+              <div class="of-prod">Enseigne + 2 totems</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date now">Aujourd'hui</span><span class="resp c">KB</span></div>
+        </div>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette v2"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04908</div>
+              <div class="of-cli">Serrurerie Nord</div>
+              <div class="of-prod">Marquage 2 Partner</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">Jeu. 12</span><span class="bat">BAT ⏳</span><span class="resp">LM</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="c-fini-tion"><i></i>Finition <em>1</em></h3>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04904</div>
+              <div class="of-cli">Clinique Saint-Paul</div>
+              <div class="of-prod">Signalétique intérieure, 14 plaques</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">Ven. 13</span><span class="resp b">SD</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="c-pose"><i></i>Pose <em>2</em></h3>
+        <div class="of aujourdhui">
+          <div class="of-top">
+            <div class="vignette v2"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04896</div>
+              <div class="of-cli">Transports Girard</div>
+              <div class="of-prod">Marquage 3 porteurs</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date now">Aujourd'hui</span><span class="resp c">KB</span></div>
+        </div>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04831</div>
+              <div class="of-cli">MARCHISIO</div>
+              <div class="of-prod">Marquage Master L2H2</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">Ven. 6</span><span class="resp b">MV</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3 class="c-fini"><i></i>Fini <em>2</em></h3>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette v3"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04901</div>
+              <div class="of-cli">Auto-école Centre</div>
+              <div class="of-prod">Kit magnétique</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">🔔 prévenu</span><span class="resp c">KB</span></div>
+        </div>
+        <div class="of">
+          <div class="of-top">
+            <div class="vignette"></div>
+            <div class="of-txt">
+              <div class="of-num">CD04898</div>
+              <div class="of-cli">Menuiserie Royer</div>
+              <div class="of-prod">Lettrage 2 fourgons</div>
+            </div>
+          </div>
+          <div class="of-bas"><span class="date">🔔 prévenu</span><span class="resp">LM</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VUE 2 : PLANNING ============ -->
+  <section class="vue" id="v-plan">
+    <div class="alerte">
+      <span>⚠️</span>
+      <div><b>2 dossiers en retard</b> — CD04902 (Garage Mercier, hier) et CD04899 (Ambulances Val, 2 jours).
+      Ils sont remontés en tête : le planning les replace avant les sorties du jour.</div>
+    </div>
+
+    <div class="alerte" style="background:rgba(212,175,55,.07);border-color:rgba(212,175,55,.3)">
+      <span>⏳</span>
+      <div><b style="color:var(--gold)">2 dossiers attendent un BAT</b> — CD04911 (TP Lefèvre, sortie lundi 9) et
+      CD04908 (Serrurerie Nord, jeudi 12). Ils ne sont pas comptés dans la charge et ne remontent pas dans la file de
+      production tant que le client n'a pas validé : inutile de les proposer à l'atelier.</div>
+    </div>
+
+    <div class="jour">
+      <div class="jour-head">
+        <h4>Aujourd'hui — jeudi 5</h4>
+        <div class="j-sub">3 sorties + 2 retards</div>
+        <div class="charge"><span>Charge</span><div class="jauge full"><i style="width:96%"></i></div><span>96 %</span></div>
+      </div>
+      <div class="ligne"><div class="ordre">1</div><div class="l-txt"><div class="l-cli">CD04902 · Garage Mercier</div>
+        <div class="l-det">Panneau alu + lettrage · retard d'un jour</div></div><span class="pill att">À faire</span></div>
+      <div class="ligne"><div class="ordre">2</div><div class="l-txt"><div class="l-cli">CD04899 · Ambulances Val</div>
+        <div class="l-det">Covering complet Trafic · retard de 2 jours</div></div><span class="pill prod">En prod</span></div>
+      <div class="ligne"><div class="ordre">3</div><div class="l-txt"><div class="l-cli">CD04905 · Pizzeria Da Vinci</div>
+        <div class="l-det">Enseigne + 2 totems</div></div><span class="pill impr">Impression</span></div>
+      <div class="ligne"><div class="ordre">4</div><div class="l-txt"><div class="l-cli">CD04906 · Paysages Dubois</div>
+        <div class="l-det">Semi-covering Kangoo</div></div><span class="pill prod">En prod</span></div>
+      <div class="ligne"><div class="ordre">5</div><div class="l-txt"><div class="l-cli">CD04907 · Boulangerie Thiry</div>
+        <div class="l-det">Vitrophanie 4 vitrines</div></div><span class="pill att">À faire</span></div>
+    </div>
+
+    <div class="jour">
+      <div class="jour-head">
+        <h4>Demain — vendredi 6</h4>
+        <div class="j-sub">1 sortie</div>
+        <div class="charge"><span>Charge</span><div class="jauge"><i style="width:34%"></i></div><span>34 %</span></div>
+      </div>
+      <div class="ligne"><div class="ordre">1</div><div class="l-txt"><div class="l-cli">CD04904 · Clinique Saint-Paul</div>
+        <div class="l-det">14 plaques · finition en cours</div></div><span class="pill fin">Finition</span></div>
+    </div>
+
+    <div class="jour">
+      <div class="jour-head">
+        <h4>Semaine prochaine</h4>
+        <div class="j-sub">2 sorties à préparer</div>
+        <div class="charge"><span>Charge</span><div class="jauge"><i style="width:52%"></i></div><span>52 %</span></div>
+      </div>
+      <div class="ligne"><div class="ordre">L</div><div class="l-txt"><div class="l-cli">CD04911 · TP Lefèvre</div>
+        <div class="l-det">Bâche 3×2 m, 8 œillets · lundi 9</div></div><span class="bat">BAT ⏳</span><span class="pill att">À faire</span></div>
+      <div class="ligne"><div class="ordre">J</div><div class="l-txt"><div class="l-cli">CD04908 · Serrurerie Nord</div>
+        <div class="l-det">Marquage 2 Partner · jeudi 12</div></div><span class="bat">BAT ⏳</span><span class="pill impr">Impression</span></div>
+    </div>
+  </section>
+
+  <!-- ============ VUE 3 : FICHE ============ -->
+  <section class="vue" id="v-fiche">
+    <div class="fiche">
+      <div class="panneau">
+        <h4>Dossier de fabrication — CD04831</h4>
+        <div class="photo-fab">
+          <div class="faux"></div>
+          <div class="tag">📄 CD04831.pdf — déposé le 9 juin par MV</div>
+        </div>
+        <div class="lu">
+          <div class="lu-t">✨ Lu automatiquement sur la fiche</div>
+          <div class="lu-l"><em>N° de commande</em><b>CD04831</b></div>
+          <div class="lu-l"><em>Client</em><b>MARCHISIO <small>(n° 934)</small></b></div>
+          <div class="lu-l"><em>Référence</em><b>Marquage MASTER L2H2</b></div>
+          <div class="lu-l"><em>Devis d'origine</em><b>DE06750 du 17/02/2026</b></div>
+          <div class="lu-l"><em>Suivi par</em><b>MV → Marie V.</b></div>
+          <div class="lu-x">Tu déposes le PDF ou tu photographies la fiche : les champs se remplissent seuls,
+          tu n'as plus qu'à ajouter <b>la date de sortie</b> et à vérifier.</div>
+        </div>
+        <div style="margin-top:12px" class="note">La fiche reste la pièce de référence de l'atelier : on l'ouvre en plein
+        écran et on zoome. Plusieurs pages possibles sur un même dossier (fiche, BAT, plan de pose).</div>
+      </div>
+
+      <div>
+        <div class="panneau" style="margin-bottom:14px">
+          <h4>Où en est le dossier</h4>
+          <div class="bandeau-bat"><span>✅</span><div><b>BAT v2 validé</b> le 23 juin par le client — l'impression est débloquée.</div></div>
+          <div class="etapes">
+            <div class="et done">À faire</div>
+            <div class="et cur">En prod</div>
+            <div class="et">Impression</div>
+            <div class="et">Finition</div>
+            <div class="et">Pose</div>
+            <div class="et">Fini</div>
+          </div>
+          <button class="btn-suiv" id="btn-suiv">Passer à « Impression » →</button>
+          <div class="ro" id="ro-msg">🔒 Avec tes casquettes actuelles, tu suis l'avancement sans pouvoir le changer.</div>
+          <div style="margin-top:12px" class="histo">
+            <div><b>En prod</b> · Karim · <i>aujourd'hui 08:12</i></div>
+            <div><b>À faire</b> · Sébastien · <i>3 nov. 17:40</i></div>
+            <div><b>Fiche créée</b> · Sébastien · <i>3 nov. 17:38</i></div>
+          </div>
+        </div>
+
+        <div class="panneau" style="margin-bottom:14px">
+          <h4>Le dossier</h4>
+          <div class="champ"><span>Client</span><b>MARCHISIO</b></div>
+          <div class="champ"><span>Suivi par</span><b>Marie V.</b></div>
+          <div class="champ"><span>À sortir le</span><b style="color:var(--primary-clair)">jeudi 5 nov.</b></div>
+          <div class="champ"><span>Référence</span><b>Marquage MASTER L2H2</b></div>
+          <div class="champ"><span>Support</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+            Vinyle polymère + vinyle DAO · quadri recto éco-solvant</b></div>
+          <div class="champ"><span>Finition</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+            Plastification MAT anti-UV</b></div>
+          <div class="champ"><span>Façonnage</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+            Découpe mi-chair + échenillage + film de transfert</b></div>
+          <div class="champ"><span>Pose</span><b>Ateliers du Versoud</b></div>
+          <div class="champ"><span>Dossier sur le NAS</span><b style="font-weight:400;text-align:right;color:var(--bleu);font-size:11px">
+            JUILLET_2026 / CD04831 - MARCHISIO…</b></div>
+        </div>
+
+        <div class="panneau futur">
+          <h4>Matière consommée</h4>
+          <div class="conso"><em>Polymère imprimable</em><span>8,4 m²</span></div>
+          <div class="conso"><em>Lamination brillante</em><span>8,4 m²</span></div>
+          <div class="conso"><em>Reste en stock après sortie</em><span style="color:var(--primary-clair)">41,6 m²</span></div>
+          <div style="margin-top:11px" class="note">Place réservée : au passage en « Fini », la matière se déduira
+          du stock existant et déclenchera l'alerte de seuil déjà en place. Rien n'est branché pour l'instant.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VUE 4 : DROITS ============ -->
+  <section class="vue" id="v-droits">
+    <div class="panneau" style="margin-bottom:14px">
+      <h4>Une personne, plusieurs casquettes</h4>
+      <div class="note" style="margin-bottom:14px">Le compte garde son rôle actuel (<b>membre</b> ou <b>admin</b>, qui ouvre
+      l'administration et les tarifs). On ajoute par-dessus des <b>casquettes métier</b>, cumulables : Sébastien peut être
+      commercial <i>et</i> graphiste. Les droits s'additionnent — on prend toujours le plus permissif de ses casquettes.</div>
+      <div class="mat-wrap">
+      <table class="mat">
+        <tr><th>Ce qu'on peut faire</th><th>Commercial</th><th>Graphiste</th><th>Prod</th><th>Poseur</th><th>Admin</th></tr>
+        <tr><td>Voir le tableau et le planning de prod</td><td class="o">oui</td><td class="o">oui</td><td class="o">oui</td><td class="o">oui</td><td class="o">oui</td></tr>
+        <tr><td>Déposer une fiche (PDF ou photo)</td><td class="o">oui</td><td class="n">non</td><td class="o">oui</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Être « suivi par » sur un dossier</td><td class="o">oui</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Changer la date de sortie</td><td class="l">tant qu'à faire</td><td class="n">non</td><td class="o">oui</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Noter le BAT comme validé</td><td class="o">oui</td><td class="o">oui</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Avancer la PAO et l'impression</td><td class="n">non</td><td class="o">oui</td><td class="o">oui</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Avancer la finition et la mise en pose</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Clôturer en « Fini » après la pose</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td><td class="o">oui</td><td class="o">oui</td></tr>
+        <tr><td>Recevoir la notification « c'est fini »</td><td class="l">si suivi par</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="l">si suivi par</td></tr>
+        <tr><td>Supprimer une fiche</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td></tr>
+        <tr><td>Régler les casquettes de l'équipe</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="n">non</td><td class="o">oui</td></tr>
+      </table>
+      </div>
+    </div>
+
+    <div class="panneau">
+      <h4>« Mon planning » n'affiche pas la même chose selon la casquette</h4>
+      <div class="champ"><span>Graphiste</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+        en priorité ce qui attend de la PAO et de l'impression</b></div>
+      <div class="champ"><span>Production</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+        en priorité la finition et les sorties du jour</b></div>
+      <div class="champ"><span>Poseur</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+        uniquement les poses du jour et des jours suivants, véhicule par véhicule</b></div>
+      <div class="champ"><span>Commercial</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+        d'abord ses dossiers à lui, puis le reste de l'atelier en lecture</b></div>
+      <div class="champ"><span>Plusieurs casquettes</span><b style="font-weight:400;text-align:right;color:var(--text-secondary);font-size:12px">
+        une seule liste, triée par urgence, tout ce qui te concerne est actionnable</b></div>
+    </div>
+
+    <div class="panneau" style="margin-top:14px">
+      <h4>Quand part la notification</h4>
+      <div class="bandeau-bat"><span>🔔</span><div>Au passage en <b>« Fini »</b>, donc <b>après la pose</b> — pas à la sortie
+      d'atelier. La personne « suivi par » reçoit l'alerte dans l'app et sur son téléphone, et peut rappeler le client
+      en sachant que le véhicule est réellement prêt à être rendu.</div></div>
+      <div class="note">Le dossier n'arrive en « Pose » que si la finition est faite, et en « Fini » que si la pose est
+      faite : la notification ne peut donc pas partir trop tôt, même si quelqu'un se trompe de bouton — il faudrait
+      franchir deux étapes à la main.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+  document.querySelectorAll('.vue-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.vue-btn').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.querySelectorAll('.vue').forEach(v => v.classList.remove('on'));
+    document.getElementById('v-' + b.dataset.v).classList.add('on');
+  }));
+  // Casquettes : cumulables, les droits s'additionnent.
+  const mesCasq = new Set(['commercial']);
+  function majCasq(){
+    const peutAvancer = mesCasq.has('prod') || mesCasq.has('graphiste') || mesCasq.has('admin');
+    const peutCreer = mesCasq.has('commercial') || mesCasq.has('prod') || mesCasq.has('admin');
+    const btn = document.getElementById('btn-suiv');
+    btn.classList.toggle('verrou', !peutAvancer);
+    // Ce dossier est a l'etape "En prod" : un poseur seul n'a pas la main dessus, il la
+    // prendra a l'etape Pose. C'est tout l'interet d'un droit par etape et non global.
+    document.getElementById('ro-msg').innerHTML = (mesCasq.has('poseur') && !peutAvancer)
+      ? '🔒 Poseur : tu prendras la main sur ce dossier à l\'étape « Pose ».'
+      : '🔒 Avec tes casquettes actuelles, tu suis l\'avancement sans pouvoir le changer.';
+    document.getElementById('ro-msg').classList.toggle('on', !peutAvancer);
+    document.querySelector('.btn-new').style.display = peutCreer ? '' : 'none';
+    const textes = [];
+    if (mesCasq.has('commercial')) textes.push('tu vois tout l\'atelier et tes dossiers remontent en tête');
+    if (mesCasq.has('graphiste')) textes.push('tu avances les étapes PAO et impression');
+    if (mesCasq.has('prod')) textes.push('tu avances toutes les étapes et tu replanifies');
+    if (mesCasq.has('poseur')) textes.push('tu vois les poses du jour et tu clôtures après la pose');
+    if (mesCasq.has('admin')) textes.push('tu règles les casquettes de l\'équipe');
+    document.getElementById('casq-x').innerHTML = mesCasq.size
+      ? '<b>Avec ' + (mesCasq.size > 1 ? 'ces casquettes' : 'cette casquette') + ' :</b> ' + textes.join(' · ') + '.'
+      : '<b>Aucune casquette :</b> le compte n\'a pas accès à l\'onglet Production.';
+  }
+  document.querySelectorAll('.cq').forEach(b => b.addEventListener('click', () => {
+    const c = b.dataset.c;
+    if (mesCasq.has(c)) mesCasq.delete(c); else mesCasq.add(c);
+    b.classList.toggle('on', mesCasq.has(c));
+    majCasq();
+  }));
+  majCasq();
+
+  document.querySelectorAll('.of').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.vue-btn').forEach(x => x.classList.remove('on'));
+    document.querySelector('.vue-btn[data-v="fiche"]').classList.add('on');
+    document.querySelectorAll('.vue').forEach(v => v.classList.remove('on'));
+    document.getElementById('v-fiche').classList.add('on');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }));
+</script>
+</body>
+</html>

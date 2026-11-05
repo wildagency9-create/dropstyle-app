@@ -433,6 +433,155 @@ async function ensureV28Tables(existingConn) {
     });
 }
 
+// ===== V39 — GESTION DE PRODUCTION =====
+// Le dossier de fabrication est un objet A PART, et non un prolongement du devis : il nait
+// d'une fiche (le PDF du logiciel de gestion, ou sa photo), et l'atelier produit aussi ce qui
+// a ete devise ailleurs. Son numero n'est donc pas genere ici : CD04831 vient du logiciel de
+// gestion, c'est le numero que tout le monde a en tete, et deux dossiers ne peuvent pas le
+// partager dans une meme equipe.
+const ETAPES_PROD = ['a_faire', 'en_prod', 'impression', 'finition', 'pose', 'fini'];
+const ETAPES_PROD_LIBELLE = {
+    a_faire: 'À faire', en_prod: 'En prod', impression: 'Impression',
+    finition: 'Finition', pose: 'Pose', fini: 'Fini'
+};
+
+// Casquettes metier, cumulables et independantes du role du compte (user/admin) : un meme
+// collegue peut etre commercial ET graphiste. Les droits s'additionnent — on retient toujours
+// le plus permissif de ses casquettes.
+const CASQUETTES = ['commercial', 'graphiste', 'prod', 'poseur'];
+
+// Qui a le droit d'AMENER un dossier a chaque etape. Le poseur ne fait que cloturer apres la
+// pose : il n'a rien a faire dans la PAO. Un compte admin passe partout.
+const ETAPE_CASQUETTES = {
+    a_faire: ['commercial', 'prod'],
+    en_prod: ['graphiste', 'prod'],
+    impression: ['graphiste', 'prod'],
+    finition: ['prod'],
+    pose: ['prod'],
+    fini: ['prod', 'poseur']
+};
+
+// Le BAT se note valide par ceux qui ont le client ou son mail sous la main, pas par l'atelier.
+const CASQUETTES_BAT = ['commercial', 'graphiste'];
+
+// La fiche arrive telle qu'elle sort du logiciel de gestion : un PDF. On accepte aussi la
+// photo, pour les fiches annotees a la main a l'atelier.
+const MIMES_FICHE = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const POIDS_MAX_FICHE = 6 * 1024 * 1024;   // un PDF de fiche fait quelques centaines de ko
+
+let v39Prete = false;
+
+async function ensureV39Tables(existingConn) {
+    if (v39Prete && !existingConn) return;
+    return avecConnexionPartagee(existingConn, async (conn) => {
+        try {
+            // numero reste NULLable : on doit pouvoir ouvrir un dossier avant d'avoir la fiche
+            // sous les yeux. MySQL accepte plusieurs NULL dans un index unique, donc la
+            // contrainte ne gene pas ces dossiers-la.
+            await conn.query(`CREATE TABLE IF NOT EXISTS prod_ordres (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                numero VARCHAR(40) DEFAULT NULL,
+                reference VARCHAR(255) DEFAULT NULL,
+                client_id INT DEFAULT NULL,
+                client_nom VARCHAR(255) DEFAULT NULL,
+                client_numero VARCHAR(20) DEFAULT NULL,
+                devis_id INT DEFAULT NULL,
+                devis_externe VARCHAR(40) DEFAULT NULL,
+                suivi_par INT DEFAULT NULL,
+                suivi_initiales VARCHAR(8) DEFAULT NULL,
+                date_sortie DATE DEFAULT NULL,
+                etape VARCHAR(20) NOT NULL DEFAULT 'a_faire',
+                etape_le DATETIME DEFAULT NULL,
+                etape_par INT DEFAULT NULL,
+                bat_requis TINYINT(1) DEFAULT 0,
+                bat_valide_le DATETIME DEFAULT NULL,
+                bat_valide_par INT DEFAULT NULL,
+                dossier_nas VARCHAR(500) DEFAULT NULL,
+                details JSON DEFAULT NULL,
+                notes TEXT DEFAULT NULL,
+                notifie_le DATETIME DEFAULT NULL,
+                auteur_id INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_equipe_numero (equipe_id, numero),
+                INDEX idx_equipe_etape (equipe_id, etape),
+                INDEX idx_equipe_sortie (equipe_id, date_sortie)
+            )`);
+
+            // Meme principe que les photos de vehicule : les octets en base, pas de fichiers sur
+            // le disque, parce que Railway ne garde rien entre deux deploiements.
+            await conn.query(`CREATE TABLE IF NOT EXISTS prod_documents (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                ordre_id INT NOT NULL,
+                nom VARCHAR(255) DEFAULT NULL,
+                genre VARCHAR(20) NOT NULL DEFAULT 'fiche',
+                mime VARCHAR(60) NOT NULL,
+                octets MEDIUMBLOB NOT NULL,
+                poids INT DEFAULT NULL,
+                auteur_id INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_ordre (ordre_id)
+            )`);
+
+            // Chaque passage d'etape est trace. C'est ce qui donnera les durees REELLES par
+            // etape : tant qu'on ne les a pas, toute capacite d'atelier serait inventee.
+            await conn.query(`CREATE TABLE IF NOT EXISTS prod_historique (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                ordre_id INT NOT NULL,
+                etape VARCHAR(20) NOT NULL,
+                etape_avant VARCHAR(20) DEFAULT NULL,
+                user_id INT DEFAULT NULL,
+                commentaire VARCHAR(255) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_ordre (ordre_id)
+            )`);
+
+            // Creee vide et volontairement non branchee : c'est l'ouverture vers le stock, qui
+            // existe deja avec ses seuils et son alerte par mail. Le jour venu, il n'y aura qu'a
+            // remplir cette table au passage en 'fini' et decrementer stock_m2.
+            await conn.query(`CREATE TABLE IF NOT EXISTS prod_consommations (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                equipe_id INT NOT NULL,
+                ordre_id INT NOT NULL,
+                type_matiere VARCHAR(20) NOT NULL,
+                matiere_id INT DEFAULT NULL,
+                designation VARCHAR(255) DEFAULT NULL,
+                quantite_m2 DECIMAL(10, 2) DEFAULT NULL,
+                deduit_le DATETIME DEFAULT NULL,
+                INDEX idx_ordre (ordre_id)
+            )`);
+
+            // Les casquettes sont lues en base a chaque appel, et volontairement PAS mises dans
+            // le jeton : un changement de casquette prend effet tout de suite, sans obliger le
+            // collegue a se reconnecter.
+            for (const sql of [
+                `ALTER TABLE users ADD COLUMN metiers VARCHAR(120) DEFAULT NULL`,
+                `ALTER TABLE users ADD COLUMN initiales VARCHAR(8) DEFAULT NULL`
+            ]) {
+                try { await conn.query(sql); }
+                catch (e) { if (!/Duplicate column/i.test(e.message)) console.error('V39 init:', e.message); }
+            }
+            v39Prete = true;
+        } catch (e) { console.error('V39 init:', e.message); }
+    });
+}
+
+// Casquettes d'un compte. Un admin recoit toutes les casquettes : il doit pouvoir debloquer
+// n'importe quel dossier sans qu'on ait a lui en attribuer une par une.
+async function casquettesDe(conn, authUserId, role) {
+    if (role === 'admin') return new Set([...CASQUETTES, 'admin']);
+    const [rows] = await conn.query('SELECT metiers FROM users WHERE id = ?', [authUserId]);
+    const brut = rows.length && rows[0].metiers ? String(rows[0].metiers) : '';
+    return new Set(brut.split(',').map(s => s.trim()).filter(c => CASQUETTES.includes(c)));
+}
+
+function peutAmenerA(casquettes, etape) {
+    if (casquettes.has('admin')) return true;
+    return (ETAPE_CASQUETTES[etape] || []).some(c => casquettes.has(c));
+}
+
 // Semees par equipe a la demande, comme les sources d'acquisition : une equipe qui a
 // ajuste ses surfaces ne les voit pas revenir aux valeurs d'origine.
 async function ensureZonesEquipe(conn, equipeId) {
@@ -505,6 +654,8 @@ async function initDB() {
         await ensureV26Tables(conn);
         // V28 — Zones du vehicule
         await ensureV28Tables(conn);
+        // V39 — Gestion de production
+        await ensureV39Tables(conn);
 
         const [users] = await conn.query('SELECT COUNT(*) as count FROM users');
         if (users[0].count === 0) {
@@ -2342,6 +2493,516 @@ app.get('/api/admin/stats', verifyToken, async (req, res) => {
             taux_transformation: tranches ? Math.round((Number(valides[0].n) / tranches) * 100) : null
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== V39 — ROUTES DE PRODUCTION =====
+
+// Ce que la personne connectee a le droit de faire. Le front s'en sert pour ne pas afficher
+// des boutons qui seront refuses : le controle reste fait cote serveur a chaque appel.
+app.get('/api/prod/casquettes', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const casq = await avecConnexion(conn => casquettesDe(conn, req.authUserId, req.userRole));
+        res.json({
+            casquettes: [...casq],
+            etapes: ETAPES_PROD.map(e => ({ cle: e, libelle: ETAPES_PROD_LIBELLE[e], autorisee: peutAmenerA(casq, e) })),
+            peut_deposer: casq.has('admin') || casq.has('commercial') || casq.has('prod'),
+            peut_valider_bat: casq.has('admin') || CASQUETTES_BAT.some(c => casq.has(c))
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Liste des dossiers. Tout le monde dans l'equipe voit tout : les commerciaux aussi, comme
+// demande. Ce sont les ACTIONS qui sont restreintes, pas la lecture.
+app.get('/api/prod/ordres', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const etape = ETAPES_PROD.includes(String(req.query.etape || '')) ? String(req.query.etape) : null;
+        const lignes = await avecConnexion(async (conn) => {
+            const [rows] = await conn.query(
+                `SELECT o.*, u.nom AS suivi_nom, u.initiales AS suivi_init,
+                        (SELECT COUNT(*) FROM prod_documents d WHERE d.ordre_id = o.id) AS nb_documents
+                   FROM prod_ordres o
+                   LEFT JOIN users u ON u.id = o.suivi_par
+                  WHERE o.equipe_id = ?` + (etape ? ' AND o.etape = ?' : '') +
+                // Les dossiers sans date de sortie passent en dernier : ils n'ont pas d'urgence
+                // etablie, les mettre en tete repousserait le travail reellement attendu.
+                ` ORDER BY o.etape = 'fini', o.date_sortie IS NULL, o.date_sortie, o.id`,
+                etape ? [req.userId, etape] : [req.userId]);
+            return rows;
+        });
+        const aujourdhui = new Date(); aujourdhui.setHours(0, 0, 0, 0);
+        const ordres = lignes.map((o) => {
+            const sortie = o.date_sortie ? new Date(o.date_sortie) : null;
+            if (sortie) sortie.setHours(0, 0, 0, 0);
+            const termine = o.etape === 'fini';
+            // Un dossier qui attend un BAT n'est pas "en retard" : il n'attend pas l'atelier,
+            // il attend le client. Le compter comme un retard de production serait faux.
+            const bloque = !!o.bat_requis && !o.bat_valide_le;
+            return {
+                ...o,
+                etape_libelle: ETAPES_PROD_LIBELLE[o.etape] || o.etape,
+                bat_en_attente: bloque,
+                en_retard: !!sortie && !termine && !bloque && sortie < aujourdhui,
+                pour_aujourdhui: !!sortie && !termine && sortie.getTime() === aujourdhui.getTime()
+            };
+        });
+        res.json({
+            ordres,
+            compteurs: {
+                en_retard: ordres.filter(o => o.en_retard).length,
+                aujourdhui: ordres.filter(o => o.pour_aujourdhui).length,
+                en_cours: ordres.filter(o => o.etape !== 'a_faire' && o.etape !== 'fini').length,
+                bat_en_attente: ordres.filter(o => o.bat_en_attente).length,
+                par_etape: ETAPES_PROD.reduce((acc, e) => ({ ...acc, [e]: ordres.filter(o => o.etape === e).length }), {})
+            }
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Le detail porte l'historique : c'est lui qui dit qui a fait avancer quoi, et quand.
+app.get('/api/prod/ordres/:id', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const data = await avecConnexion(async (conn) => {
+            const [rows] = await conn.query(
+                `SELECT o.*, u.nom AS suivi_nom, u.initiales AS suivi_init
+                   FROM prod_ordres o LEFT JOIN users u ON u.id = o.suivi_par
+                  WHERE o.id = ? AND o.equipe_id = ?`, [req.params.id, req.userId]);
+            if (!rows.length) return null;
+            const [histo] = await conn.query(
+                `SELECT h.etape, h.etape_avant, h.commentaire, h.created_at, u.nom
+                   FROM prod_historique h LEFT JOIN users u ON u.id = h.user_id
+                  WHERE h.ordre_id = ? AND h.equipe_id = ? ORDER BY h.id DESC`, [req.params.id, req.userId]);
+            // Jamais les octets ici : la liste des documents sert a afficher des vignettes et
+            // des liens, charger les PDF entiers pour cela saturerait la reponse.
+            const [docs] = await conn.query(
+                'SELECT id, nom, genre, mime, poids, created_at FROM prod_documents WHERE ordre_id = ? AND equipe_id = ? ORDER BY id',
+                [req.params.id, req.userId]);
+            return { ordre: rows[0], historique: histo, documents: docs };
+        });
+        if (!data) return res.status(404).json({ error: 'Dossier introuvable' });
+        data.ordre.etape_libelle = ETAPES_PROD_LIBELLE[data.ordre.etape] || data.ordre.etape;
+        data.ordre.bat_en_attente = !!data.ordre.bat_requis && !data.ordre.bat_valide_le;
+        res.json(data);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Champs modifiables d'un dossier, mis en commun par la creation et la mise a jour.
+function champsOrdre(body) {
+    const texte = (v, max) => {
+        const s = String(v === undefined || v === null ? '' : v).trim();
+        return s ? s.slice(0, max) : null;
+    };
+    // Une date vide efface la date de sortie ; une date mal formee est refusee plus haut.
+    const date = String(body.date_sortie || '').trim();
+    return {
+        numero: texte(body.numero, 40),
+        reference: texte(body.reference, 255),
+        client_nom: texte(body.client_nom, 255),
+        client_numero: texte(body.client_numero, 20),
+        devis_externe: texte(body.devis_externe, 40),
+        suivi_initiales: texte(body.suivi_initiales, 8),
+        dossier_nas: texte(body.dossier_nas, 500),
+        notes: texte(body.notes, 5000),
+        date_sortie: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+        client_id: parseInt(body.client_id, 10) || null,
+        devis_id: parseInt(body.devis_id, 10) || null,
+        suivi_par: parseInt(body.suivi_par, 10) || null,
+        bat_requis: body.bat_requis ? 1 : 0,
+        details: body.details && typeof body.details === 'object' ? JSON.stringify(body.details) : null
+    };
+}
+
+app.post('/api/prod/ordres', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const c = champsOrdre(req.body);
+        if (!c.numero && !c.client_nom && !c.reference) {
+            return res.status(400).json({ error: 'Indiquez au moins un numéro, un client ou une référence' });
+        }
+        const id = await avecConnexion(async (conn) => {
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            if (!(casq.has('admin') || casq.has('commercial') || casq.has('prod'))) return 'interdit';
+            // Le collegue suivi doit etre de l'equipe : sans ce controle, on pourrait designer
+            // n'importe quel utilisateur du logiciel et lui envoyer une notification.
+            if (c.suivi_par) {
+                const [dest] = await conn.query(
+                    'SELECT id FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [c.suivi_par, req.userId]);
+                if (!dest.length) return 'hors-equipe';
+            }
+            // Les initiales lues sur la fiche ("Dossier suivi par : MV") servent a retrouver le
+            // collegue quand le front n'a pas su le faire.
+            if (!c.suivi_par && c.suivi_initiales) {
+                const [u] = await conn.query(
+                    'SELECT id FROM users WHERE COALESCE(equipe_id, id) = ? AND UPPER(initiales) = UPPER(?)',
+                    [req.userId, c.suivi_initiales]);
+                if (u.length === 1) c.suivi_par = u[0].id;
+            }
+            const [r] = await conn.query(
+                `INSERT INTO prod_ordres (equipe_id, numero, reference, client_id, client_nom, client_numero,
+                    devis_id, devis_externe, suivi_par, suivi_initiales, date_sortie, dossier_nas, notes,
+                    bat_requis, details, etape, etape_le, etape_par, auteur_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'a_faire', NOW(), ?, ?)`,
+                [req.userId, c.numero, c.reference, c.client_id, c.client_nom, c.client_numero,
+                 c.devis_id, c.devis_externe, c.suivi_par, c.suivi_initiales, c.date_sortie, c.dossier_nas,
+                 c.notes, c.bat_requis, c.details, req.authUserId, req.authUserId]);
+            await conn.query(
+                'INSERT INTO prod_historique (equipe_id, ordre_id, etape, user_id, commentaire) VALUES (?, ?, ?, ?, ?)',
+                [req.userId, r.insertId, 'a_faire', req.authUserId, 'Dossier créé']);
+            return r.insertId;
+        });
+        if (id === 'interdit') return res.status(403).json({ error: "Votre casquette ne permet pas de déposer une fiche" });
+        if (id === 'hors-equipe') return res.status(400).json({ error: 'Ce collègue ne fait pas partie de votre équipe' });
+        res.status(201).json({ message: 'OK', id });
+    } catch (err) {
+        if (/Duplicate entry/i.test(err.message)) {
+            return res.status(409).json({ error: 'Un dossier porte déjà ce numéro de commande' });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/prod/ordres/:id', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const c = champsOrdre(req.body);
+        const issue = await avecConnexion(async (conn) => {
+            const [rows] = await conn.query(
+                'SELECT etape, suivi_par FROM prod_ordres WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            if (!rows.length) return 'absent';
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            // Un commercial garde la main tant que l'atelier n'a pas commence : apres, c'est la
+            // prod qui replanifie, sinon une date changee en cours de route ne veut plus rien dire.
+            const libre = rows[0].etape === 'a_faire';
+            const peut = casq.has('admin') || casq.has('prod') || (casq.has('commercial') && libre);
+            if (!peut) return 'interdit';
+            if (c.suivi_par) {
+                const [dest] = await conn.query(
+                    'SELECT id FROM users WHERE id = ? AND COALESCE(equipe_id, id) = ?', [c.suivi_par, req.userId]);
+                if (!dest.length) return 'hors-equipe';
+            }
+            await conn.query(
+                `UPDATE prod_ordres SET numero = ?, reference = ?, client_id = ?, client_nom = ?, client_numero = ?,
+                    devis_id = ?, devis_externe = ?, suivi_par = ?, suivi_initiales = ?, date_sortie = ?,
+                    dossier_nas = ?, notes = ?, bat_requis = ?, details = COALESCE(?, details)
+                  WHERE id = ? AND equipe_id = ?`,
+                [c.numero, c.reference, c.client_id, c.client_nom, c.client_numero, c.devis_id, c.devis_externe,
+                 c.suivi_par, c.suivi_initiales, c.date_sortie, c.dossier_nas, c.notes, c.bat_requis, c.details,
+                 req.params.id, req.userId]);
+            return null;
+        });
+        if (issue === 'absent') return res.status(404).json({ error: 'Dossier introuvable' });
+        if (issue === 'interdit') return res.status(403).json({ error: "Ce dossier est en production : seul l'atelier peut le modifier" });
+        if (issue === 'hors-equipe') return res.status(400).json({ error: 'Ce collègue ne fait pas partie de votre équipe' });
+        res.json({ message: 'OK' });
+    } catch (err) {
+        if (/Duplicate entry/i.test(err.message)) {
+            return res.status(409).json({ error: 'Un dossier porte déjà ce numéro de commande' });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Le BAT n'est pas une etape : un dossier peut l'attendre a plusieurs moments. C'est un
+// drapeau qui bloque l'impression, et le lever est reversible.
+app.put('/api/prod/ordres/:id/bat', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const valide = req.body.valide !== false;
+        const issue = await avecConnexion(async (conn) => {
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            if (!(casq.has('admin') || CASQUETTES_BAT.some(c => casq.has(c)))) return 'interdit';
+            const [r] = await conn.query(
+                `UPDATE prod_ordres SET bat_requis = 1, bat_valide_le = ${valide ? 'NOW()' : 'NULL'},
+                    bat_valide_par = ? WHERE id = ? AND equipe_id = ?`,
+                [valide ? req.authUserId : null, req.params.id, req.userId]);
+            if (!r.affectedRows) return 'absent';
+            await conn.query(
+                'INSERT INTO prod_historique (equipe_id, ordre_id, etape, user_id, commentaire) VALUES (?, ?, ?, ?, ?)',
+                [req.userId, req.params.id, 'bat', req.authUserId, valide ? 'BAT validé' : 'BAT remis en attente']);
+            return null;
+        });
+        if (issue === 'interdit') return res.status(403).json({ error: 'Seuls le commercial et le graphiste notent un BAT' });
+        if (issue === 'absent') return res.status(404).json({ error: 'Dossier introuvable' });
+        res.json({ message: 'OK', bat_valide: valide });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Changement d'etape : le coeur du suivi. Quatre garde-fous, dans cet ordre, parce qu'un
+// refus doit dire la vraie raison et pas la premiere venue.
+app.put('/api/prod/ordres/:id/etape', verifyToken, async (req, res) => {
+    try {
+        const etape = String(req.body.etape || '');
+        if (!ETAPES_PROD.includes(etape)) return res.status(400).json({ error: 'Étape inconnue' });
+        await ensureV39Tables();
+        const issue = await avecConnexion(async (conn) => {
+            const [rows] = await conn.query(
+                `SELECT o.*, u.nom AS suivi_nom FROM prod_ordres o LEFT JOIN users u ON u.id = o.suivi_par
+                  WHERE o.id = ? AND o.equipe_id = ?`, [req.params.id, req.userId]);
+            if (!rows.length) return { err: 'absent' };
+            const ordre = rows[0];
+            if (ordre.etape === etape) return { err: 'identique' };
+
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            if (!peutAmenerA(casq, etape)) return { err: 'interdit' };
+
+            // On n'avance que d'un cran a la fois. Revenir en arriere reste libre : c'est ce
+            // qui repare une erreur de bouton, et c'est sans consequence.
+            const avant = ETAPES_PROD.indexOf(ordre.etape);
+            const apres = ETAPES_PROD.indexOf(etape);
+            if (apres > avant + 1) return { err: 'saut' };
+
+            // Un BAT non valide bloque l'impression et tout ce qui suit : c'est la premiere
+            // cause d'un dossier qui n'avance pas, autant que le logiciel le dise.
+            if (apres >= ETAPES_PROD.indexOf('impression') && ordre.bat_requis && !ordre.bat_valide_le) {
+                return { err: 'bat' };
+            }
+
+            await conn.query(
+                'UPDATE prod_ordres SET etape = ?, etape_le = NOW(), etape_par = ? WHERE id = ? AND equipe_id = ?',
+                [etape, req.authUserId, req.params.id, req.userId]);
+            await conn.query(
+                'INSERT INTO prod_historique (equipe_id, ordre_id, etape, etape_avant, user_id) VALUES (?, ?, ?, ?, ?)',
+                [req.userId, req.params.id, etape, ordre.etape, req.authUserId]);
+
+            // La notification part en 'fini', donc APRES la pose, et une seule fois : un
+            // aller-retour entre deux etapes ne doit pas rappeler deux fois le commercial.
+            if (etape !== 'fini' || !ordre.suivi_par || ordre.notifie_le) return { ordre, prevenir: null };
+            await conn.query('UPDATE prod_ordres SET notifie_le = NOW() WHERE id = ?', [req.params.id]);
+            const quoi = [ordre.numero, ordre.client_nom].filter(Boolean).join(' · ') || `Dossier ${ordre.id}`;
+            const [moi] = await conn.query('SELECT nom FROM users WHERE id = ?', [req.authUserId]);
+            await conn.query(
+                `INSERT INTO notifications (equipe_id, de_user_id, vers_user_id, type, titre, message, ref_type, ref_id)
+                 VALUES (?, ?, ?, 'prod', ?, ?, 'prod_ordre', ?)`,
+                [req.userId, req.authUserId, ordre.suivi_par, `Terminé — ${quoi}`,
+                 `${ordre.reference || 'Le dossier'} est posé et prêt à être rendu.`, ordre.id]);
+            return { ordre, prevenir: { vers: ordre.suivi_par, quoi, de: moi.length ? moi[0].nom : 'L\'atelier' } };
+        });
+        if (issue.err === 'absent') return res.status(404).json({ error: 'Dossier introuvable' });
+        if (issue.err === 'identique') return res.status(200).json({ message: 'OK', etape });
+        if (issue.err === 'interdit') return res.status(403).json({ error: `Votre casquette ne permet pas de passer un dossier en « ${ETAPES_PROD_LIBELLE[etape]} »` });
+        if (issue.err === 'saut') return res.status(400).json({ error: 'Une étape à la fois : passez par l\'étape précédente' });
+        if (issue.err === 'bat') return res.status(409).json({ error: 'Le BAT n\'est pas validé : impression bloquée' });
+        // Hors du chemin critique, comme les notifications entre collegues : la cloche est
+        // deja servie, le telephone peut attendre.
+        if (issue.prevenir) {
+            envoyerPush(issue.prevenir.vers, {
+                titre: `Terminé — ${issue.prevenir.quoi}`,
+                message: 'Posé et prêt à être rendu.',
+                de: issue.prevenir.de,
+                url: '/app'
+            }).catch(() => { /* deja journalise */ });
+        }
+        res.json({ message: 'OK', etape, notifie: !!issue.prevenir });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Suppression reservee a l'admin : un dossier efface emporte sa fiche et son historique.
+app.delete('/api/prod/ordres/:id', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Seul un administrateur supprime un dossier' });
+        await ensureV39Tables();
+        const n = await avecConnexion(async (conn) => {
+            const [r] = await conn.query('DELETE FROM prod_ordres WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            if (r.affectedRows) {
+                await conn.query('DELETE FROM prod_documents WHERE ordre_id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+                await conn.query('DELETE FROM prod_historique WHERE ordre_id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+                await conn.query('DELETE FROM prod_consommations WHERE ordre_id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            }
+            return r.affectedRows;
+        });
+        if (!n) return res.status(404).json({ error: 'Dossier introuvable' });
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// La fiche telle qu'elle sort du logiciel de gestion : un PDF, ou sa photo. Le navigateur
+// envoie une data-URL, comme pour les photos de vehicule.
+app.post('/api/prod/documents', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const ordreId = parseInt(req.body.ordre_id, 10);
+        if (!ordreId) return res.status(400).json({ error: 'Dossier non précisé' });
+        const m = String(req.body.data || '').match(/^data:([a-z/+-]+);base64,([A-Za-z0-9+/=]+)$/);
+        if (!m || !MIMES_FICHE.includes(m[1])) {
+            return res.status(400).json({ error: 'Fichier attendu en PDF, JPEG, PNG ou WebP' });
+        }
+        const octets = Buffer.from(m[2], 'base64');
+        if (!octets.length) return res.status(400).json({ error: 'Fichier vide' });
+        if (octets.length > POIDS_MAX_FICHE) {
+            return res.status(413).json({ error: `Fichier trop lourd (${Math.round(octets.length / 1024)} ko pour un maximum de ${Math.round(POIDS_MAX_FICHE / 1024)} ko)` });
+        }
+        const genre = ['fiche', 'bat', 'plan', 'autre'].includes(String(req.body.genre)) ? String(req.body.genre) : 'fiche';
+        const nom = String(req.body.nom || '').trim().slice(0, 255) || null;
+        const id = await avecConnexion(async (conn) => {
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            if (!(casq.has('admin') || casq.has('commercial') || casq.has('prod'))) return 'interdit';
+            const [o] = await conn.query('SELECT id FROM prod_ordres WHERE id = ? AND equipe_id = ?', [ordreId, req.userId]);
+            if (!o.length) return null;
+            const [r] = await conn.query(
+                'INSERT INTO prod_documents (equipe_id, ordre_id, nom, genre, mime, octets, poids, auteur_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [req.userId, ordreId, nom, genre, m[1], octets, octets.length, req.authUserId]);
+            return r.insertId;
+        });
+        if (id === 'interdit') return res.status(403).json({ error: 'Votre casquette ne permet pas de déposer un document' });
+        if (!id) return res.status(404).json({ error: 'Dossier introuvable' });
+        res.status(201).json({ message: 'OK', id });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/prod/documents/:id/fichier', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const [rows] = await avecConnexion(conn => conn.query(
+            'SELECT mime, octets, nom FROM prod_documents WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]));
+        if (!rows.length) return res.status(404).json({ error: 'Document introuvable' });
+        res.set('Content-Type', rows[0].mime);
+        // inline : la fiche s'ouvre dans l'onglet, on ne force pas un telechargement a
+        // quelqu'un qui veut juste la lire a l'atelier.
+        res.set('Content-Disposition', `inline; filename="${(rows[0].nom || 'fiche').replace(/"/g, '')}"`);
+        res.set('Cache-Control', 'private, max-age=3600');
+        res.send(rows[0].octets);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/prod/documents/:id', verifyToken, async (req, res) => {
+    try {
+        await ensureV39Tables();
+        const n = await avecConnexion(async (conn) => {
+            const casq = await casquettesDe(conn, req.authUserId, req.userRole);
+            if (!(casq.has('admin') || casq.has('commercial') || casq.has('prod'))) return 'interdit';
+            const [r] = await conn.query('DELETE FROM prod_documents WHERE id = ? AND equipe_id = ?', [req.params.id, req.userId]);
+            return r.affectedRows;
+        });
+        if (n === 'interdit') return res.status(403).json({ error: 'Votre casquette ne permet pas de retirer un document' });
+        if (!n) return res.status(404).json({ error: 'Document introuvable' });
+        res.json({ message: 'OK' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Casquettes d'un collegue, reglees par l'admin. Le role du compte (user/admin) se change
+// ailleurs, par la route qui existait deja : ce sont deux choses differentes.
+app.put('/api/admin/users/:id/casquettes', verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+        await ensureV39Tables();
+        const liste = Array.isArray(req.body.casquettes) ? req.body.casquettes : [];
+        const propres = [...new Set(liste.map(c => String(c).trim()).filter(c => CASQUETTES.includes(c)))];
+        const initiales = String(req.body.initiales || '').trim().toUpperCase().slice(0, 8) || null;
+        const n = await avecConnexion(async (conn) => {
+            const [r] = await conn.query(
+                'UPDATE users SET metiers = ?, initiales = ? WHERE id = ? AND COALESCE(equipe_id, id) = ?',
+                [propres.join(',') || null, initiales, req.params.id, req.userId]);
+            return r.affectedRows;
+        });
+        if (!n) return res.status(404).json({ error: 'Compte introuvable dans votre équipe' });
+        res.json({ message: 'OK', casquettes: propres, initiales });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Lecture de la fiche. Les champs reprennent exactement ceux que porte le PDF du logiciel de
+// gestion : numero de commande, devis d'origine, numero client, « Dossier suivi par » en
+// initiales, puis le detail technique. Tout est nullable : une fiche incomplete ou mal cadree
+// doit rendre ce qu'elle a, pas echouer.
+const OUTIL_FICHE = {
+    name: 'fiche_lue',
+    description: "Releve les informations d'un dossier de fabrication de signaletique, pour preremplir un suivi de production.",
+    strict: true,
+    input_schema: {
+        type: 'object',
+        properties: {
+            numero: { type: ['string', 'null'], description: "Numero de commande, souvent de la forme CD04831. null si absent." },
+            reference: { type: ['string', 'null'], description: "Reference du travail, par exemple 'Marquage MASTER L2H2'." },
+            client_nom: { type: ['string', 'null'], description: 'Nom du client tel qu\'ecrit sur la fiche.' },
+            client_numero: { type: ['string', 'null'], description: 'Numero de compte client, s\'il figure sur la fiche.' },
+            devis_externe: { type: ['string', 'null'], description: "Numero du devis d'origine, souvent de la forme DE06750." },
+            suivi_initiales: { type: ['string', 'null'], description: "Initiales en face de 'Dossier suivi par', par exemple MV." },
+            support: { type: ['string', 'null'], description: 'Matiere : vinyle, polymere, DAO, panneau...' },
+            impression: { type: ['string', 'null'], description: 'Mode d\'impression indique sur la fiche.' },
+            finition: { type: ['string', 'null'], description: 'Plastification, vernis, lamination...' },
+            faconnage: { type: ['string', 'null'], description: 'Decoupe, echenillage, oeillets, film de transfert...' },
+            quantite: { type: ['string', 'null'], description: 'Quantite telle qu\'ecrite, par exemple "1 vehicule".' },
+            pose_incluse: { type: 'boolean', description: 'Vrai si la fiche mentionne une pose dans vos ateliers ou chez le client.' },
+            confiance: { type: 'string', enum: ['haute', 'moyenne', 'faible'] },
+            commentaire: { type: 'string', description: 'Une phrase courte, en francais, sur ce qui a pu etre lu ou non.' }
+        },
+        required: ['numero', 'reference', 'client_nom', 'client_numero', 'devis_externe', 'suivi_initiales',
+                   'support', 'impression', 'finition', 'faconnage', 'quantite', 'pose_incluse', 'confiance', 'commentaire'],
+        additionalProperties: false
+    }
+};
+
+// Meme patron que la reconnaissance de vehicule : document deja depose (document_id) ou
+// data-URL envoyee directement, ce second cas servant AVANT la creation du dossier, pour que
+// le formulaire arrive deja rempli.
+app.post('/api/prod/lire-fiche', verifyToken, async (req, res) => {
+    if (typeof fetch !== 'function') {
+        return res.status(503).json({ error: "Serveur sur une version de Node trop ancienne (fetch absent) : cette fonction a besoin de Node 18 ou plus." });
+    }
+    if (!process.env.ANTHROPIC_API_KEY) {
+        return res.status(503).json({ error: "Lecture automatique non configurée : la clé ANTHROPIC_API_KEY n'est pas définie sur le serveur." });
+    }
+    try {
+        await ensureV39Tables();
+        // Meme droit que le depot : on ne lance pas un appel facture pour quelqu'un qui ne
+        // pourra de toute facon pas creer le dossier derriere.
+        const casq = await avecConnexion(conn => casquettesDe(conn, req.authUserId, req.userRole));
+        if (!(casq.has('admin') || casq.has('commercial') || casq.has('prod'))) {
+            return res.status(403).json({ error: 'Votre casquette ne permet pas de déposer une fiche' });
+        }
+        let mime = null;
+        let octets = null;
+        const documentId = parseInt(req.body.document_id, 10);
+        if (documentId) {
+            const [rows] = await avecConnexion(conn => conn.query(
+                'SELECT mime, octets FROM prod_documents WHERE id = ? AND equipe_id = ?', [documentId, req.userId]));
+            if (!rows.length) return res.status(404).json({ error: 'Document introuvable' });
+            mime = rows[0].mime;
+            octets = Buffer.from(rows[0].octets);
+        } else {
+            const m = String(req.body.data || '').match(/^data:([a-z/+-]+);base64,([A-Za-z0-9+/=]+)$/);
+            if (!m || !MIMES_FICHE.includes(m[1])) {
+                return res.status(400).json({ error: 'Fichier attendu en PDF, JPEG, PNG ou WebP' });
+            }
+            mime = m[1];
+            octets = Buffer.from(m[2], 'base64');
+            if (octets.length > POIDS_MAX_FICHE) {
+                return res.status(413).json({ error: `Fichier trop lourd (${Math.round(octets.length / 1024)} ko pour un maximum de ${Math.round(POIDS_MAX_FICHE / 1024)} ko)` });
+            }
+        }
+
+        const estPdf = mime === 'application/pdf';
+        const piece = estPdf
+            ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: octets.toString('base64') } }
+            : { type: 'image', source: { type: 'base64', media_type: mime, data: octets.toString('base64') } };
+
+        const client = new Anthropic();
+        const reponse = await client.messages.create({
+            // Le PDF du logiciel de gestion est du texte propre : Haiku le releve sans peine.
+            // Une PHOTO de fiche, elle, peut etre de travers, annotee a la main ou mal
+            // eclairee : on y met Sonnet, sinon on recopie des numeros faux.
+            model: estPdf ? 'claude-haiku-5-5' : 'claude-sonnet-5-5',
+            max_tokens: 1000,
+            tools: [OUTIL_FICHE],
+            tool_choice: { type: 'tool', name: 'fiche_lue' },
+            messages: [{
+                role: 'user',
+                content: [
+                    piece,
+                    { type: 'text', text: "Relève les informations de ce dossier de fabrication avec l'outil. Recopie les numéros EXACTEMENT comme ils sont écrits, sans rien compléter ni corriger. Ce qui n'est pas lisible ou pas présent doit rester null : une case vide vaut mieux qu'une valeur inventée." }
+                ]
+            }]
+        });
+        const appel = reponse.content.find(b => b.type === 'tool_use');
+        if (!appel) return res.status(502).json({ error: "La lecture n'a rien renvoyé d'exploitable." });
+        res.json(appel.input);
+    } catch (err) {
+        if (err instanceof Anthropic.AuthenticationError) return res.status(502).json({ error: 'Clé API Anthropic invalide.' });
+        if (err instanceof Anthropic.RateLimitError) return res.status(502).json({ error: 'Trop de demandes, réessayez dans un instant.' });
+        if (err instanceof Anthropic.APIError) return res.status(502).json({ error: `Lecture indisponible (${err.status}).` });
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ROUTES FRONTEND
